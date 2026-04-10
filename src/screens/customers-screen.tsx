@@ -43,6 +43,7 @@ import {
   Banknote,
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
+import { useCurrency } from '@/hooks/use-currency'
 
 interface Customer {
   id: string
@@ -70,6 +71,7 @@ interface Payment {
 const emptyForm: CustomerFormData = { name: '', phone: '', debt: '0' }
 
 export function CustomersScreen() {
+  const { formatCurrency, symbol } = useCurrency()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -263,7 +265,7 @@ export function CustomersScreen() {
       const data = await res.json()
       if (data.success) {
         const methodLabel = paymentMethod === 'cash' ? 'نقدي' : 'تحويل'
-        toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ر.س (${methodLabel}) للعميل ${paymentCustomer.name}`)
+        toast.success(`تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للعميل ${paymentCustomer.name}`)
         setOpenPaymentDialog(false)
         setPaymentCustomer(null)
         fetchCustomers(search)
@@ -371,7 +373,7 @@ export function CustomersScreen() {
             <div>
               <p className="text-xs text-muted-foreground">إجمالي المديونية</p>
               <p className="text-lg font-bold text-destructive">
-                {totalDebt.toFixed(2)} ر.س
+                {formatCurrency(totalDebt)}
               </p>
             </div>
           </div>
@@ -459,10 +461,10 @@ export function CustomersScreen() {
                     <TableCell className="text-center">
                       {customer.debt > 0 ? (
                         <span className="badge-danger font-bold text-xs px-2.5 py-0.5 rounded-full">
-                          {customer.debt.toFixed(2)} ر.س
+                          {formatCurrency(customer.debt)}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">0.00 ر.س</span>
+                        <span className="text-muted-foreground">{formatCurrency(0)}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
@@ -607,7 +609,7 @@ export function CustomersScreen() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-debt">المديونية (ر.س)</Label>
+              <Label htmlFor="edit-debt">المديونية ({symbol})</Label>
               <Input
                 id="edit-debt"
                 type="number"
@@ -664,7 +666,7 @@ export function CustomersScreen() {
                     {selectedCustomer.debt > 0 && (
                       <span className="mr-1 text-destructive">
                         {' '}
-                        (ولديه مديونية {selectedCustomer.debt.toFixed(2)} ر.س)
+                        (ولديه مديونية {formatCurrency(selectedCustomer.debt)})
                       </span>
                     )}
                   </p>
@@ -721,7 +723,7 @@ export function CustomersScreen() {
                   <div className="text-left">
                     <p className="text-[10px] text-muted-foreground">المديونية الحالية</p>
                     <p className="text-base font-bold text-destructive tabular-nums">
-                      {paymentCustomer.debt.toFixed(2)} ر.س
+                      {formatCurrency(paymentCustomer.debt)}
                     </p>
                   </div>
                 </div>
@@ -742,7 +744,7 @@ export function CustomersScreen() {
                     dir="ltr"
                     autoFocus
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">ر.س</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
                 </div>
                 {paymentAmount && parseFloat(paymentAmount) > paymentCustomer.debt && (
                   <p className="text-[11px] text-destructive">المبلغ يتجاوز المديونية الحالية</p>
@@ -807,7 +809,7 @@ export function CustomersScreen() {
                       : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
                   }`}
                 >
-                  تسديد الكامل ({paymentCustomer.debt.toFixed(2)})
+                  تسديد الكامل ({formatCurrency(paymentCustomer.debt)})
                 </button>
               </div>
 
@@ -894,7 +896,7 @@ export function CustomersScreen() {
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">المديونية الحالية</p>
                   <p className={`text-sm font-bold tabular-nums ${historyCustomer.debt > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                    {historyCustomer.debt.toFixed(2)} ر.س
+                    {formatCurrency(historyCustomer.debt)}
                   </p>
                 </div>
               </div>
@@ -924,7 +926,7 @@ export function CustomersScreen() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-emerald-600 tabular-nums">
-                            -{payment.amount.toFixed(2)} ر.س
+                            -{formatCurrency(payment.amount)}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
                             {payment.method === 'cash' ? 'نقدي' : 'تحويل'}

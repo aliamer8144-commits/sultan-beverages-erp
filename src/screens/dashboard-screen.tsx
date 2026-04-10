@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import { DollarSign, TrendingUp, FileText, AlertTriangle, RefreshCw, Download, Target, Clock, Flame } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
+import { formatWithSettings } from '@/lib/currency'
 
 // Chart color palette matching the theme
 const CHART_COLORS = ['#3b5bdb', '#364fc7', '#5c7cfa', '#e03131', '#c92a2a', '#0ca678', '#f08c00', '#9c36b5', '#1c7ed6', '#e8590c']
@@ -112,10 +113,8 @@ function formatDate(dateStr: string): string {
   })
 }
 
-// Format currency
-function formatCurrency(amount: number): string {
-  return amount.toFixed(2)
-}
+// Format currency (delegates to centralized utility)
+const formatCurrency = formatWithSettings
 
 // Custom tooltip for bar charts
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload?: { name?: string } }>; label?: string }) {
@@ -124,7 +123,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(payload[0].value)} ر.س
+        {formatCurrency(payload[0].value)}
       </p>
     </div>
   )
@@ -151,7 +150,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(item.value)} ر.س
+        {formatCurrency(item.value)}
       </p>
     </div>
   )
@@ -227,7 +226,7 @@ function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteg
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatCurrency(animatedValue)}
+              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatWithSettings(animatedValue)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
           </div>
@@ -357,17 +356,17 @@ function SalesTargetWidget() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">الهدف</p>
-                <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(target.targetAmount)}</p>
+                <p className="text-sm font-bold text-foreground tabular-nums">{formatWithSettings(target.targetAmount)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">الحالي</p>
-                <p className={`text-sm font-bold tabular-nums ${isComplete ? 'text-emerald-600' : getProgressBgColor(percent).split(' ')[1]}`}>                  {formatCurrency(target.currentAmount)}
+                <p className={`text-sm font-bold tabular-nums ${isComplete ? 'text-emerald-600' : getProgressBgColor(percent).split(' ')[1]}`}>                  {formatWithSettings(target.currentAmount)}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">المتبقي</p>
                 <p className="text-sm font-bold text-foreground tabular-nums">
-                  {isComplete ? '0.00' : formatCurrency(target.remainingAmount)}
+                  {isComplete ? '0.00' : formatWithSettings(target.remainingAmount)}
                 </p>
               </div>
               <div className="text-center">
@@ -753,8 +752,7 @@ export function DashboardScreen() {
                             </TableCell>
                             <TableCell className="py-3 px-4 text-left">
                               <span className="text-sm font-bold text-foreground">
-                                {formatCurrency(sale.total)}
-                                <span className="text-[10px] text-muted-foreground mr-1">ر.س</span>
+                                {formatWithSettings(sale.total)}
                               </span>
                             </TableCell>
                             <TableCell className="py-3 px-4">

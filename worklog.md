@@ -1741,3 +1741,52 @@ auth, products, categories, customers, suppliers, invoices, users, dashboard, da
 5. **MEDIUM: Mobile-Responsive POS** — Optimize POS for tablet/mobile
 6. **LOW: WebSocket Real-time Updates** — Live stock/sales across terminals
 7. **LOW: API Rate Limiting** — Rate limiting for production
+
+================================================================================
+                        PHASE 5 - PRODUCT IMAGE SUPPORT
+================================================================================
+
+---
+Task ID: 7-A
+Agent: full-stack-developer
+Task: Add Product Image Support to the ERP system
+
+Work Log:
+- Created `/src/lib/image-utils.ts` — Image utility module with 3 functions:
+  - `compressImage(file, maxWidth, quality)` — Compresses images via canvas to max 400px width at 75% JPEG quality, returns base64 data URL. Skips compression for files < 50KB.
+  - `getDefaultPlaceholder()` — Returns empty string for UI fallback handling
+  - `getBase64Size(base64)` — Estimates file size in KB from base64 data URL
+- Enhanced `/src/screens/inventory-screen.tsx`:
+  - Updated `handleImageUpload` to use `compressImage` for client-side compression before upload (async, shows loading toast)
+  - Added "change image" button alongside "remove image" button in the product form dialog
+  - Changed image preview from small circular (w-20 h-20) to larger rectangular (w-full h-32 rounded-lg)
+  - Applied `image-upload-zone` CSS class to drop zone for consistent hover effects
+  - Applied `product-image-lg` CSS class to image preview for styled border
+  - Applied `image-remove-btn` CSS class to remove button for scale animation
+  - Added `e.target.value = ''` to reset file input so same file can be selected again
+  - Removed unused `handleDrop` and `handleDragOver` callbacks (replaced with inline handlers)
+- Enhanced `/src/screens/pos-screen.tsx`:
+  - Updated product quick view dialog: changed from small 12x12 thumbnail inline to large w-full h-32 image banner at top of dialog
+  - Applied `product-image-lg` CSS class to quick view image for styled border
+  - Applied `product-placeholder` CSS class for consistent placeholder styling
+  - Added cart item thumbnails: each cart item now shows a 9x9 rounded image or Package icon placeholder
+  - Applied `product-card-image` CSS class to product grid card images for hover scale effect
+  - Applied `product-placeholder` CSS class to grid card placeholders for consistent muted bg
+- Added CSS Section 73 to `globals.css` (~130 lines):
+  - `.image-upload-zone` — Drop zone hover/active animations
+  - `.image-upload-loading` — Shimmer effect while image compresses
+  - `@keyframes image-shimmer` — Sweep animation for loading state
+  - `.product-thumb` — Table thumbnail with hover zoom effect
+  - `.product-placeholder` — Consistent placeholder styling with muted bg
+  - `.product-card-image` — Hover scale transform for card images
+  - `.product-image-lg` — Large image container with subtle border overlay
+  - `.image-remove-btn` — Scale animation on hover/active for remove button
+  - Dark mode variants for all image components
+
+Stage Summary:
+- Image compression utility created with canvas-based resize (max 400px, 75% JPEG quality)
+- Inventory screen: enhanced image upload with compression, larger preview, change/remove buttons
+- POS screen: enhanced quick view with large image banner, cart item thumbnails, card hover effects
+- New CSS section with 8 utility classes and dark mode variants
+- `bun run lint` passes with 0 errors
+- Zero breaking changes, all existing functionality preserved

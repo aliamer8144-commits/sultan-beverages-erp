@@ -39,6 +39,7 @@ import {
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
 import { exportToCSV } from '@/lib/export-csv'
+import { formatWithSettings } from '@/lib/currency'
 import {
   Receipt,
   Plus,
@@ -210,14 +211,8 @@ interface ExpenseSummary {
   averageDailyExpense: number
 }
 
-// ── Helpers ────────────────────────────────────────────────────────
-
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString('ar-SA', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
+// Format currency (delegates to centralized utility)
+const formatCurrency = formatWithSettings
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -273,7 +268,7 @@ function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: A
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)} ر.س</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)}</p>
     </div>
   )
 }
@@ -284,7 +279,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)} ر.س</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
     </div>
   )
 }
@@ -769,7 +764,6 @@ export function ExpenseScreen() {
                       </div>
                       <p className="text-base font-bold text-foreground mt-0.5 tabular-nums">
                         {formatCurrency(cat.total)}
-                        <span className="text-xs text-muted-foreground mr-1 font-normal">ر.س</span>
                       </p>
                       <div className="mt-1.5">
                         <CategoryProgressBar
@@ -971,7 +965,7 @@ export function ExpenseScreen() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-sm font-bold text-foreground tabular-nums">
-                            {formatCurrency(item.amount)} <span className="text-[10px] text-muted-foreground font-normal">ر.س</span>
+                            {formatCurrency(item.amount)}
                           </span>
                           <div className={`flex items-center gap-1 text-[10px] ${isOverdue ? 'text-red-500' : 'text-muted-foreground'}`}>
                             <Clock className="w-3 h-3" />
@@ -1117,7 +1111,6 @@ export function ExpenseScreen() {
                               <TableCell className="py-3 px-4 text-left">
                                 <span className="text-sm font-bold text-foreground tabular-nums">
                                   {formatCurrency(expense.amount)}
-                                  <span className="text-[10px] text-muted-foreground mr-1">ر.س</span>
                                 </span>
                               </TableCell>
                               <TableCell className="py-3 px-4">

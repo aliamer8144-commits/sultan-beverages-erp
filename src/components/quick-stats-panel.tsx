@@ -274,7 +274,7 @@ function SalesTargetProgress({ progress }: { progress: number }) {
 // ─── Main Component ─────────────────────────────────────────────────
 export function QuickStatsPanel() {
   const { setScreen } = useAppStore()
-  const { formatAmount, symbol } = useCurrency()
+  const { formatCurrency, symbol } = useCurrency()
   const [isOpen, setIsOpen] = useState(false)
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -417,7 +417,7 @@ export function QuickStatsPanel() {
                 <div className="space-y-0.5">
                   <MetricRow
                     label="إجمالي المبيعات اليوم"
-                    value={`${formatAmount(stats.totalSalesToday)} ${symbol}`}
+                    value={`${formatCurrency(stats.totalSalesToday)} ${symbol}`}
                     icon={DollarSign}
                     iconBg="bg-emerald-50 dark:bg-emerald-500/10"
                     iconColor="text-emerald-500"
@@ -430,7 +430,7 @@ export function QuickStatsPanel() {
 
                   <MetricRow
                     label="صافي الربح"
-                    value={`${formatAmount(stats.totalProfitToday)} ${symbol}`}
+                    value={`${formatCurrency(stats.totalProfitToday)} ${symbol}`}
                     icon={TrendingUp}
                     iconBg={stats.totalProfitToday >= 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'}
                     iconColor={stats.totalProfitToday >= 0 ? 'text-green-500' : 'text-red-500'}
@@ -483,7 +483,7 @@ export function QuickStatsPanel() {
 
                   <MetricRow
                     label="إجمالي المصروفات اليوم"
-                    value={`${formatAmount(stats.totalExpensesToday)} ${symbol}`}
+                    value={`${formatCurrency(stats.totalExpensesToday)} ${symbol}`}
                     icon={Receipt}
                     iconBg="bg-red-50 dark:bg-red-500/10"
                     iconColor="text-red-500"

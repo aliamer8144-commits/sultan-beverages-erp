@@ -43,6 +43,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
+import { formatWithSettings } from '@/lib/currency'
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface TopProduct {
@@ -113,10 +114,8 @@ function useAnimatedNumber(target: number, duration = 1200) {
   return display
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return amount.toFixed(2)
-}
+// Format currency (delegates to centralized utility)
+const formatCurrency = formatWithSettings
 
 function getTodayArabic(): string {
   const now = new Date()
@@ -139,7 +138,7 @@ function HourlyTooltip({ active, payload, label }: { active?: boolean; payload?:
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(payload[0].value)} ر.س
+        {formatCurrency(payload[0].value)}
       </p>
     </div>
   )
@@ -152,7 +151,7 @@ function ComparisonTooltip({ active, payload, label }: { active?: boolean; paylo
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="text-sm font-bold text-foreground">
-          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {formatCurrency(item.value)} ر.س
+          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {formatCurrency(item.value)}
         </p>
       ))}
     </div>
@@ -186,7 +185,7 @@ function StatCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatCurrency(animatedValue)}
+              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatWithSettings(animatedValue)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
           </div>
@@ -278,25 +277,25 @@ function generatePrintContent(data: DailyCloseData) {
 
       <div class="section">
         <div class="section-title">ملخص المبيعات</div>
-        <div class="row"><span class="label">إجمالي المبيعات</span><span class="value">${formatCurrency(data.totalSales)} ر.س</span></div>
-        <div class="row"><span class="label">صافي الربح</span><span class="value">${formatCurrency(data.netProfit)} ر.س</span></div>
+        <div class="row"><span class="label">إجمالي المبيعات</span><span class="value">${formatCurrency(data.totalSales)}</span></div>
+        <div class="row"><span class="label">صافي الربح</span><span class="value">${formatCurrency(data.netProfit)}</span></div>
         <div class="row"><span class="label">عدد الفواتير</span><span class="value">${data.invoiceCount}</span></div>
         <div class="row"><span class="label">الأصناف المباعة</span><span class="value">${data.itemsSold}</span></div>
-        <div class="row"><span class="label">متوسط الفاتورة</span><span class="value">${formatCurrency(data.averageInvoice)} ر.س</span></div>
+        <div class="row"><span class="label">متوسط الفاتورة</span><span class="value">${formatCurrency(data.averageInvoice)}</span></div>
       </div>
 
       <div class="section">
         <div class="section-title">المصروفات</div>
-        <div class="row"><span class="label">إجمالي المشتريات</span><span class="value">${formatCurrency(data.totalPurchases)} ر.س</span></div>
+        <div class="row"><span class="label">إجمالي المشتريات</span><span class="value">${formatCurrency(data.totalPurchases)}</span></div>
         <div class="total-row">
-          <div class="row"><span class="label">صافي الربح النهائي</span><span class="value">${formatCurrency(data.netProfit)} ر.س</span></div>
+          <div class="row"><span class="label">صافي الربح النهائي</span><span class="value">${formatCurrency(data.netProfit)}</span></div>
         </div>
       </div>
 
       <div class="section">
         <div class="section-title">طرق الدفع</div>
-        <div class="row"><span class="label">نقدي</span><span class="value">${formatCurrency(data.paymentMethods.cash.total)} ر.س (${data.paymentMethods.cash.count})</span></div>
-        <div class="row"><span class="label">آجل</span><span class="value">${formatCurrency(data.paymentMethods.credit.total)} ر.س (${data.paymentMethods.credit.count})</span></div>
+        <div class="row"><span class="label">نقدي</span><span class="value">${formatCurrency(data.paymentMethods.cash.total)} (${data.paymentMethods.cash.count})</span></div>
+        <div class="row"><span class="label">آجل</span><span class="value">${formatCurrency(data.paymentMethods.credit.total)} (${data.paymentMethods.credit.count})</span></div>
       </div>
 
       ${data.topSellingProducts.length > 0 ? `
@@ -512,7 +511,7 @@ export function DailyCloseScreen() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">متوسط قيمة الفاتورة</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{formatCurrency(data.averageInvoice)} <span className="text-xs text-muted-foreground">ر.س</span></p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{formatCurrency(data.averageInvoice)}</p>
                 </div>
               </div>
             </CardContent>
@@ -531,7 +530,7 @@ export function DailyCloseScreen() {
                   </p>
                   {data.topSellingProduct && (
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {data.topSellingProduct.quantity} وحدة — {formatCurrency(data.topSellingProduct.revenue)} ر.س
+                      {data.topSellingProduct.quantity} وحدة — {formatCurrency(data.topSellingProduct.revenue)}
                     </p>
                   )}
                 </div>
@@ -727,7 +726,6 @@ export function DailyCloseScreen() {
                             <span className="text-sm font-bold text-foreground tabular-nums">
                               {formatCurrency(product.revenue)}
                             </span>
-                            <span className="text-[10px] text-muted-foreground mr-1">ر.س</span>
                           </td>
                         </tr>
                       ))}

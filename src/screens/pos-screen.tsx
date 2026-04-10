@@ -848,12 +848,12 @@ export function POSScreen() {
                           <img
                             src={product.image}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            className="product-card-image w-full h-full object-cover"
                           />
                         </div>
                       ) : (
-                        <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center mx-auto mb-3 ${colors.hover} transition-colors`}>
-                          {getCategoryIcon(product.category.icon || 'CupSoda', { className: `w-6 h-6 ${colors.text}` })}
+                        <div className={`product-placeholder w-12 h-12 rounded-xl mx-auto mb-3 ${colors.hover} transition-colors`}>
+                          {getCategoryIcon(product.category.icon || 'CupSoda', { className: `w-6 h-6` })}
                         </div>
                       )}
 
@@ -1043,6 +1043,20 @@ export function POSScreen() {
                     key={item.productId}
                     className="cart-item-enter flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
+                    {/* Item thumbnail */}
+                    {item.image ? (
+                      <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Package className="w-4 h-4 text-primary" />
+                      </div>
+                    )}
                     {/* Item info */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.name}</p>
@@ -1358,24 +1372,25 @@ export function POSScreen() {
           </DialogHeader>
           {quickViewProduct && (
             <div className="space-y-4">
+              {/* Product image */}
+              {(() => {
+                const colors = getCategoryColor(quickViewProduct.categoryId)
+                return quickViewProduct.image ? (
+                  <div className="product-image-lg w-full h-32">
+                    <img
+                      src={quickViewProduct.image}
+                      alt={quickViewProduct.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="product-placeholder w-full h-32 rounded-xl">
+                    {getCategoryIcon(quickViewProduct.category.icon || 'CupSoda', { className: 'w-12 h-12' })}
+                  </div>
+                )
+              })()}
               {/* Product info */}
               <div className="flex items-center gap-3">
-                {(() => {
-                  const colors = getCategoryColor(quickViewProduct.categoryId)
-                  return quickViewProduct.image ? (
-                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
-                      <img
-                        src={quickViewProduct.image}
-                        alt={quickViewProduct.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center flex-shrink-0`}>
-                      {getCategoryIcon(quickViewProduct.category.icon || 'CupSoda', { className: `w-6 h-6 ${colors.text}` })}
-                    </div>
-                  )
-                })()}
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold truncate">{quickViewProduct.name}</h3>
                   <p className="text-[11px] text-muted-foreground">{quickViewProduct.category.name}</p>

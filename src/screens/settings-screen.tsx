@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useAppStore, type SettingsState, CURRENCY_MAP, type CurrencyCode } from '@/store/app-store'
+import { formatCurrency as fc, getCurrencySymbol } from '@/lib/currency'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +43,8 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
+  Globe,
+  Eye,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
@@ -702,18 +705,26 @@ export function SettingsScreen() {
             {/* Currency Selector */}
             <div className="space-y-2">
               <Label htmlFor="currency" className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                 العملة
               </Label>
               <Select
                 value={localSettings.currency}
-                onValueChange={(v) => handleChange('currency', v as CurrencyCode)}
+                onValueChange={(v) => {
+                  handleChange('currency', v as CurrencyCode)
+                  // Auto-set decimal places from CURRENCY_MAP
+                  const meta = CURRENCY_MAP[v as CurrencyCode]
+                  if (meta) {
+                    handleChange('decimalPlaces', meta.decimalPlaces)
+                    handleChange('currencySymbol', '')
+                  }
+                }}
               >
                 <SelectTrigger id="currency" className="w-full text-right">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(CURRENCY_MAP) as [CurrencyCode, { symbol: string; name: string }][]).map(
+                  {(Object.entries(CURRENCY_MAP) as [CurrencyCode, { symbol: string; name: string; decimalPlaces: number }][]).map(
                     ([code, { symbol, name }]) => (
                       <SelectItem key={code} value={code}>
                         <span className="flex items-center gap-2">
@@ -725,9 +736,107 @@ export function SettingsScreen() {
                   )}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Custom Symbol */}
+            <div className="space-y-2">
+              <Label htmlFor="currencySymbol" className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                رمز العملة المخصص
+                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
+              </Label>
+              <Input
+                id="currencySymbol"
+                value={localSettings.currencySymbol}
+                onChange={(e) => handleChange('currencySymbol', e.target.value)}
+                placeholder={CURRENCY_MAP[localSettings.currency].symbol}
+                className="text-right"
+                dir="ltr"
+                maxLength={10}
+              />
               <p className="text-[10px] text-muted-foreground">
-                سيتم استخدام رمز العملة المحدد في جميع أنحاء النظام
+                اتركه فارغاً لاستخدام الرمز الافتراضي ({CURRENCY_MAP[localSettings.currency].symbol})
               </p>
+            </div>
+
+            {/* Decimal Places */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                الأرقام العشرية
+              </Label>
+              <Select
+                value={String(localSettings.decimalPlaces)}
+                onValueChange={(v) => handleChange('decimalPlaces', Number(v))}
+              >
+                <SelectTrigger className="w-full text-right">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">٠ — بدون كسور</SelectItem>
+                  <SelectItem value="1">١ — رقم عشري واحد</SelectItem>
+                  <SelectItem value="2">٢ — رقمين عشريين</SelectItem>
+                  <SelectItem value="3">٣ — ثلاثة أرقام عشرية</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Currency Position */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">موقع رمز العملة</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleChange('currencyPosition', 'after')}
+                  className={`p-3 rounded-xl border-2 text-center transition-all text-sm ${
+                    localSettings.currencyPosition === 'after'
+                      ? 'border-primary bg-primary/5 text-primary font-bold'
+                      : 'border-border/50 hover:border-primary/30 text-muted-foreground'
+                  }`}
+                >
+                  {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}{' '}
+                  ١,٥٠٠
+                  <span className="block text-[10px] mt-1">بعد المبلغ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChange('currencyPosition', 'before')}
+                  className={`p-3 rounded-xl border-2 text-center transition-all text-sm ${
+                    localSettings.currencyPosition === 'before'
+                      ? 'border-primary bg-primary/5 text-primary font-bold'
+                      : 'border-border/50 hover:border-primary/30 text-muted-foreground'
+                  }`}
+                >
+                  {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}{' '}
+                  ١,٥٠٠
+                  <span className="block text-[10px] mt-1">قبل المبلغ</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Preview */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                معاينة مباشرة
+              </Label>
+              <div className="p-4 rounded-xl bg-muted/40 border border-border/50 space-y-2">
+                <p className="text-[10px] text-muted-foreground">مثال على تنسيق المبالغ:</p>
+                <div className="space-y-1.5">
+                  <p className="text-lg font-bold text-primary tabular-nums">
+                    {fc(1500, localSettings.currency, localSettings.currencySymbol, localSettings.currencyPosition, localSettings.decimalPlaces)}
+                  </p>
+                  <p className="text-base text-foreground tabular-nums">
+                    {fc(25000, localSettings.currency, localSettings.currencySymbol, localSettings.currencyPosition, localSettings.decimalPlaces)}
+                  </p>
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    {fc(150, localSettings.currency, localSettings.currencySymbol, localSettings.currencyPosition, localSettings.decimalPlaces)}
+                  </p>
+                  <p className="text-sm text-emerald-600 tabular-nums">
+                    {fc(1234567.89, localSettings.currency, localSettings.currencySymbol, localSettings.currencyPosition, localSettings.decimalPlaces)}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Auto-print on Payment */}
@@ -800,7 +909,7 @@ export function SettingsScreen() {
                     dir="ltr"
                   />
                   <span className="text-sm text-muted-foreground whitespace-nowrap">
-                    {CURRENCY_MAP[localSettings.currency].symbol}
+                    {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}
                   </span>
                 </div>
               </div>

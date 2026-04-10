@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
+import { useCurrency } from '@/hooks/use-currency'
 
 // Types
 interface Supplier {
@@ -52,6 +53,7 @@ interface SupplierPayment {
 
 export function PurchasesScreen() {
   const { user } = useAppStore()
+  const { formatCurrency, symbol } = useCurrency()
 
   // ==================== Suppliers State ====================
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -235,7 +237,7 @@ export function PurchasesScreen() {
       const data = await res.json()
       if (data.success) {
         const methodLabel = paymentMethod === 'cash' ? 'نقدي' : paymentMethod === 'transfer' ? 'تحويل' : 'شيك'
-        toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ر.س (${methodLabel}) للمورد ${paymentSupplier.name}`)
+        toast.success(`تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${paymentSupplier.name}`)
         setOpenPaymentDialog(false)
         setPaymentSupplier(null)
         fetchSuppliers(supplierSearch)
@@ -447,7 +449,7 @@ export function PurchasesScreen() {
                   <div>
                     <p className="text-[11px] text-muted-foreground">إجمالي المستحقات</p>
                     <p className="text-base font-bold text-destructive tabular-nums number-animate-in">
-                      {totalOutstanding.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                      {formatCurrency(totalOutstanding)}
                     </p>
                   </div>
                 </div>
@@ -539,22 +541,22 @@ export function PurchasesScreen() {
                           </TableCell>
                           <TableCell className="text-center">
                             <span className="text-sm tabular-nums">
-                              {supplier.totalPurchases.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                              {formatCurrency(supplier.totalPurchases)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
                             <span className="text-sm tabular-nums text-emerald-600">
-                              {supplier.totalPaid.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                              {formatCurrency(supplier.totalPaid)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
                             {supplier.remainingBalance > 0 ? (
                               <span className="badge-danger font-bold text-xs px-2.5 py-0.5 rounded-full tabular-nums">
-                                {supplier.remainingBalance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                                {formatCurrency(supplier.remainingBalance)}
                               </span>
                             ) : (
                               <span className="badge-active text-xs px-2.5 py-0.5 rounded-full">
-                                0.00 ر.س
+                                {formatCurrency(0)}
                               </span>
                             )}
                           </TableCell>
@@ -614,7 +616,7 @@ export function PurchasesScreen() {
                 إجمالي الموردين: {suppliers.length}
                 {suppliersWithBalance > 0 && (
                   <span className="text-destructive mr-2">
-                    • {suppliersWithBalance} مورد برصيد مستحق ({totalOutstanding.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س)
+                    • {suppliersWithBalance} مورد برصيد مستحق ({formatCurrency(totalOutstanding)})
                   </span>
                 )}
               </div>
@@ -645,7 +647,7 @@ export function PurchasesScreen() {
                               <span>{supplier.name}</span>
                               {supplier.remainingBalance > 0 && (
                                 <span className="text-xs text-destructive">
-                                  ({supplier.remainingBalance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س)
+                                  ({formatCurrency(supplier.remainingBalance)})
                                 </span>
                               )}
                             </span>

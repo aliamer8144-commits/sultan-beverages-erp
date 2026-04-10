@@ -8821,3 +8821,130 @@ button:active:not(:disabled) {
 }
 
 /* RTL: aurora is full-screen effect, no directional changes needed */
+
+/* --- Section 73: Image Upload & Product Image Components --- */
+
+/* Image upload drop zone hover animation */
+.image-upload-zone {
+  transition: all 0.2s ease;
+}
+
+.image-upload-zone:hover {
+  border-color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.image-upload-zone:active {
+  transform: scale(0.995);
+}
+
+/* Image upload loading shimmer while compressing */
+.image-upload-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.image-upload-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 10%, transparent) 50%,
+    transparent 100%
+  );
+  animation: image-shimmer 1.5s infinite;
+}
+
+@keyframes image-shimmer {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* Product thumbnail in tables */
+.product-thumb {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.product-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.product-thumb:hover img {
+  transform: scale(1.1);
+}
+
+/* Product image placeholder icon */
+.product-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--primary) 8%, var(--muted));
+  color: color-mix(in srgb, var(--primary) 50%, var(--muted-foreground));
+  transition: all 0.2s ease;
+}
+
+.product-placeholder:hover {
+  background: color-mix(in srgb, var(--primary) 15%, var(--muted));
+}
+
+/* Product card image hover effect */
+.product-card-image {
+  transition: transform 0.3s ease;
+}
+
+.group:hover .product-card-image {
+  transform: scale(1.05);
+}
+
+/* Large product image in dialogs */
+.product-image-lg {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.product-image-lg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  pointer-events: none;
+}
+
+/* Image remove button animation */
+.image-remove-btn {
+  transition: all 0.15s ease;
+}
+
+.image-remove-btn:hover {
+  transform: scale(1.1);
+}
+
+.image-remove-btn:active {
+  transform: scale(0.95);
+}
+
+/* Dark mode adjustments for image components */
+.dark .image-upload-zone:hover {
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.dark .product-thumb {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.dark .product-placeholder {
+  background: color-mix(in srgb, var(--primary) 6%, var(--muted));
+  color: color-mix(in srgb, var(--primary) 40%, var(--muted-foreground));
+}

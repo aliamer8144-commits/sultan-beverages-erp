@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore, CURRENCY_MAP } from '@/store/app-store'
+import { useCurrency } from '@/hooks/use-currency'
+import { formatWithSettings } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,13 +54,9 @@ interface Invoice {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ar-SA', {
-    style: 'currency',
-    currency: 'SAR',
-    minimumFractionDigits: 2,
-  }).format(amount)
-}
+// formatCurrency is provided by useCurrency hook (client component)
+// formatWithSettings is used in print templates (non-react context)
+const printFormatCurrency = formatWithSettings
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ar-SA', {
@@ -88,6 +86,7 @@ function formatTime(dateStr: string): string {
 export function InvoicesScreen() {
   const [activeTab, setActiveTab] = useState<'sale' | 'purchase'>('sale')
   const settings = useAppStore((s) => s.settings)
+  const { formatCurrency } = useCurrency()
 
   // Filters
   const [search, setSearch] = useState('')
@@ -246,8 +245,8 @@ export function InvoicesScreen() {
           <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;">${i + 1}</td>
           <td style="border:1px solid #ddd;padding:8px;text-align:right;font-size:12px;">${item.product.name}</td>
           <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;">${item.quantity}</td>
-          <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;">${formatCurrency(item.price)}</td>
-          <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;font-weight:600;">${formatCurrency(item.total)}</td>
+          <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;">${printFormatCurrency(item.price)}</td>
+          <td style="border:1px solid #ddd;padding:8px;text-align:center;font-size:12px;font-weight:600;">${printFormatCurrency(item.total)}</td>
         </tr>`
       )
       .join('')
@@ -524,23 +523,23 @@ export function InvoicesScreen() {
         <div class="totals-section">
           <div class="totals-row">
             <span class="label">المجموع:</span>
-            <span class="value">${formatCurrency(invoice.totalAmount)}</span>
+            <span class="value">${printFormatCurrency(invoice.totalAmount)}</span>
           </div>
           ${invoice.discount > 0 ? `<div class="totals-row">
             <span class="label">الخصم:</span>
-            <span class="value" style="color:#ea580c;">-${formatCurrency(invoice.discount)}</span>
+            <span class="value" style="color:#ea580c;">-${printFormatCurrency(invoice.discount)}</span>
           </div>` : ''}
           <div class="totals-row">
             <span class="label">المدفوع:</span>
-            <span class="value" style="color:#16a34a;">${formatCurrency(invoice.paidAmount)}</span>
+            <span class="value" style="color:#16a34a;">${printFormatCurrency(invoice.paidAmount)}</span>
           </div>
           ${remaining > 0 ? `<div class="totals-row remaining">
             <span class="label">المتبقي:</span>
-            <span class="value">${formatCurrency(remaining)}</span>
+            <span class="value">${printFormatCurrency(remaining)}</span>
           </div>` : ''}
           <div class="totals-row grand">
             <span class="label">الصافي:</span>
-            <span class="value">${formatCurrency(invoice.totalAmount - invoice.discount)}</span>
+            <span class="value">${printFormatCurrency(invoice.totalAmount - invoice.discount)}</span>
           </div>
         </div>
 

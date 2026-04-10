@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
+import { compressImage } from '@/lib/image-utils'
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 
@@ -183,8 +184,8 @@ export function InventoryScreen() {
   const [dateFromOpen, setDateFromOpen] = useState(false)
   const [dateToOpen, setDateToOpen] = useState(false)
 
-  // Image upload handler
-  const handleImageUpload = useCallback((file: File) => {
+  // Image upload handler with compression
+  const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('يرجى اختيار ملف صورة فقط')
       return
@@ -193,21 +194,14 @@ export function InventoryScreen() {
       toast.error('حجم الصورة يجب أن يكون أقل من 2 ميجابايت')
       return
     }
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setForm((prev) => ({ ...prev, image: reader.result as string }))
+    try {
+      toast.loading('جاري ضغط الصورة...', { id: 'image-compress' })
+      const compressed = await compressImage(file, 400, 0.75)
+      setForm((prev) => ({ ...prev, image: compressed }))
+      toast.success('تم تحميل الصورة بنجاح', { id: 'image-compress' })
+    } catch {
+      toast.error('فشل في تحميل الصورة', { id: 'image-compress' })
     }
-    reader.readAsDataURL(file)
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) handleImageUpload(file)
-  }, [handleImageUpload])
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
   }, [])
 
   // Fetch categories
@@ -1250,38 +1244,49 @@ export function InventoryScreen() {
                   صورة المنتج <span className="text-muted-foreground text-xs">(اختياري)</span>
                 </Label>
                 <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  className={`relative rounded-xl border-2 border-dashed transition-colors ${
+                  onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleImageUpload(file) }}
+                  onDragOver={(e) => e.preventDefault()}
+                  className={`image-upload-zone relative rounded-xl border-2 border-dashed ${
                     form.image
                       ? 'border-primary/30 bg-primary/5'
-                      : 'border-border hover:border-primary/30 hover:bg-muted/30'
+                      : 'border-border'
                   }`}
                 >
                   {form.image ? (
                     <div className="relative p-3">
-                      <div className="w-20 h-20 rounded-full overflow-hidden mx-auto border-2 border-primary/20">
+                      <div className="product-image-lg w-full h-32 mx-auto">
                         <img
                           src={form.image}
                           alt="صورة المنتج"
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, image: '' })}
-                        className="absolute top-1 left-1 w-6 h-6 rounded-full bg-destructive/90 text-white flex items-center justify-center hover:bg-destructive transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="flex justify-center mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, image: '' })}
+                          className="image-remove-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          حذف الصورة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors mr-2"
+                        >
+                          <ImagePlus className="w-3.5 h-3.5" />
+                          تغيير الصورة
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div
-                      className="flex flex-col items-center justify-center py-6 cursor-pointer gap-2"
+                      className="flex flex-col items-center justify-center py-8 cursor-pointer gap-2"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <div className="w-10 h-10 rounded-full bg-muted/80 flex items-center justify-center">
-                        <ImagePlus className="w-5 h-5 text-muted-foreground" />
+                      <div className="w-12 h-12 rounded-xl bg-muted/80 flex items-center justify-center">
+                        <ImagePlus className="w-6 h-6 text-muted-foreground" />
                       </div>
                       <p className="text-xs text-muted-foreground text-center">
                         <span className="font-medium text-primary">اضغط لاختيار صورة</span>
@@ -1299,6 +1304,8 @@ export function InventoryScreen() {
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) handleImageUpload(file)
+                      // Reset input so same file can be selected again
+                      e.target.value = ''
                     }}
                   />
                 </div>

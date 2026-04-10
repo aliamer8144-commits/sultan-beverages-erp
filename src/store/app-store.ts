@@ -2,15 +2,16 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 // Currency Types
-export type CurrencyCode = 'SAR' | 'USD' | 'EUR' | 'AED' | 'EGP' | 'QAR'
+export type CurrencyCode = 'YER' | 'SAR' | 'USD' | 'EUR' | 'AED' | 'EGP' | 'QAR'
 
-export const CURRENCY_MAP: Record<CurrencyCode, { symbol: string; name: string }> = {
-  SAR: { symbol: 'ر.س', name: 'ريال سعودي' },
-  USD: { symbol: '$', name: 'دولار أمريكي' },
-  EUR: { symbol: '€', name: 'يورو' },
-  AED: { symbol: 'د.إ', name: 'درهم إماراتي' },
-  EGP: { symbol: 'ج.م', name: 'جنيه مصري' },
-  QAR: { symbol: 'ر.ق', name: 'ريال قطري' },
+export const CURRENCY_MAP: Record<CurrencyCode, { symbol: string; name: string; decimalPlaces: number }> = {
+  YER: { symbol: 'ر.ي', name: 'ريال يمني', decimalPlaces: 0 },
+  SAR: { symbol: 'ر.س', name: 'ريال سعودي', decimalPlaces: 2 },
+  USD: { symbol: '$', name: 'دولار أمريكي', decimalPlaces: 2 },
+  EUR: { symbol: '€', name: 'يورو', decimalPlaces: 2 },
+  AED: { symbol: 'د.إ', name: 'درهم إماراتي', decimalPlaces: 2 },
+  EGP: { symbol: 'ج.م', name: 'جنيه مصري', decimalPlaces: 2 },
+  QAR: { symbol: 'ر.ق', name: 'ريال قطري', decimalPlaces: 2 },
 }
 
 // Types
@@ -56,6 +57,9 @@ export interface SettingsState {
   receiptFooterText: string
   showTaxOnReceipt: boolean
   currency: CurrencyCode
+  currencySymbol: string
+  currencyPosition: 'before' | 'after'
+  decimalPlaces: number
   autoPrintOnPayment: boolean
 
   // POS Settings
@@ -82,7 +86,10 @@ export const defaultSettings: SettingsState = {
   receiptHeaderText: '',
   receiptFooterText: 'شكراً لتعاملكم معنا',
   showTaxOnReceipt: true,
-  currency: 'SAR',
+  currency: 'YER',
+  currencySymbol: '',
+  currencyPosition: 'after',
+  decimalPlaces: 0,
   autoPrintOnPayment: false,
 
   // POS Settings

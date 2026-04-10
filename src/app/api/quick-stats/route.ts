@@ -55,13 +55,13 @@ export async function GET() {
         where: { invoice: { type: 'sale', createdAt: { gte: startOfDay } } },
         _sum: { quantity: true },
         orderBy: { _sum: { quantity: 'desc' } },
-        take: 3,
+        take: 5,
       }),
 
-      // 8. Recent activity (last 5 audit log entries)
+      // 8. Recent activity (last 10 audit log entries)
       db.auditLog.findMany({
         orderBy: { createdAt: 'desc' },
-        take: 5,
+        take: 10,
       }),
 
       // 9. Active sales target (monthly)
