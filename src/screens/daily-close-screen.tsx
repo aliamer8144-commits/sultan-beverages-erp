@@ -191,7 +191,7 @@ function StatCard({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
+            <p className="text-3xl font-bold text-foreground mt-1 tabular-nums number-lg tabular-nums-enhanced">
               {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : dual.display}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
@@ -448,7 +448,7 @@ export function DailyCloseScreen() {
       ) : data ? (
         <div className="relative">
           <div className="glow-orb-green" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children card-grid-responsive">
           <StatCard
             label="إجمالي المبيعات"
             value={data.totalSales}
@@ -495,7 +495,7 @@ export function DailyCloseScreen() {
           <SummaryCardSkeleton />
         </div>
       ) : data ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children card-grid-responsive">
           <Card className="rounded-2xl border-0 shadow-sm card-hover glass-card">
             <CardContent className="p-5">
               <div className="flex items-center gap-3">
@@ -504,7 +504,7 @@ export function DailyCloseScreen() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">الأصناف المباعة</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{data.itemsSold.toLocaleString('ar-SA')}</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums number-lg tabular-nums-enhanced">{data.itemsSold.toLocaleString('ar-SA')}</p>
                 </div>
               </div>
             </CardContent>
@@ -518,7 +518,7 @@ export function DailyCloseScreen() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">متوسط قيمة الفاتورة</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{dualFormat(data.averageInvoice).display}</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums number-lg tabular-nums-enhanced">{dualFormat(data.averageInvoice).display}</p>
                 </div>
               </div>
             </CardContent>
@@ -761,14 +761,14 @@ export function DailyCloseScreen() {
           <SummaryCardSkeleton />
         </div>
       ) : data ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children" style={{ animationDelay: '0.35s' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children card-grid-responsive" style={{ animationDelay: '0.35s' }}>
           {/* Cash Payments */}
           <Card className="rounded-2xl border-0 shadow-sm card-hover">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">مدفوعات نقدية</p>
-                  <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
+                  <p className="text-3xl font-bold text-foreground mt-1 tabular-nums number-lg tabular-nums-enhanced">
                     {dualFormat(data.paymentMethods.cash.total).display}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -800,7 +800,7 @@ export function DailyCloseScreen() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">مدفوعات آجلة</p>
-                  <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
+                  <p className="text-3xl font-bold text-foreground mt-1 tabular-nums number-lg tabular-nums-enhanced">
                     {dualFormat(data.paymentMethods.credit.total).display}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">

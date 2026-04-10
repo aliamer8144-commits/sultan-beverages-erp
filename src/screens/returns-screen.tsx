@@ -121,19 +121,19 @@ function getStatusBadge(status: string) {
   switch (status) {
     case 'pending':
       return (
-        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold">
+        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold status-chip-warning">
           قيد المراجعة
         </Badge>
       )
     case 'approved':
       return (
-        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold">
+        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold status-chip-success">
           موافق عليه
         </Badge>
       )
     case 'rejected':
       return (
-        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold">
+        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold status-chip-danger">
           مرفوض
         </Badge>
       )

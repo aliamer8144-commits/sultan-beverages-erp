@@ -1030,7 +1030,7 @@ export function InventoryScreen() {
           {/* Category filter */}
           <div className="sm:w-48">
             <Select value={categoryId} onValueChange={(val) => { setCategoryId(val) }}>
-              <SelectTrigger className="h-10 rounded-lg">
+              <SelectTrigger className="h-10 rounded-lg select-enhanced">
                 <SelectValue placeholder="جميع التصنيفات" />
               </SelectTrigger>
               <SelectContent>
@@ -1155,8 +1155,8 @@ export function InventoryScreen() {
 
                       {/* Quantity */}
                       <TableCell className="text-center">
-                        <div className={`inline-flex flex-col items-center px-3 py-1.5 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted/50'}`}>
-                          <span className={`text-sm font-bold tabular-nums ${isLowStock ? 'text-destructive' : 'text-foreground'}`}>
+                        <div className={`inline-flex flex-col items-center px-3 py-1.5 rounded-lg ${isLowStock ? 'bg-destructive/10 status-chip-danger' : 'bg-muted/50'}`}>
+                          <span className={`text-sm font-bold tabular-nums tabular-nums-enhanced ${isLowStock ? 'text-destructive' : 'text-foreground'}`}>
                             {product.quantity}
                           </span>
                           {isLowStock && (

@@ -1092,7 +1092,7 @@ export function POSScreen() {
             </div>
           ) : (
             <ScrollArea className="h-full">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4 stagger-children grid-stagger">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4 stagger-children grid-stagger card-grid-responsive">
                 {displayProducts.map((product) => {
                   const colors = getCategoryColor(product.categoryId)
                   const inCart = getCartItemQuantity(product.id)
@@ -1133,11 +1133,11 @@ export function POSScreen() {
 
                       {/* Product info */}
                       <h3 className="text-sm font-semibold text-center truncate mb-1">{product.name}</h3>
-                      <p className="text-lg font-bold text-primary text-center">{formatDual(product.price).display}</p>
+                      <p className="text-lg font-bold text-primary text-center price-tag">{formatDual(product.price).display}</p>
 
                       {/* Stock indicator */}
                       {isOutOfStock ? (
-                        <Badge variant="destructive" className="text-[10px] mt-1.5 block text-center w-fit mx-auto">
+                        <Badge variant="destructive" className="text-[10px] mt-1.5 block text-center w-fit mx-auto status-chip-danger">
                           غير متوفر
                         </Badge>
                       ) : isLowStock ? (
@@ -1481,7 +1481,7 @@ export function POSScreen() {
               <Separator className="!my-2" />
               <div className="flex justify-between items-center">
                 <span className="text-base font-bold">الإجمالي</span>
-                <span className="text-xl font-bold text-primary tabular-nums text-gradient-green">{formatDual(grandTotal).display}</span>
+                <span className="text-xl font-bold text-primary tabular-nums text-gradient-green price-highlight">{formatDual(grandTotal).display}</span>
               </div>
             </div>
 
@@ -1535,7 +1535,7 @@ export function POSScreen() {
 
       {/* ── Payment Dialog ── */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="sm:max-w-lg animated-border-gradient" dir="rtl">
+        <DialogContent className="sm:max-w-lg animated-border-gradient dialog-slide-up" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-right">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">

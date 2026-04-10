@@ -1,12 +1,9 @@
 'use client'
 
 import { useAppStore, type Screen } from '@/store/app-store'
-import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+
 import {
   Dialog,
   DialogContent,
@@ -32,6 +29,7 @@ import { StockAdjustmentsScreen } from '@/screens/stock-adjustments-screen'
 import { SalesTargetsScreen } from '@/screens/sales-targets-screen'
 import { CustomerStatementScreen } from '@/screens/customer-statement-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
+import { StockAlertsWidget } from '@/components/stock-alerts-widget'
 import { toast } from 'sonner'
 import {
   ShoppingCart,
@@ -48,11 +46,8 @@ import {
   ChevronLeft,
   Menu,
   X,
-  Bell,
-  AlertTriangle,
   Clock,
   Keyboard,
-  PackageSearch,
   Settings,
   Sun,
   Moon,
@@ -64,22 +59,12 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 // ─── Hydration-safe mounted hook ─────────────────────────────────
 const emptySubscribe = () => () => {}
 function useHasMounted() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
-// ─── Low Stock Product Type ────────────────────────────────────────
-interface LowStockProduct {
-  id: string
-  name: string
-  quantity: number
-  minQuantity: number
-  price: number
-  category?: { name: string }
 }
 
 // ─── Screen Labels Map ─────────────────────────────────────────────
@@ -223,130 +208,9 @@ function LiveClock() {
   )
 }
 
-// ─── Notification Bell Component ───────────────────────────────────
-function NotificationBell() {
-  const [lowStockItems, setLowStockItems] = useState<LowStockProduct[]>([])
-  const [loading, setLoading] = useState(true)
-  const { setScreen } = useAppStore()
-
-  const fetchLowStock = useCallback(async () => {
-    try {
-      const res = await fetch('/api/products?lowStock=true')
-      const json = await res.json()
-      if (json.success) {
-        setLowStockItems(json.data)
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchLowStock()
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchLowStock, 60000)
-    return () => clearInterval(interval)
-  }, [fetchLowStock])
-
-  const count = lowStockItems.length
-
-  return (
-    <Popover>
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <button className="relative p-2 rounded-xl hover:bg-muted transition-colors badge-ping" aria-label="تنبيهات المخزون">
-                <Bell className="w-5 h-5 text-foreground/70" />
-                {count > 0 && (
-                  <span className="absolute -top-0.5 -left-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold leading-none">
-                    {count > 99 ? '٩٩+' : count}
-                  </span>
-                )}
-              </button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="font-medium">
-            تنبيهات المخزون
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <PopoverContent align="start" side="bottom" className="w-80 p-0" dir="rtl">
-        <div className="p-3 border-b border-border/50 flex items-center gap-2">
-          <Bell className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold">تنبيهات المخزون المنخفض</h3>
-          {count > 0 && (
-            <Badge variant="destructive" className="mr-auto text-[10px] px-1.5">
-              {count}
-            </Badge>
-          )}
-        </div>
-
-        <ScrollArea className="max-h-72">
-          {loading ? (
-            <div className="p-6 text-center text-muted-foreground text-xs">
-              جاري التحميل...
-            </div>
-          ) : count === 0 ? (
-            <div className="p-6 text-center">
-              <Package className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">لا توجد منتجات بمخزون منخفض</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/30">
-              {lowStockItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => {
-                    setScreen('inventory')
-                  }}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <AlertTriangle className="w-4 h-4 text-destructive" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-destructive font-semibold">
-                        الكمية: {item.quantity}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        الحد الأدنى: {item.minQuantity}
-                      </span>
-                    </div>
-                    {item.category && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{item.category.name}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-
-        {count > 0 && (
-          <div className="p-2 border-t border-border/50">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs font-medium text-primary hover:text-primary hover:bg-primary/5"
-              onClick={() => {
-                setScreen('inventory')
-              }}
-            >
-              <PackageSearch className="w-3.5 h-3.5 ml-1.5" />
-              عرض المخزون
-            </Button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
+// ─── Notification Bell (replaced by StockAlertsWidget) ─────────────
+// Legacy NotificationBell removed — now using StockAlertsWidget component
+// which has enhanced color-coded alerts, summary badges, and auto-refresh
 
 // ─── Keyboard Shortcuts Dialog Component ───────────────────────────
 function ShortcutsDialog({
@@ -618,8 +482,8 @@ export function AppLayout() {
             {/* Live Clock */}
             <LiveClock />
 
-            {/* Notification Bell */}
-            <NotificationBell />
+            {/* Stock Alert Notifications Widget */}
+            <StockAlertsWidget />
 
             {/* Dark Mode Toggle */}
             <ThemeToggle />

@@ -778,32 +778,32 @@ export function InvoicesScreen() {
                       <div className="flex items-center gap-4 flex-shrink-0">
                         <div className="text-left hidden sm:block">
                           <p className="text-[10px] text-muted-foreground">الإجمالي</p>
-                          <p className="text-sm font-bold text-foreground">
+                          <p className="text-sm font-bold text-foreground tabular-nums-enhanced">
                             {formatDual(invoice.totalAmount).display}
                           </p>
                         </div>
                         <div className="text-left hidden md:block">
                           <p className="text-[10px] text-muted-foreground">الخصم</p>
-                          <p className="text-sm font-semibold text-orange-600">
+                          <p className="text-sm font-semibold text-orange-600 tabular-nums-enhanced">
                             {invoice.discount > 0 ? `-${formatDual(invoice.discount).display}` : '—'}
                           </p>
                         </div>
                         <div className="text-left hidden md:block">
                           <p className="text-[10px] text-muted-foreground">المدفوع</p>
-                          <p className="text-sm font-semibold text-emerald-600">
+                          <p className="text-sm font-semibold text-emerald-600 tabular-nums-enhanced">
                             {formatDual(invoice.paidAmount).display}
                           </p>
                         </div>
-                        <div className="text-left hidden lg:block">
+                        <div className={`text-left hidden lg:block ${remaining <= 0 ? 'status-chip-success' : invoice.paidAmount > 0 ? 'status-chip-warning' : 'status-chip-danger'}`}>
                           <p className="text-[10px] text-muted-foreground">المتبقي</p>
-                          <p className={`text-sm font-semibold ${remaining > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          <p className={`text-sm font-semibold tabular-nums-enhanced ${remaining > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                             {remaining > 0 ? formatDual(remaining).display : '✓'}
                           </p>
                         </div>
 
                         {/* Mobile total */}
                         <div className="text-left sm:hidden">
-                          <p className="text-xs font-bold text-foreground">
+                          <p className="text-xs font-bold text-foreground tabular-nums-enhanced">
                             {formatDual(invoice.totalAmount).display}
                           </p>
                           {remaining > 0 && (
@@ -1033,14 +1033,14 @@ export function InvoicesScreen() {
                     )}
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">المدفوع</span>
-                      <span className="font-semibold text-emerald-600">
+                      <span className="font-semibold text-emerald-600 tabular-nums-enhanced">
                         {formatDual(selectedInvoice.paidAmount).display}
                       </span>
                     </div>
                     {selectedInvoice.totalAmount - selectedInvoice.discount - selectedInvoice.paidAmount > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">المتبقي</span>
-                        <span className="font-semibold text-destructive">
+                        <span className="font-semibold text-destructive tabular-nums-enhanced">
                           {formatDual(
                             selectedInvoice.totalAmount -
                               selectedInvoice.discount -
@@ -1051,7 +1051,7 @@ export function InvoicesScreen() {
                     )}
                     <div className="border-t border-border/70 pt-2 flex justify-between items-center">
                       <span className="text-sm font-bold">الصافي</span>
-                      <span className="text-lg font-bold text-primary">
+                      <span className="text-lg font-bold text-primary tabular-nums-enhanced">
                         {formatDual(selectedInvoice.totalAmount - selectedInvoice.discount).display}
                       </span>
                     </div>
