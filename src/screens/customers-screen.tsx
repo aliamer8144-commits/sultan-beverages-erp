@@ -557,7 +557,7 @@ export function CustomersScreen() {
 
         {/* ── Stats Cards ───────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 stagger-children">
-          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover">
+          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover glass-card-elevated">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
                 <Users className="h-4 w-4 text-blue-500" />
@@ -569,7 +569,7 @@ export function CustomersScreen() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover">
+          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover glass-card-elevated">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10">
                 <AlertCircle className="h-4 w-4 text-red-500" />
@@ -583,7 +583,7 @@ export function CustomersScreen() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover">
+          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover glass-card-elevated">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
                 <Crown className="h-4 w-4 text-amber-500" />
@@ -595,7 +595,7 @@ export function CustomersScreen() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover">
+          <div className="rounded-xl border bg-card p-4 shadow-sm card-hover glass-card-elevated">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10">
                 <Phone className="h-4 w-4 text-purple-500" />
@@ -693,7 +693,7 @@ export function CustomersScreen() {
                     return (
                       <TableRow
                         key={customer.id}
-                        className={`group transition-colors hover:bg-muted/50 ${isVip ? 'border-r-4 border-r-amber-400' : ''}`}
+                        className={`group transition-colors hover:bg-muted/50 list-item-hover ${isVip ? 'border-r-4 border-r-amber-400' : ''}`}
                       >
                         <TableCell className="text-center text-muted-foreground">
                           {index + 1}
@@ -701,6 +701,9 @@ export function CustomersScreen() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{customer.name}</span>
+                            {customer.debt > 0 && (
+                              <span className="badge-indicator-dot" />
+                            )}
                             {isVip && (
                               <Crown className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
                             )}

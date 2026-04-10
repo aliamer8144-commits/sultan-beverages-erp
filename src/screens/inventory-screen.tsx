@@ -1010,7 +1010,7 @@ export function InventoryScreen() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card rounded-xl border shadow-sm p-4 card-hover">
+      <div className="bg-card rounded-xl border shadow-sm p-4 card-hover glass-card-subtle">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">تصفية وبحث</span>
@@ -1060,7 +1060,7 @@ export function InventoryScreen() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden card-hover">
+      <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden card-hover data-table-enhanced">
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">

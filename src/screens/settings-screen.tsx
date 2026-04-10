@@ -585,7 +585,7 @@ export function SettingsScreen() {
                 value={localSettings.storeName}
                 onChange={(e) => handleChange('storeName', e.target.value)}
                 placeholder="السلطان للمشروبات"
-                className="text-right"
+                className="text-right input-glow-ring"
               />
             </div>
 
@@ -600,7 +600,7 @@ export function SettingsScreen() {
                 value={localSettings.storePhone}
                 onChange={(e) => handleChange('storePhone', e.target.value)}
                 placeholder="05XXXXXXXX"
-                className="text-right"
+                className="text-right input-glow-ring"
                 dir="ltr"
               />
             </div>
@@ -633,7 +633,7 @@ export function SettingsScreen() {
                 value={localSettings.taxNumber}
                 onChange={(e) => handleChange('taxNumber', e.target.value)}
                 placeholder="الرقم الضريبي"
-                className="text-right"
+                className="text-right input-glow-ring"
                 dir="ltr"
               />
             </div>
@@ -650,7 +650,7 @@ export function SettingsScreen() {
                 value={localSettings.storeLogoUrl}
                 onChange={(e) => handleChange('storeLogoUrl', e.target.value)}
                 placeholder="https://example.com/logo.png"
-                className="text-right"
+                className="text-right input-glow-ring"
                 dir="ltr"
               />
             </div>
@@ -1347,7 +1347,7 @@ export function SettingsScreen() {
         <SalesTargetsSection />
 
         {/* Bottom Save Bar (Mobile) */}
-        <div className="md:hidden sticky bottom-0 bg-background/80 backdrop-blur-sm pt-4 pb-2 -mx-4 px-4 border-t border-border/50">
+        <div className="md:hidden sticky bottom-0 bg-background/80 backdrop-blur-sm pt-4 pb-2 -mx-4 px-4 border-t border-border/50 glass-card-colored" style={{ '--glass-accent': 'oklch(0.6 0.2 260)' } as React.CSSProperties}>
           <Button
             onClick={handleSave}
             disabled={!hasChanges}

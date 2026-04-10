@@ -30,6 +30,7 @@ import { AnalyticsScreen } from '@/screens/analytics-screen'
 import { ExpenseScreen } from '@/screens/expense-screen'
 import { StockAdjustmentsScreen } from '@/screens/stock-adjustments-screen'
 import { SalesTargetsScreen } from '@/screens/sales-targets-screen'
+import { CustomerStatementScreen } from '@/screens/customer-statement-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { toast } from 'sonner'
 import {
@@ -99,6 +100,7 @@ const screenLabels: Record<Screen, string> = {
   analytics: 'التحليلات المتقدمة',
   expenses: 'المصروفات',
   'sales-targets': 'أهداف المبيعات',
+  'customer-statement': 'كشف حساب عميل',
 }
 
 // ─── Keyboard Shortcuts Definition ─────────────────────────────────
@@ -128,6 +130,7 @@ const navItems: { id: Screen; label: string; icon: React.ElementType; adminOnly?
   { id: 'expenses', label: 'المصروفات', icon: Receipt, adminOnly: true },
   { id: 'analytics', label: 'التحليلات المتقدمة', icon: TrendingUp },
   { id: 'sales-targets', label: 'أهداف المبيعات', icon: Target, adminOnly: true },
+  { id: 'customer-statement', label: 'كشف حساب عميل', icon: FileText, adminOnly: true },
 ]
 
 // ─── Theme Toggle Component ────────────────────────────────────────
@@ -568,6 +571,7 @@ export function AppLayout() {
       case 'analytics': return <AnalyticsScreen />
       case 'expenses': return <ExpenseScreen />
       case 'sales-targets': return <SalesTargetsScreen />
+      case 'customer-statement': return <CustomerStatementScreen />
       default: return <POSScreen />
     }
   }

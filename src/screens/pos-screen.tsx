@@ -866,7 +866,7 @@ export function POSScreen() {
               placeholder="بحث عن منتج... (Ctrl+K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-11 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 pr-10 pl-10 text-sm"
+              className="h-11 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 pr-10 pl-10 text-sm input-glow-ring"
             />
             {searchQuery && (
               <button
@@ -898,7 +898,7 @@ export function POSScreen() {
                   handleBarcodeScan(barcodeInput)
                 }
               }}
-              className="h-9 rounded-xl bg-transparent border-0 focus-visible:ring-0 pr-9 pl-16 text-sm"
+              className="h-9 rounded-xl bg-transparent border-0 focus-visible:ring-0 pr-9 pl-16 text-sm input-glow-ring"
             />
             <kbd className="kbd absolute left-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex">F2</kbd>
           </div>
@@ -1092,7 +1092,7 @@ export function POSScreen() {
             </div>
           ) : (
             <ScrollArea className="h-full">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4 stagger-children">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4 stagger-children grid-stagger">
                 {displayProducts.map((product) => {
                   const colors = getCategoryColor(product.categoryId)
                   const inCart = getCartItemQuantity(product.id)
@@ -1481,7 +1481,7 @@ export function POSScreen() {
               <Separator className="!my-2" />
               <div className="flex justify-between items-center">
                 <span className="text-base font-bold">الإجمالي</span>
-                <span className="text-xl font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
+                <span className="text-xl font-bold text-primary tabular-nums text-gradient-green">{formatDual(grandTotal).display}</span>
               </div>
             </div>
 
@@ -1504,7 +1504,7 @@ export function POSScreen() {
             <div className="p-4 pt-0 flex gap-2">
               <Button
                 onClick={handleOpenPayment}
-                className="flex-1 h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-all duration-200 gap-2 btn-ripple hover-glow-green"
+                className="flex-1 h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-all duration-200 gap-2 btn-ripple hover-glow-green btn-neon"
               >
                 <CreditCard className="w-5 h-5" />
                 <span>دفع وطباعة</span>

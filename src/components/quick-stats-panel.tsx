@@ -22,6 +22,10 @@ import {
   Clock,
   Package,
   Target,
+  Truck,
+  Wallet,
+  CalendarDays,
+  CheckCircle2,
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -50,6 +54,12 @@ interface StatsData {
   topProducts: TopProduct[]
   recentActivity: RecentActivityItem[]
   salesTargetProgress: number | null
+  // New fields
+  totalProducts: number
+  totalSuppliers: number
+  totalDebt: number
+  monthlySales: number
+  totalExpenses: number
 }
 
 // ─── Relative Arabic time ───────────────────────────────────────────
@@ -505,6 +515,71 @@ export function QuickStatsPanel() {
                     trendBg="bg-violet-50 dark:bg-violet-500/10"
                     trendColor="text-violet-400"
                     trendLabel="عملاء"
+                  />
+
+                  <MetricRow
+                    label="عدد المنتجات"
+                    value={stats.totalProducts.toLocaleString('ar-SA')}
+                    icon={Package}
+                    iconBg="bg-cyan-50 dark:bg-cyan-500/10"
+                    iconColor="text-cyan-500"
+                    valueColor="text-cyan-600 dark:text-cyan-400"
+                    trendIcon={Package}
+                    trendBg="bg-cyan-50 dark:bg-cyan-500/10"
+                    trendColor="text-cyan-400"
+                    trendLabel="منتج"
+                  />
+
+                  <MetricRow
+                    label="عدد الموردين"
+                    value={stats.totalSuppliers.toLocaleString('ar-SA')}
+                    icon={Truck}
+                    iconBg="bg-orange-50 dark:bg-orange-500/10"
+                    iconColor="text-orange-500"
+                    valueColor="text-orange-600 dark:text-orange-400"
+                    trendIcon={Truck}
+                    trendBg="bg-orange-50 dark:bg-orange-500/10"
+                    trendColor="text-orange-400"
+                    trendLabel="مورد"
+                  />
+
+                  <MetricRow
+                    label="مبيعات الشهر"
+                    value={`${formatCurrency(stats.monthlySales)} ${symbol}`}
+                    icon={CalendarDays}
+                    iconBg="bg-indigo-50 dark:bg-indigo-500/10"
+                    iconColor="text-indigo-500"
+                    valueColor="text-indigo-600 dark:text-indigo-400"
+                    trendIcon={TrendingUp}
+                    trendBg={stats.monthlySales > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-muted'}
+                    trendColor={stats.monthlySales > 0 ? 'text-emerald-500' : 'text-muted-foreground'}
+                    trendLabel="شهري"
+                  />
+
+                  <MetricRow
+                    label="مصروفات الشهر"
+                    value={`${formatCurrency(stats.totalExpenses)} ${symbol}`}
+                    icon={Receipt}
+                    iconBg="bg-rose-50 dark:bg-rose-500/10"
+                    iconColor="text-rose-500"
+                    valueColor="text-rose-600 dark:text-rose-400"
+                    trendIcon={TrendingDown}
+                    trendBg="bg-rose-50 dark:bg-rose-500/10"
+                    trendColor="text-rose-400"
+                    trendLabel="شهري"
+                  />
+
+                  <MetricRow
+                    label="إجمالي مديونية العملاء"
+                    value={`${formatCurrency(stats.totalDebt)} ${symbol}`}
+                    icon={Wallet}
+                    iconBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
+                    iconColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
+                    valueColor={stats.totalDebt > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
+                    trendIcon={stats.totalDebt > 0 ? AlertTriangle : CheckCircle2}
+                    trendBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
+                    trendColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
+                    trendLabel={stats.totalDebt > 0 ? 'مديونية' : 'لا ديون'}
                   />
                 </div>
 

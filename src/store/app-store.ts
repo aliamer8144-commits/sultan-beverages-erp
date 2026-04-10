@@ -155,6 +155,7 @@ export type Screen =
   | 'backup'
   | 'analytics'
   | 'sales-targets'
+  | 'customer-statement'
   | 'loyalty'
 
 interface AppState {

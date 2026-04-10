@@ -5,6 +5,9 @@ import { db } from '@/lib/db'
 export async function GET() {
   try {
     const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
 
     // Run all independent queries in parallel
     const [
@@ -13,7 +16,13 @@ export async function GET() {
       invoiceCount,
       lowStockCount,
       customerCount,
+      supplierCount,
+      productCount,
       expensesAgg,
+      todayExpensesAgg,
+      monthlySalesAgg,
+      monthlyExpensesAgg,
+      totalDebtAgg,
       topProductGroups,
       recentLogs,
       activeTargets,
@@ -43,13 +52,43 @@ export async function GET() {
       // 5. Total customers
       db.customer.count({ where: { isActive: true } }),
 
-      // 6. Today's expenses
+      // 6. Total suppliers
+      db.supplier.count({ where: { isActive: true } }),
+
+      // 7. Total products
+      db.product.count({ where: { isActive: true } }),
+
+      // 8. Current month expenses
+      db.expense.aggregate({
+        where: { date: { gte: monthStart, lte: monthEnd } },
+        _sum: { amount: true },
+      }),
+
+      // 9. Today's expenses (kept for backward compatibility)
       db.expense.aggregate({
         where: { date: { gte: startOfDay } },
         _sum: { amount: true },
       }),
 
-      // 7. Top products by quantity sold today
+      // 10. Monthly sales total
+      db.invoice.aggregate({
+        where: { type: 'sale', createdAt: { gte: monthStart, lte: monthEnd } },
+        _sum: { totalAmount: true },
+      }),
+
+      // 11. Monthly expenses (redundant with 8 but explicit for clarity)
+      db.expense.aggregate({
+        where: { date: { gte: monthStart, lte: monthEnd } },
+        _sum: { amount: true },
+      }),
+
+      // 12. Total customer debt
+      db.customer.aggregate({
+        where: { isActive: true },
+        _sum: { debt: true },
+      }),
+
+      // 13. Top products by quantity sold today
       db.invoiceItem.groupBy({
         by: ['productId'],
         where: { invoice: { type: 'sale', createdAt: { gte: startOfDay } } },
@@ -58,13 +97,13 @@ export async function GET() {
         take: 5,
       }),
 
-      // 8. Recent activity (last 10 audit log entries)
+      // 14. Recent activity (last 10 audit log entries)
       db.auditLog.findMany({
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
 
-      // 9. Active sales target (monthly)
+      // 15. Active sales target (monthly)
       db.salesTarget.findFirst({
         where: {
           isActive: true,
@@ -92,7 +131,17 @@ export async function GET() {
 
     const totalCustomers = customerCount
 
-    const totalExpensesToday = expensesAgg._sum.amount ?? 0
+    const totalSuppliers = supplierCount
+
+    const totalProducts = productCount
+
+    const totalExpensesToday = todayExpensesAgg._sum.amount ?? 0
+
+    const monthlySales = monthlySalesAgg._sum.totalAmount ?? 0
+
+    const totalExpenses = expensesAgg._sum.amount ?? 0
+
+    const totalDebt = totalDebtAgg._sum.debt ?? 0
 
     // Top 3 products (resolve names from the items already fetched)
     const productIdToName = new Map<string, string>()
@@ -128,19 +177,7 @@ export async function GET() {
     // Sales target progress
     let salesTargetProgress: number | null = null
     if (activeTargets) {
-      const now = new Date()
-      const rangeStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const rangeEnd = new Date(now)
-
-      const monthSales = await db.invoice.aggregate({
-        _sum: { totalAmount: true },
-        where: {
-          type: 'sale',
-          createdAt: { gte: rangeStart, lte: rangeEnd },
-        },
-      })
-
-      const current = monthSales._sum.totalAmount ?? 0
+      const current = monthlySales
       salesTargetProgress =
         activeTargets.targetAmount > 0
           ? Math.min(Math.round((current / activeTargets.targetAmount) * 1000) / 10, 100)
@@ -150,6 +187,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
+        // Existing fields (backward compatible)
         totalSalesToday,
         totalProfitToday,
         profitMargin,
@@ -160,6 +198,13 @@ export async function GET() {
         topProducts,
         recentActivity,
         salesTargetProgress,
+
+        // New fields
+        totalProducts,
+        totalSuppliers,
+        totalDebt,
+        monthlySales,
+        totalExpenses,
       },
     })
   } catch (error) {
