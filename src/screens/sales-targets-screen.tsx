@@ -31,7 +31,6 @@ import {
   Loader2,
   DollarSign,
   HourglassIcon,
-  ArrowTrendingUp,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -523,7 +522,7 @@ export function SalesTargetsScreen() {
                             colorClass={!isComplete && target.daysRemaining <= 1 ? 'text-red-500' : ''}
                           />
                           <StatPill
-                            icon={ArrowTrendingUp}
+                            icon={TrendingUp}
                             label="المعدل اليومي المطلوب"
                             value={target.dailyTargetNeeded > 0 ? `${formatCurrency(target.dailyTargetNeeded)} ر.س` : isComplete ? '—' : '∞'}
                             colorClass={target.dailyTargetNeeded > target.targetAmount * 0.05 ? 'text-amber-500' : ''}
