@@ -85,7 +85,13 @@ model Supplier {
   id              String            @id @default(cuid())
   name            String            @unique
   phone           String?
+  phone2          String?
   address         String?
+  website         String?
+  paymentTerms    String            @default("نقدي")
+  rating          Float             @default(0)
+  ratingCount     Int               @default(0)
+  notes           String?
   isActive        Boolean           @default(true)
   invoices        Invoice[]
   supplierPayments SupplierPayment[]
@@ -182,12 +188,12 @@ model StockAdjustment {
 
 model Expense {
   id               String   @id @default(cuid())
-  category         String   // مصروفات تشغيلية, صيانة, إيجار, رواتب, نقل, متنوع
+  category         String   @default("عام") // عام, إيجار, رواتب, كهرباء, ماء, صيانة, نقل, تسويق, مصروفات تشغيلية, متنوع
   amount           Float
   description      String
   date             DateTime @default(now())
   recurring        Boolean  @default(false)  // مصروف متكرر
-  recurringPeriod  String?  // daily, weekly, monthly
+  recurringPeriod  String?  // daily, weekly, monthly, yearly
   userId           String
   userName         String?
   createdAt        DateTime @default(now())

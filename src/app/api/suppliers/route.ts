@@ -5,6 +5,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
+    const sortBy = searchParams.get('sortBy') || 'createdAt'
+
+    const orderBy: Record<string, string> = {}
+    if (sortBy === 'rating') {
+      orderBy.rating = 'desc'
+    } else {
+      orderBy.createdAt = 'desc'
+    }
 
     const suppliers = await db.supplier.findMany({
       where: search
@@ -15,7 +23,7 @@ export async function GET(request: NextRequest) {
             ],
           }
         : undefined,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
     })
 
     // Compute balance info for each supplier
@@ -55,10 +63,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, phone, address } = body
+    const { name, phone, phone2, address, website, paymentTerms, notes } = body
 
     const supplier = await db.supplier.create({
-      data: { name, phone, address },
+      data: { name, phone, phone2, address, website, paymentTerms: paymentTerms || 'نقدي', notes },
     })
 
     return NextResponse.json({ success: true, data: supplier }, { status: 201 })
@@ -71,11 +79,11 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, phone, address, isActive } = body
+    const { id, name, phone, phone2, address, website, paymentTerms, notes, isActive } = body
 
     const updated = await db.supplier.update({
       where: { id },
-      data: { name, phone, address, isActive },
+      data: { name, phone, phone2, address, website, paymentTerms, notes, isActive },
     })
 
     return NextResponse.json({ success: true, data: updated })

@@ -10,8 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/toast'
 import { toast } from 'sonner'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 
@@ -20,7 +22,13 @@ interface Supplier {
   id: string
   name: string
   phone: string | null
+  phone2: string | null
   address: string | null
+  website: string | null
+  paymentTerms: string
+  rating: number
+  ratingCount: number
+  notes: string | null
   isActive: boolean
   totalPurchases: number
   totalPaid: number
@@ -51,6 +59,57 @@ interface SupplierPayment {
   createdAt: string
 }
 
+// ── Star Rating Component ──
+function StarRating({
+  rating,
+  onRate,
+  size = 'sm',
+  interactive = false,
+}: {
+  rating: number
+  onRate?: (val: number) => void
+  size?: 'sm' | 'md'
+  interactive?: boolean
+}) {
+  const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5'
+  const [hovered, setHovered] = useState(0)
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = star <= (hovered || rating)
+        return (
+          <button
+            key={star}
+            type="button"
+            className={`${interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'} transition-transform`}
+            onMouseEnter={() => interactive && setHovered(star)}
+            onMouseLeave={() => interactive && setHovered(0)}
+            onClick={() => interactive && onRate?.(star)}
+            disabled={!interactive}
+          >
+            <Star
+              className={`${sizeClass} ${
+                filled
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'fill-transparent text-muted-foreground/30'
+              }`}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Payment Terms Labels ──
+const PAYMENT_TERMS = [
+  { value: 'نقدي', label: 'نقدي' },
+  { value: '30 يوم', label: '30 يوم' },
+  { value: '60 يوم', label: '60 يوم' },
+  { value: '90 يوم', label: '90 يوم' },
+]
+
 export function PurchasesScreen() {
   const { user } = useAppStore()
   const { formatCurrency, symbol } = useCurrency()
@@ -63,9 +122,14 @@ export function PurchasesScreen() {
   const [supplierForm, setSupplierForm] = useState({
     name: '',
     phone: '',
+    phone2: '',
     address: '',
+    website: '',
+    paymentTerms: 'نقدي',
+    notes: '',
   })
   const [supplierLoading, setSupplierLoading] = useState(false)
+  const [supplierSort, setSupplierSort] = useState<string>('createdAt')
 
   // ==================== Supplier Payment State ====================
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false)
@@ -92,10 +156,12 @@ export function PurchasesScreen() {
   const [invoiceLoading, setInvoiceLoading] = useState(false)
 
   // ==================== Load Data ====================
-  const fetchSuppliers = useCallback(async (search = '') => {
+  const fetchSuppliers = useCallback(async (search = '', sortBy = 'createdAt') => {
     try {
-      const params = search ? `?search=${encodeURIComponent(search)}` : ''
-      const res = await fetch(`/api/suppliers${params}`)
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      if (sortBy) params.set('sortBy', sortBy)
+      const res = await fetch(`/api/suppliers?${params.toString()}`)
       const data = await res.json()
       if (data.success) {
         setSuppliers(data.data)
@@ -118,22 +184,42 @@ export function PurchasesScreen() {
   }, [])
 
   useEffect(() => {
-    fetchSuppliers()
+    fetchSuppliers('', supplierSort)
     fetchProducts()
-  }, [fetchSuppliers, fetchProducts])
+  }, [fetchSuppliers, fetchProducts, supplierSort])
 
   // Debounced search for suppliers
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchSuppliers(supplierSearch)
+      fetchSuppliers(supplierSearch, supplierSort)
     }, 400)
     return () => clearTimeout(timer)
-  }, [supplierSearch, fetchSuppliers])
+  }, [supplierSearch, supplierSort, fetchSuppliers])
+
+  // ==================== Supplier Rating Handler ====================
+  const handleRateSupplier = async (supplierId: string, rating: number) => {
+    try {
+      const res = await fetch('/api/supplier-rating', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplierId, rating }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`تم تقييم المورد ${rating} نجوم`)
+        fetchSuppliers(supplierSearch, supplierSort)
+      } else {
+        toast.error(data.error || 'فشل في تسجيل التقييم')
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تسجيل التقييم')
+    }
+  }
 
   // ==================== Suppliers Handlers ====================
   const openAddSupplierDialog = () => {
     setEditingSupplier(null)
-    setSupplierForm({ name: '', phone: '', address: '' })
+    setSupplierForm({ name: '', phone: '', phone2: '', address: '', website: '', paymentTerms: 'نقدي', notes: '' })
     setSupplierDialogOpen(true)
   }
 
@@ -142,7 +228,11 @@ export function PurchasesScreen() {
     setSupplierForm({
       name: supplier.name,
       phone: supplier.phone || '',
+      phone2: supplier.phone2 || '',
       address: supplier.address || '',
+      website: supplier.website || '',
+      paymentTerms: supplier.paymentTerms || 'نقدي',
+      notes: supplier.notes || '',
     })
     setSupplierDialogOpen(true)
   }
@@ -170,7 +260,7 @@ export function PurchasesScreen() {
       if (data.success) {
         toast.success(isEditing ? 'تم تحديث المورد بنجاح' : 'تم إضافة المورد بنجاح')
         setSupplierDialogOpen(false)
-        fetchSuppliers(supplierSearch)
+        fetchSuppliers(supplierSearch, supplierSort)
       } else {
         toast.error(data.error || 'حدث خطأ أثناء الحفظ')
       }
@@ -192,7 +282,7 @@ export function PurchasesScreen() {
 
       if (data.success) {
         toast.success('تم حذف المورد بنجاح')
-        fetchSuppliers(supplierSearch)
+        fetchSuppliers(supplierSearch, supplierSort)
       } else {
         toast.error(data.error || 'فشل في حذف المورد')
       }
@@ -240,7 +330,7 @@ export function PurchasesScreen() {
         toast.success(`تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${paymentSupplier.name}`)
         setOpenPaymentDialog(false)
         setPaymentSupplier(null)
-        fetchSuppliers(supplierSearch)
+        fetchSuppliers(supplierSearch, supplierSort)
       } else {
         toast.error(data.error || 'حدث خطأ أثناء تسجيل الدفعة')
       }
@@ -292,7 +382,6 @@ export function PurchasesScreen() {
       return
     }
 
-    // Check if product already exists in the list
     const existingIndex = purchaseItems.findIndex(
       (item) => item.productId === selectedProductId
     )
@@ -316,7 +405,6 @@ export function PurchasesScreen() {
       ])
     }
 
-    // Reset form
     setSelectedProductId('')
     setItemQuantity(1)
     setItemCostPrice(0)
@@ -387,13 +475,12 @@ export function PurchasesScreen() {
 
       if (data.success) {
         toast.success('تم إنشاء فاتورة الشراء بنجاح')
-        // Reset form
         setSelectedSupplierId('')
         setPurchaseItems([])
         setSelectedProductId('')
         setItemQuantity(1)
         setItemCostPrice(0)
-        fetchSuppliers(supplierSearch)
+        fetchSuppliers(supplierSearch, supplierSort)
       } else {
         toast.error(data.error || 'فشل في إنشاء فاتورة الشراء')
       }
@@ -407,6 +494,7 @@ export function PurchasesScreen() {
   // ==================== Stats ====================
   const totalOutstanding = suppliers.reduce((sum, s) => sum + (s.remainingBalance > 0 ? s.remainingBalance : 0), 0)
   const suppliersWithBalance = suppliers.filter((s) => s.remainingBalance > 0).length
+  const averageRating = suppliers.length > 0 ? suppliers.reduce((sum, s) => sum + s.rating, 0) / suppliers.length : 0
 
   // ==================== Render ====================
   return (
@@ -428,7 +516,7 @@ export function PurchasesScreen() {
           <TabsContent value="suppliers" className="flex-1 overflow-hidden flex flex-col mt-0">
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 stagger-children">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 stagger-children">
               <div className="rounded-xl border bg-card p-3 shadow-sm card-hover">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
@@ -466,18 +554,44 @@ export function PurchasesScreen() {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-xl border bg-card p-3 shadow-sm card-hover hidden md:block">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/10">
+                    <Star className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">متوسط التقييم</p>
+                    <div className="flex items-center gap-1.5">
+                      <StarRating rating={Math.round(averageRating * 10) / 10} size="sm" />
+                      <span className="text-sm font-bold tabular-nums">{(Math.round(averageRating * 10) / 10).toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="بحث عن مورد..."
-                  value={supplierSearch}
-                  onChange={(e) => setSupplierSearch(e.target.value)}
-                  className="pr-10 h-10 rounded-xl input-glass"
-                />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-none sm:w-72">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="بحث عن مورد..."
+                    value={supplierSearch}
+                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    className="pr-10 h-10 rounded-xl input-glass"
+                  />
+                </div>
+                <Select value={supplierSort} onValueChange={setSupplierSort}>
+                  <SelectTrigger className="h-10 w-auto min-w-[150px] rounded-xl text-xs">
+                    <SelectValue placeholder="ترتيب حسب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="createdAt">الأحدث أولاً</SelectItem>
+                    <SelectItem value="rating">حسب التقييم</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button
                 onClick={openAddSupplierDialog}
@@ -490,15 +604,14 @@ export function PurchasesScreen() {
 
             {/* Table */}
             <div className="flex-1 rounded-xl border bg-card overflow-hidden">
-              <ScrollArea className="h-[calc(100vh-340px)]">
+              <ScrollArea className="h-[calc(100vh-380px)]">
                 <Table className="table-enhanced">
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead className="text-right font-semibold">الاسم</TableHead>
+                      <TableHead className="text-right font-semibold">الاسم والتقييم</TableHead>
                       <TableHead className="text-right font-semibold">الهاتف</TableHead>
-                      <TableHead className="text-right font-semibold hidden md:table-cell">العنوان</TableHead>
+                      <TableHead className="text-right font-semibold hidden md:table-cell">شروط الدفع</TableHead>
                       <TableHead className="text-right font-semibold text-center">إجمالي المشتريات</TableHead>
-                      <TableHead className="text-right font-semibold text-center">المدفوع</TableHead>
                       <TableHead className="text-right font-semibold text-center">المتبقي</TableHead>
                       <TableHead className="text-right font-semibold w-[160px]">الإجراءات</TableHead>
                     </TableRow>
@@ -506,7 +619,7 @@ export function PurchasesScreen() {
                   <TableBody className="stagger-children">
                     {suppliers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12">
+                        <TableCell colSpan={6} className="text-center py-12">
                           <div className="flex flex-col items-center gap-2 text-muted-foreground empty-state">
                             <Truck className="w-12 h-12 opacity-20 empty-state-icon" />
                             <p className="text-sm empty-state-title">
@@ -532,21 +645,63 @@ export function PurchasesScreen() {
                     ) : (
                       suppliers.map((supplier) => (
                         <TableRow key={supplier.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-medium">{supplier.name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <div>
+                                <p className="font-medium text-sm">{supplier.name}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <div className="flex items-center gap-0.5 cursor-pointer hover:scale-105 transition-transform" title="انقر للتقييم">
+                                        <StarRating
+                                          rating={supplier.rating}
+                                          size="sm"
+                                        />
+                                        <ChevronDown className="w-3 h-3 text-muted-foreground/50" />
+                                      </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-3" dir="rtl" side="bottom" align="start">
+                                      <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-foreground">تقييم المورد</p>
+                                        <StarRating
+                                          rating={supplier.rating}
+                                          size="md"
+                                          interactive
+                                          onRate={(val) => handleRateSupplier(supplier.id, val)}
+                                        />
+                                        {supplier.ratingCount > 0 && (
+                                          <p className="text-[10px] text-muted-foreground text-center">
+                                            ({supplier.ratingCount} تقييم) — المتوسط: {supplier.rating.toFixed(1)}
+                                          </p>
+                                        )}
+                                        {supplier.ratingCount === 0 && (
+                                          <p className="text-[10px] text-muted-foreground text-center">
+                                            لا توجد تقييمات بعد
+                                          </p>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-muted-foreground" dir="ltr">
-                            {supplier.phone || '—'}
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs">{supplier.phone || '—'}</span>
+                              {supplier.phone2 && (
+                                <span className="text-[10px] text-muted-foreground/60">{supplier.phone2}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground hidden md:table-cell">
-                            {supplier.address || '—'}
+                            <span className="text-xs px-2 py-0.5 rounded-md bg-muted/60 font-medium">
+                              {supplier.paymentTerms}
+                            </span>
                           </TableCell>
                           <TableCell className="text-center">
                             <span className="text-sm tabular-nums">
                               {formatCurrency(supplier.totalPurchases)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-sm tabular-nums text-emerald-600">
-                              {formatCurrency(supplier.totalPaid)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
@@ -645,6 +800,9 @@ export function PurchasesScreen() {
                           <SelectItem key={supplier.id} value={supplier.id}>
                             <span className="flex items-center gap-2">
                               <span>{supplier.name}</span>
+                              {supplier.rating > 0 && (
+                                <span className="text-amber-400 text-xs">★ {supplier.rating.toFixed(1)}</span>
+                              )}
                               {supplier.remainingBalance > 0 && (
                                 <span className="text-xs text-destructive">
                                   ({formatCurrency(supplier.remainingBalance)})
@@ -737,7 +895,6 @@ export function PurchasesScreen() {
 
               {/* Right Column - Items & Total */}
               <div className="flex flex-col overflow-hidden">
-                {/* Items List */}
                 <div className="bg-card rounded-xl border flex-1 flex flex-col overflow-hidden glass-card">
                   <div className="flex items-center justify-between p-4 pb-3">
                     <div className="flex items-center gap-2">
@@ -855,7 +1012,7 @@ export function PurchasesScreen() {
 
       {/* ==================== Add/Edit Supplier Dialog ==================== */}
       <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="sm:max-w-lg" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingSupplier ? (
@@ -872,46 +1029,139 @@ export function PurchasesScreen() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 glass-card rounded-xl p-4">
-            <div className="space-y-2">
-              <Label htmlFor="supplier-name">اسم المورد *</Label>
-              <Input
-                id="supplier-name"
-                placeholder="أدخل اسم المورد"
-                value={supplierForm.name}
-                onChange={(e) =>
-                  setSupplierForm({ ...supplierForm, name: e.target.value })
-                }
-                className="h-10 rounded-xl"
-                autoFocus
-              />
+          <ScrollArea className="max-h-[70vh]">
+            <div className="space-y-4 py-2 px-1">
+              {/* Rating Display */}
+              {editingSupplier && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
+                  <Star className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">التقييم الحالي</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <StarRating rating={editingSupplier.rating} size="sm" />
+                      <span className="text-xs text-muted-foreground">
+                        ({editingSupplier.ratingCount} تقييم)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="glass-card rounded-xl p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-name">اسم المورد *</Label>
+                  <Input
+                    id="supplier-name"
+                    placeholder="أدخل اسم المورد"
+                    value={supplierForm.name}
+                    onChange={(e) =>
+                      setSupplierForm({ ...supplierForm, name: e.target.value })
+                    }
+                    className="h-10 rounded-xl"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-phone" className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                      رقم الهاتف
+                    </Label>
+                    <Input
+                      id="supplier-phone"
+                      placeholder="رقم الهاتف"
+                      value={supplierForm.phone}
+                      onChange={(e) =>
+                        setSupplierForm({ ...supplierForm, phone: e.target.value })
+                      }
+                      className="h-10 rounded-xl"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier-phone2" className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                      هاتف احتياطي
+                    </Label>
+                    <Input
+                      id="supplier-phone2"
+                      placeholder="رقم احتياطي"
+                      value={supplierForm.phone2}
+                      onChange={(e) =>
+                        setSupplierForm({ ...supplierForm, phone2: e.target.value })
+                      }
+                      className="h-10 rounded-xl"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-address">العنوان</Label>
+                  <Input
+                    id="supplier-address"
+                    placeholder="أدخل العنوان"
+                    value={supplierForm.address}
+                    onChange={(e) =>
+                      setSupplierForm({ ...supplierForm, address: e.target.value })
+                    }
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-website" className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                    الموقع الإلكتروني
+                  </Label>
+                  <Input
+                    id="supplier-website"
+                    placeholder="https://example.com"
+                    value={supplierForm.website}
+                    onChange={(e) =>
+                      setSupplierForm({ ...supplierForm, website: e.target.value })
+                    }
+                    className="h-10 rounded-xl"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-payment-terms">شروط الدفع</Label>
+                  <Select
+                    value={supplierForm.paymentTerms}
+                    onValueChange={(val) => setSupplierForm({ ...supplierForm, paymentTerms: val })}
+                  >
+                    <SelectTrigger className="h-10 rounded-xl">
+                      <SelectValue placeholder="شروط الدفع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_TERMS.map((term) => (
+                        <SelectItem key={term.value} value={term.value}>
+                          {term.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-notes">ملاحظات</Label>
+                  <Textarea
+                    id="supplier-notes"
+                    placeholder="ملاحظات إضافية عن المورد..."
+                    value={supplierForm.notes}
+                    onChange={(e) =>
+                      setSupplierForm({ ...supplierForm, notes: e.target.value })
+                    }
+                    className="rounded-xl resize-none min-h-[80px]"
+                    rows={3}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-phone">رقم الهاتف</Label>
-              <Input
-                id="supplier-phone"
-                placeholder="أدخل رقم الهاتف"
-                value={supplierForm.phone}
-                onChange={(e) =>
-                  setSupplierForm({ ...supplierForm, phone: e.target.value })
-                }
-                className="h-10 rounded-xl"
-                dir="ltr"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-address">العنوان</Label>
-              <Input
-                id="supplier-address"
-                placeholder="أدخل العنوان"
-                value={supplierForm.address}
-                onChange={(e) =>
-                  setSupplierForm({ ...supplierForm, address: e.target.value })
-                }
-                className="h-10 rounded-xl"
-              />
-            </div>
-          </div>
+          </ScrollArea>
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
@@ -960,221 +1210,170 @@ export function PurchasesScreen() {
           </DialogHeader>
           {paymentSupplier && (
             <div className="space-y-4 py-2">
-              {/* Supplier info */}
               <div className="rounded-xl bg-muted/40 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold">{paymentSupplier.name}</p>
-                    {paymentSupplier.phone && (
-                      <p className="text-xs text-muted-foreground" dir="ltr">{paymentSupplier.phone}</p>
-                    )}
+                    <p className="text-sm font-semibold">{paymentSupplier.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">المبلغ المستحق</p>
                   </div>
-                  <div className="text-left">
-                    <p className="text-[10px] text-muted-foreground">الرصيد المتبقي</p>
-                    <p className="text-base font-bold text-destructive tabular-nums">
-                      {paymentSupplier.remainingBalance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>إجمالي المشتريات: <span className="tabular-nums font-medium">{paymentSupplier.totalPurchases.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س</span></span>
-                  <span>المدفوع: <span className="tabular-nums font-medium text-emerald-600">{paymentSupplier.totalPaid.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س</span></span>
+                  <span className="text-lg font-bold text-destructive tabular-nums">
+                    {formatCurrency(paymentSupplier.remainingBalance)}
+                  </span>
                 </div>
               </div>
 
-              {/* Amount */}
-              <div className="space-y-1.5">
-                <Label>مبلغ الدفعة <span className="text-destructive">*</span></Label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="أدخل المبلغ"
-                    className="h-11 text-base font-bold pr-4 pl-14 tabular-nums input-glass"
-                    dir="ltr"
-                    autoFocus
-                  />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">ر.س</span>
+              <div className="space-y-2">
+                <Label>المبلغ *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="h-10 rounded-xl"
+                  placeholder="0.00"
+                  dir="ltr"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs rounded-lg"
+                    onClick={() => setPaymentAmount(String(Math.ceil(paymentSupplier.remainingBalance / 4)))}
+                  >
+                    الربع
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs rounded-lg"
+                    onClick={() => setPaymentAmount(String(Math.ceil(paymentSupplier.remainingBalance / 2)))}
+                  >
+                    النصف
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs rounded-lg"
+                    onClick={() => setPaymentAmount(String(paymentSupplier.remainingBalance))}
+                  >
+                    الكل
+                  </Button>
                 </div>
-                {paymentAmount && parseFloat(paymentAmount) > paymentSupplier.remainingBalance && (
-                  <p className="text-[11px] text-destructive">المبلغ يتجاوز الرصيد المتبقي</p>
-                )}
               </div>
 
-              {/* Quick amount buttons */}
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setPaymentAmount(String(paymentSupplier.remainingBalance / 4))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 bg-muted/60 text-muted-foreground hover:bg-muted"
-                >
-                  ربع ({(paymentSupplier.remainingBalance / 4).toFixed(2)})
-                </button>
-                <button
-                  onClick={() => setPaymentAmount(String(paymentSupplier.remainingBalance / 2))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 bg-muted/60 text-muted-foreground hover:bg-muted"
-                >
-                  النصف ({(paymentSupplier.remainingBalance / 2).toFixed(2)})
-                </button>
-                <button
-                  onClick={() => setPaymentAmount(String(paymentSupplier.remainingBalance))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
-                >
-                  الكل ({paymentSupplier.remainingBalance.toFixed(2)})
-                </button>
-              </div>
-
-              {/* Payment method */}
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>طريقة الدفع</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger className="h-10 rounded-xl bg-muted/30 border-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash" className="gap-2">
-                      <span className="flex items-center gap-2">
-                        <Banknote className="w-4 h-4" />
-                        نقدي
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="transfer" className="gap-2">
-                      <span className="flex items-center gap-2">
-                        <Wallet className="w-4 h-4" />
-                        تحويل
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="check" className="gap-2">
-                      <span className="flex items-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        شيك
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'cash', label: 'نقدي', icon: Banknote },
+                    { value: 'transfer', label: 'تحويل', icon: Wallet },
+                    { value: 'check', label: 'شيك', icon: Wallet },
+                  ].map((m) => (
+                    <Button
+                      key={m.value}
+                      type="button"
+                      variant={paymentMethod === m.value ? 'default' : 'outline'}
+                      size="sm"
+                      className="rounded-lg text-xs"
+                      onClick={() => setPaymentMethod(m.value)}
+                    >
+                      {m.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
-              {/* Notes */}
-              <div className="space-y-1.5">
-                <Label>ملاحظات (اختياري)</Label>
+              <div className="space-y-2">
+                <Label>ملاحظات</Label>
                 <Textarea
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
-                  placeholder="أضف ملاحظات حول الدفعة..."
-                  className="h-16 rounded-xl bg-muted/30 border-0 text-sm resize-none"
+                  className="rounded-xl resize-none"
+                  rows={2}
+                  placeholder="ملاحظات إضافية (اختياري)"
                 />
               </div>
+
+              <Button
+                onClick={handleRecordSupplierPayment}
+                disabled={paymentSubmitting || !paymentAmount}
+                className="w-full gap-2 rounded-xl btn-ripple"
+              >
+                {paymentSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>جاري التسجيل...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-4 h-4" />
+                    تسجيل الدفعة
+                  </>
+                )}
+              </Button>
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setOpenPaymentDialog(false)}
-              className="flex-1 h-10 rounded-xl"
-              disabled={paymentSubmitting}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleRecordSupplierPayment}
-              disabled={paymentSubmitting || !paymentAmount || parseFloat(paymentAmount) <= 0 || parseFloat(paymentAmount) > (paymentSupplier?.remainingBalance || 0)}
-              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-emerald-500/25 btn-ripple"
-            >
-              {paymentSubmitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>جاري التسجيل...</span>
-                </>
-              ) : (
-                <>
-                  <Wallet className="w-4 h-4" />
-                  تسجيل الدفعة
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* ==================== Payment History Dialog ==================== */}
       <Dialog open={openHistoryDialog} onOpenChange={setOpenHistoryDialog}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col glass-card" dir="rtl">
+        <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                <History className="h-5 w-5 text-primary" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                <History className="h-5 w-5 text-blue-600" />
               </div>
-              سجل الدفعات — {historySupplier?.name}
+              سجل الدفعات
             </DialogTitle>
           </DialogHeader>
           {historySupplier && (
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <div className="mb-3 rounded-xl bg-muted/40 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>إجمالي المشتريات: <span className="tabular-nums font-medium">{historySupplier.totalPurchases.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span></span>
-                    <span>المدفوع: <span className="tabular-nums font-medium text-emerald-600">{historySupplier.totalPaid.toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span></span>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] text-muted-foreground">المتبقي</p>
-                    <p className={`text-sm font-bold tabular-nums ${historySupplier.remainingBalance > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                      {historySupplier.remainingBalance.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
-                    </p>
-                  </div>
-                </div>
+            <div className="space-y-3 py-2">
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-sm font-semibold">{historySupplier.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  إجمالي المدفوع: <span className="text-emerald-600 font-bold">{formatCurrency(historySupplier.totalPaid)}</span>
+                </p>
               </div>
-              {historyLoading ? (
-                <div className="flex-1 flex items-center justify-center py-8">
-                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                </div>
-              ) : paymentHistory.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
-                  <History className="w-10 h-10 text-muted-foreground/30 mb-2" />
-                  <p className="text-sm text-muted-foreground">لا توجد دفعات مسجلة</p>
-                  <p className="text-xs text-muted-foreground mt-1">لم يتم تسجيل أي دفعة لهذا المورد بعد</p>
-                </div>
-              ) : (
-                <ScrollArea className="flex-1">
-                  <div className="space-y-2 pb-2">
+
+              <ScrollArea className="max-h-[300px]">
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  </div>
+                ) : paymentHistory.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <History className="w-8 h-8 mx-auto opacity-30 mb-2" />
+                    <p className="text-sm">لا توجد دفعات سابقة</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
                     {paymentHistory.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-card border border-border/40 hover:bg-muted/30 transition-colors card-hover"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 flex-shrink-0">
-                          {payment.method === 'cash' ? (
-                            <Banknote className="w-4 h-4 text-emerald-600" />
-                          ) : payment.method === 'transfer' ? (
-                            <Wallet className="w-4 h-4 text-emerald-600" />
-                          ) : (
-                            <Truck className="w-4 h-4 text-emerald-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-emerald-600 tabular-nums">
-                            -{payment.amount.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
-                          </p>
+                      <div key={payment.id} className="rounded-lg border p-3 bg-card/50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-emerald-600 tabular-nums">
+                              {formatCurrency(payment.amount)}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {payment.method === 'cash' ? 'نقدي' : payment.method === 'transfer' ? 'تحويل' : 'شيك'}
+                            </p>
+                          </div>
                           <p className="text-[10px] text-muted-foreground">
-                            {payment.method === 'cash' ? 'نقدي' : payment.method === 'transfer' ? 'تحويل' : 'شيك'}
-                            {payment.notes && ` • ${payment.notes}`}
+                            {new Date(payment.createdAt).toLocaleDateString('ar-SA')}
                           </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground flex-shrink-0">
-                          {new Date(payment.createdAt).toLocaleDateString('ar-SA', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
+                        {payment.notes && (
+                          <p className="text-xs text-muted-foreground mt-1.5 border-t border-border/30 pt-1.5">
+                            {payment.notes}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
-              )}
+                )}
+              </ScrollArea>
             </div>
           )}
         </DialogContent>

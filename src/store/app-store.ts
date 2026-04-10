@@ -67,6 +67,7 @@ export interface SettingsState {
   currencyPosition: 'before' | 'after'
   decimalPlaces: number
   autoPrintOnPayment: boolean
+  invoiceTemplate: 'classic' | 'professional' | 'simple'
 
   // POS Settings
   defaultCustomerId: string
@@ -110,6 +111,7 @@ export const defaultSettings: SettingsState = {
   currencyPosition: 'after',
   decimalPlaces: 0,
   autoPrintOnPayment: false,
+  invoiceTemplate: 'classic' as const,
 
   // POS Settings
   defaultCustomerId: '',

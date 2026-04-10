@@ -841,6 +841,48 @@ export function SettingsScreen() {
               </div>
             </div>
 
+            {/* Invoice Template Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="invoiceTemplate" className="text-sm font-medium flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                قالب الفاتورة
+              </Label>
+              <Select
+                value={localSettings.invoiceTemplate}
+                onValueChange={(v) => handleChange('invoiceTemplate', v as SettingsState['invoiceTemplate'])}
+              >
+                <SelectTrigger id="invoiceTemplate" className="w-full text-right">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="classic">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm">📋</span>
+                      <span>كلاسيك</span>
+                      <span className="text-[10px] text-muted-foreground">— التخطيط القياسي</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="professional">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm">✨</span>
+                      <span>احترافي</span>
+                      <span className="text-[10px] text-muted-foreground">— تصميم عصري</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="simple">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm">📄</span>
+                      <span>مبسط</span>
+                      <span className="text-[10px] text-muted-foreground">— نص فقط</span>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                اختر قالب الفاتورة الذي سيتم استخدامه عند الطباعة
+              </p>
+            </div>
+
             {/* Auto-print on Payment */}
             <SwitchRow
               label="طباعة تلقائية بعد الدفع"
