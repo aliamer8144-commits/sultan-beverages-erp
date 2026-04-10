@@ -130,19 +130,54 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // 4 & 5. Update product quantities based on invoice type
+      // 4 & 5. Update product quantities and log stock adjustments
       for (const item of items) {
+        // Get current stock before updating
+        const productBefore = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { quantity: true },
+        })
+        const previousQty = productBefore?.quantity || 0
+
+        let newQty: number
+        let adjustmentType: string
+        let reason: string
+
         if (type === 'sale') {
+          newQty = Math.max(0, previousQty - item.quantity)
+          adjustmentType = 'sale'
+          reason = `بيع - فاتورة ${invoiceNo}`
           await tx.product.update({
             where: { id: item.productId },
-            data: { quantity: { decrement: item.quantity } },
+            data: { quantity: newQty },
           })
         } else if (type === 'purchase') {
+          newQty = previousQty + item.quantity
+          adjustmentType = 'purchase'
+          reason = `شراء - فاتورة ${invoiceNo}`
           await tx.product.update({
             where: { id: item.productId },
-            data: { quantity: { increment: item.quantity } },
+            data: { quantity: newQty },
           })
+        } else {
+          continue
         }
+
+        // Auto-log stock adjustment
+        await tx.stockAdjustment.create({
+          data: {
+            productId: item.productId,
+            type: adjustmentType,
+            quantity: item.quantity,
+            previousQty,
+            newQty,
+            reason,
+            reference: invoiceNo,
+            referenceType: 'invoice',
+            userId: userId || '',
+            userName: createdInvoice.user?.name || null,
+          },
+        })
       }
 
       // 6. Update customer debt if sale and not fully paid

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -36,7 +36,7 @@ model Product {
   costPrice   Float           // purchase cost
   quantity    Int             @default(0)
   minQuantity Int             @default(5) // minimum stock level for alerts
-  image       String?         @db.Text
+  image       String?
   barcode     String?         @unique
   isActive    Boolean         @default(true)
   category    Category        @relation(fields: [categoryId], references: [id])
@@ -48,15 +48,17 @@ model Product {
 }
 
 model Customer {
-  id       String    @id @default(cuid())
-  name     String    @unique
-  phone    String?
-  debt     Float     @default(0)
-  isActive Boolean   @default(true)
-  invoices Invoice[]
-  payments Payment[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            String             @id @default(cuid())
+  name          String             @unique
+  phone         String?
+  debt          Float              @default(0)
+  loyaltyPoints Int                @default(0)
+  isActive      Boolean            @default(true)
+  invoices      Invoice[]
+  payments      Payment[]
+  loyaltyTransactions LoyaltyTransaction[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 model Supplier {
@@ -72,22 +74,23 @@ model Supplier {
 }
 
 model Invoice {
-  id          String         @id @default(cuid())
-  invoiceNo   String         @unique
-  type        String         @default("sale") // sale, purchase
-  customerId  String?
-  customer    Customer?      @relation(fields: [customerId], references: [id])
-  supplierId  String?
-  supplier    Supplier?      @relation(fields: [supplierId], references: [id])
-  totalAmount Float
-  discount    Float          @default(0)
-  paidAmount  Float
-  userId      String
-  user        User           @relation(fields: [userId], references: [id])
-  items       InvoiceItem[]
-  returns     ProductReturn[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id                   String             @id @default(cuid())
+  invoiceNo            String             @unique
+  type                 String             @default("sale") // sale, purchase
+  customerId           String?
+  customer             Customer?          @relation(fields: [customerId], references: [id])
+  supplierId           String?
+  supplier             Supplier?          @relation(fields: [supplierId], references: [id])
+  totalAmount          Float
+  discount             Float              @default(0)
+  paidAmount           Float
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id])
+  items                InvoiceItem[]
+  returns              ProductReturn[]
+  loyaltyTransactions  LoyaltyTransaction[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 }
 
 model InvoiceItem {
@@ -107,7 +110,7 @@ model Payment {
   customer   Customer @relation(fields: [customerId], references: [id])
   amount     Float
   method     String   @default("cash") // cash, transfer
-  notes      String?  @db.Text
+  notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -118,7 +121,7 @@ model SupplierPayment {
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   amount     Float
   method     String   @default("cash") // cash, transfer, check
-  notes      String?  @db.Text
+  notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -142,25 +145,26 @@ model ProductReturn {
 }
 
 model StockAdjustment {
-  id          String   @id @default(cuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  type        String   // in, out, adjustment
-  quantity    Int
-  previousQty Int
-  newQty      Int
-  reason      String   @default("")
-  userId      String   @default("")
-  userName    String?
-  reference   String?  // e.g., invoice number, return number
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  type          String   // in, out, adjustment, sale, purchase, return
+  quantity      Int
+  previousQty   Int
+  newQty        Int
+  reason        String   @default("")
+  userId        String   @default("")
+  userName      String?
+  reference     String?  // e.g., invoice number, return number
+  referenceType String?  // invoice, return, manual
+  createdAt     DateTime @default(now())
 }
 
 model Expense {
   id               String   @id @default(cuid())
   category         String   // مصروفات تشغيلية, صيانة, إيجار, رواتب, نقل, متنوع
   amount           Float
-  description      String   @db.Text
+  description      String
   date             DateTime @default(now())
   recurring        Boolean  @default(false)  // مصروف متكرر
   recurringPeriod  String?  // daily, weekly, monthly
@@ -175,7 +179,7 @@ model AuditLog {
   action    String   // create, update, delete, login, logout, payment, backup, restore
   entity    String   // User, Product, Customer, Invoice, Category, Supplier, Payment, System
   entityId  String?
-  details   String?  @db.Text
+  details   String?
   userId    String?
   userName  String?
   ipAddress String?
@@ -191,4 +195,17 @@ model SalesTarget {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+model LoyaltyTransaction {
+  id             String    @id @default(cuid())
+  customerId     String
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  points         Int       // positive for earned, negative for redeemed
+  transactionType String   // "earned", "redeemed", "adjusted"
+  referenceId    String?   // optional reference
+  invoiceId      String?
+  invoice        Invoice?  @relation(fields: [invoiceId], references: [id])
+  description    String
+  createdAt      DateTime  @default(now())
 }

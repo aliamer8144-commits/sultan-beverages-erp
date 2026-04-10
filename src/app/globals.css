@@ -8948,3 +8948,856 @@ button:active:not(:disabled) {
   background: color-mix(in srgb, var(--primary) 6%, var(--muted));
   color: color-mix(in srgb, var(--primary) 40%, var(--muted-foreground));
 }
+
+/* ============================================================================
+   74. SCROLL-DRIVEN REVEAL ANIMATIONS
+   ============================================================================ */
+
+@keyframes reveal-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-on-scroll {
+  animation: reveal-fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+
+/* Fallback for browsers without animation-timeline support */
+@supports not (animation-timeline: view()) {
+  .reveal-on-scroll {
+    opacity: 0;
+    transform: translateY(24px);
+    animation: reveal-fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .reveal-on-scroll.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dark .reveal-on-scroll {
+  animation-name: reveal-fade-in-up;
+}
+
+/* Stagger delay variants for sequential reveal */
+.reveal-on-scroll-d1 { animation-range: entry 5% entry 90%; }
+.reveal-on-scroll-d2 { animation-range: entry 10% entry 95%; }
+.reveal-on-scroll-d3 { animation-range: entry 15% entry 100%; }
+
+@supports not (animation-timeline: view()) {
+  .reveal-on-scroll-d1 { animation-delay: 0.1s; }
+  .reveal-on-scroll-d2 { animation-delay: 0.2s; }
+  .reveal-on-scroll-d3 { animation-delay: 0.3s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .reveal-on-scroll-d1,
+  .reveal-on-scroll-d2,
+  .reveal-on-scroll-d3 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================================
+   75. PRICING TABLE STYLES
+   ============================================================================ */
+
+.pricing-row {
+  position: relative;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.pricing-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 4%, transparent) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.pricing-row:hover {
+  background-color: color-mix(in srgb, var(--primary) 3%, var(--card));
+}
+
+.pricing-row:hover::before {
+  opacity: 1;
+}
+
+.pricing-row-hover {
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.pricing-row-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--primary) 6%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.pricing-row-hover:hover {
+  background-color: color-mix(in srgb, var(--primary) 4%, var(--card));
+  transform: translateX(-2px);
+  box-shadow: 2px 0 12px -4px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.pricing-row-hover:hover::after {
+  opacity: 1;
+}
+
+.pricing-row-hover:active {
+  transform: translateX(-1px);
+}
+
+/* Dark mode */
+.dark .pricing-row:hover {
+  background-color: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+
+.dark .pricing-row:hover::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 8%, transparent) 50%,
+    transparent 100%
+  );
+}
+
+.dark .pricing-row-hover:hover {
+  background-color: color-mix(in srgb, var(--primary) 8%, var(--card));
+  box-shadow: 2px 0 16px -4px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.dark .pricing-row-hover:hover::after {
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--primary) 10%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-row,
+  .pricing-row-hover {
+    transition: background-color 0.15s ease;
+    transform: none !important;
+  }
+  .pricing-row::before,
+  .pricing-row-hover::after {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   76. STATUS CHIP VARIANTS
+   ============================================================================ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chip-success {
+  background-color: oklch(0.96 0.03 155);
+  color: oklch(0.45 0.15 155);
+  border: 1px solid oklch(0.88 0.05 155);
+}
+
+.chip-success:hover {
+  background-color: oklch(0.92 0.05 155);
+}
+
+.chip-warning {
+  background-color: oklch(0.97 0.03 85);
+  color: oklch(0.55 0.15 65);
+  border: 1px solid oklch(0.90 0.05 85);
+}
+
+.chip-warning:hover {
+  background-color: oklch(0.93 0.05 85);
+}
+
+.chip-danger {
+  background-color: oklch(0.96 0.03 25);
+  color: oklch(0.50 0.18 25);
+  border: 1px solid oklch(0.88 0.05 25);
+  animation: chip-danger-pulse 2s ease-in-out infinite;
+}
+
+.chip-danger:hover {
+  background-color: oklch(0.92 0.06 25);
+}
+
+@keyframes chip-danger-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.50 0.18 25 / 0%); }
+  50% { box-shadow: 0 0 0 4px oklch(0.50 0.18 25 / 10%); }
+}
+
+.chip-info {
+  background-color: oklch(0.96 0.02 250);
+  color: oklch(0.45 0.15 250);
+  border: 1px solid oklch(0.88 0.04 250);
+}
+
+.chip-info:hover {
+  background-color: oklch(0.92 0.04 250);
+}
+
+.chip-neutral {
+  background-color: oklch(0.96 0.005 260);
+  color: oklch(0.45 0.01 260);
+  border: 1px solid oklch(0.90 0.005 260);
+}
+
+.chip-neutral:hover {
+  background-color: oklch(0.92 0.01 260);
+}
+
+/* Icon sizing inside chips */
+.chip > svg,
+.chip [data-lucide] {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* Dark mode variants */
+.dark .chip-success {
+  background-color: oklch(0.20 0.06 155 / 30%);
+  color: oklch(0.75 0.15 155);
+  border-color: oklch(0.30 0.08 155 / 50%);
+}
+
+.dark .chip-success:hover {
+  background-color: oklch(0.25 0.08 155 / 40%);
+}
+
+.dark .chip-warning {
+  background-color: oklch(0.22 0.06 85 / 30%);
+  color: oklch(0.78 0.12 85);
+  border-color: oklch(0.32 0.08 85 / 50%);
+}
+
+.dark .chip-warning:hover {
+  background-color: oklch(0.28 0.08 85 / 40%);
+}
+
+.dark .chip-danger {
+  background-color: oklch(0.22 0.06 25 / 30%);
+  color: oklch(0.75 0.15 25);
+  border-color: oklch(0.32 0.08 25 / 50%);
+  animation-name: chip-danger-pulse-dark;
+}
+
+.dark .chip-danger:hover {
+  background-color: oklch(0.28 0.08 25 / 40%);
+}
+
+@keyframes chip-danger-pulse-dark {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.75 0.15 25 / 0%); }
+  50% { box-shadow: 0 0 0 4px oklch(0.75 0.15 25 / 12%); }
+}
+
+.dark .chip-info {
+  background-color: oklch(0.22 0.04 250 / 30%);
+  color: oklch(0.75 0.12 250);
+  border-color: oklch(0.32 0.06 250 / 50%);
+}
+
+.dark .chip-info:hover {
+  background-color: oklch(0.28 0.06 250 / 40%);
+}
+
+.dark .chip-neutral {
+  background-color: oklch(0.22 0.01 260 / 30%);
+  color: oklch(0.70 0.02 260);
+  border-color: oklch(0.32 0.01 260 / 50%);
+}
+
+.dark .chip-neutral:hover {
+  background-color: oklch(0.28 0.02 260 / 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-danger {
+    animation: none !important;
+  }
+}
+
+/* ============================================================================
+   77. FORM GROUP ENHANCEMENT
+   ============================================================================ */
+
+.form-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.form-group label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: oklch(0.35 0.01 260);
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus + label,
+.form-group input:not(:placeholder-shown) + label,
+.form-group textarea:focus + label,
+.form-group textarea:not(:placeholder-shown) + label {
+  color: var(--primary);
+}
+
+/* Error state with shake */
+@keyframes form-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-4px); }
+  30%, 70% { transform: translateX(4px); }
+}
+
+.form-group-error {
+  animation: form-shake 0.4s ease-in-out;
+}
+
+.form-group-error label {
+  color: oklch(0.55 0.18 25) !important;
+}
+
+.form-group-error input,
+.form-group-error textarea,
+.form-group-error select {
+  border-color: oklch(0.55 0.18 25) !important;
+  box-shadow: 0 0 0 3px oklch(0.55 0.18 25 / 10%);
+}
+
+.form-group-error .form-error-text {
+  font-size: 0.6875rem;
+  color: oklch(0.55 0.18 25);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+/* Success state */
+.form-group-success label {
+  color: oklch(0.50 0.15 155) !important;
+}
+
+.form-group-success input,
+.form-group-success textarea,
+.form-group-success select {
+  border-color: oklch(0.55 0.15 155) !important;
+  box-shadow: 0 0 0 3px oklch(0.55 0.15 155 / 8%);
+}
+
+.form-group-success .form-success-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background-color: oklch(0.92 0.05 155);
+  color: oklch(0.45 0.15 155);
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: form-success-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes form-success-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+/* Dark mode */
+.dark .form-group label {
+  color: oklch(0.80 0.01 260);
+}
+
+.dark .form-group-error label {
+  color: oklch(0.75 0.15 25) !important;
+}
+
+.dark .form-group-error input,
+.dark .form-group-error textarea,
+.dark .form-group-error select {
+  border-color: oklch(0.70 0.15 25) !important;
+  box-shadow: 0 0 0 3px oklch(0.70 0.15 25 / 12%);
+}
+
+.dark .form-group-error .form-error-text {
+  color: oklch(0.75 0.15 25);
+}
+
+.dark .form-group-success label {
+  color: oklch(0.75 0.15 155) !important;
+}
+
+.dark .form-group-success input,
+.dark .form-group-success textarea,
+.dark .form-group-success select {
+  border-color: oklch(0.70 0.15 155) !important;
+  box-shadow: 0 0 0 3px oklch(0.70 0.15 155 / 10%);
+}
+
+.dark .form-group-success .form-success-icon {
+  background-color: oklch(0.30 0.08 155 / 40%);
+  color: oklch(0.75 0.15 155);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form-group-error {
+    animation: none !important;
+  }
+  .form-group-success .form-success-icon {
+    animation: none !important;
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+/* ============================================================================
+   78. DRAG HANDLE STYLES
+   ============================================================================ */
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: grab;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+  background-size: 5px 5px;
+  background-position: 0 0, 5px 5px;
+  background-repeat: repeat;
+  border-radius: 0.25rem;
+  color: oklch(0.45 0.01 260);
+  flex-shrink: 0;
+  padding: 0.375rem;
+}
+
+.drag-handle:hover {
+  opacity: 0.7;
+  background-color: oklch(0.94 0.005 260);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle-active {
+  opacity: 1;
+  transform: scale(1.1);
+  background-color: color-mix(in srgb, var(--primary) 10%, oklch(0.94 0.005 260));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  border-radius: 0.375rem;
+}
+
+.drag-placeholder {
+  border: 2px dashed oklch(0.70 0.04 260);
+  border-radius: var(--radius-lg);
+  background: oklch(0.98 0.005 260 / 50%);
+  min-height: 3rem;
+  transition: all 0.2s ease;
+}
+
+/* Dark mode */
+.dark .drag-handle {
+  color: oklch(0.65 0.01 260);
+}
+
+.dark .drag-handle:hover {
+  background-color: oklch(0.30 0.01 260 / 50%);
+}
+
+.dark .drag-handle-active {
+  background-color: color-mix(in srgb, var(--primary) 15%, oklch(0.25 0.01 260 / 50%));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.dark .drag-placeholder {
+  border-color: oklch(0.45 0.04 260);
+  background: oklch(0.20 0.01 260 / 30%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drag-handle,
+  .drag-handle-active,
+  .drag-placeholder {
+    transition: opacity 0.15s ease;
+    transform: none !important;
+  }
+}
+
+/* ============================================================================
+   79. TIMELINE COMPONENT
+   ============================================================================ */
+
+.timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-right: 1.5rem;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  right: 0.4375rem;
+  top: 0.625rem;
+  bottom: 0.625rem;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    oklch(0.85 0.03 260) 0%,
+    oklch(0.90 0.02 260) 50%,
+    oklch(0.85 0.03 260) 100%
+  );
+  border-radius: 9999px;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  gap: 0.875rem;
+  padding: 0.75rem 0;
+  padding-right: 1.25rem;
+}
+
+.timeline-line {
+  position: absolute;
+  right: 0.4375rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: oklch(0.88 0.02 260);
+}
+
+.timeline-dot {
+  position: absolute;
+  right: -0.0625rem;
+  top: 1rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: oklch(0.95 0.01 260);
+  border: 2px solid oklch(0.80 0.04 260);
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.timeline-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0.1875rem;
+  border-radius: 50%;
+  background: oklch(0.80 0.04 260);
+}
+
+.timeline-item:hover .timeline-dot {
+  border-color: var(--primary);
+  transform: scale(1.15);
+}
+
+.timeline-item:hover .timeline-dot::after {
+  background: var(--primary);
+}
+
+.timeline-dot-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.timeline-dot-active::after {
+  background: white;
+  inset: 0.25rem;
+}
+
+/* Dark mode */
+.dark .timeline::before {
+  background: linear-gradient(
+    180deg,
+    oklch(0.35 0.02 260) 0%,
+    oklch(0.30 0.015 260) 50%,
+    oklch(0.35 0.02 260) 100%
+  );
+}
+
+.dark .timeline-dot {
+  background: oklch(0.25 0.01 260);
+  border-color: oklch(0.45 0.03 260);
+}
+
+.dark .timeline-dot::after {
+  background: oklch(0.45 0.03 260);
+}
+
+.dark .timeline-item:hover .timeline-dot {
+  border-color: var(--primary);
+}
+
+.dark .timeline-item:hover .timeline-dot::after {
+  background: var(--primary);
+}
+
+.dark .timeline-dot-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.dark .timeline-dot-active::after {
+  background: oklch(0.15 0.01 260);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-dot,
+  .timeline-item:hover .timeline-dot {
+    transition: none;
+    transform: none !important;
+  }
+}
+
+/* ============================================================================
+   80. CARD GRID PATTERN
+   ============================================================================ */
+
+.card-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.card-grid-masonry {
+  columns: 3 18rem;
+  column-gap: 1rem;
+}
+
+.card-grid-masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+
+.card-grid-featured {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.card-grid-featured > *:first-child {
+  grid-row: 1 / 3;
+}
+
+/* Responsive overrides */
+@media (max-width: 768px) {
+  .card-grid-masonry {
+    columns: 2 14rem;
+  }
+
+  .card-grid-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .card-grid-featured > *:first-child {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-grid-masonry {
+    columns: 1;
+  }
+}
+
+/* Dark mode: subtle border adjustment */
+.dark .card-grid-auto > *,
+.dark .card-grid-masonry > * {
+  border-color: oklch(0.35 0.01 260 / 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-grid-auto,
+  .card-grid-masonry,
+  .card-grid-featured {
+    /* No animations on grid containers themselves */
+  }
+}
+
+/* ============================================================================
+   81. MICRO-INTERACTION HOVER COLLECTION
+   ============================================================================ */
+
+.hover-lift-sm {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.hover-lift-sm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -2px oklch(0.15 0.01 260 / 10%);
+}
+
+.hover-lift-md {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.hover-lift-md:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px -4px oklch(0.15 0.01 260 / 12%);
+}
+
+.hover-lift-lg {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift-lg:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 16px 48px -8px oklch(0.15 0.01 260 / 15%);
+}
+
+.hover-press {
+  transition: transform 0.1s ease;
+}
+
+.hover-press:active {
+  transform: scale(0.98);
+}
+
+.hover-skew {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-skew:hover {
+  transform: skewX(-1.5deg) skewY(-0.5deg);
+}
+
+.hover-border-glow {
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.hover-border-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    oklch(0.65 0.2 310) 25%,
+    oklch(0.60 0.18 200) 50%,
+    oklch(0.65 0.2 310) 75%,
+    var(--primary) 100%
+  );
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  animation: border-glow-rotate 4s linear infinite;
+}
+
+@keyframes border-glow-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hover-border-glow:hover::before {
+  opacity: 1;
+}
+
+.hover-border-glow:hover {
+  box-shadow: 0 0 20px -4px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* Dark mode variants */
+.dark .hover-lift-sm:hover {
+  box-shadow: 0 4px 16px -2px oklch(0.10 0.01 260 / 20%);
+}
+
+.dark .hover-lift-md:hover {
+  box-shadow: 0 8px 32px -4px oklch(0.10 0.01 260 / 25%);
+}
+
+.dark .hover-lift-lg:hover {
+  box-shadow: 0 16px 48px -8px oklch(0.10 0.01 260 / 30%);
+}
+
+.dark .hover-border-glow:hover {
+  box-shadow: 0 0 24px -4px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-lift-sm,
+  .hover-lift-md,
+  .hover-lift-lg {
+    transition: none;
+    transform: none !important;
+  }
+  .hover-press:active {
+    transform: none !important;
+  }
+  .hover-skew:hover {
+    transform: none !important;
+  }
+  .hover-border-glow::before {
+    animation: none !important;
+  }
+}

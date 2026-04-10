@@ -30,6 +30,7 @@ import {
   PackageX, ImagePlus, X, History, PackagePlus, Download, ChevronLeft,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RotateCcw, PenLine,
   FileInput, ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
+  TrendingUp, TrendingDown, Clock, Activity,
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
@@ -170,6 +171,11 @@ export function InventoryScreen() {
   // Batch delete confirmation dialog state
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
 
+  // Per-product stock history popover state
+  const [productHistoryId, setProductHistoryId] = useState<string | null>(null)
+  const [productMovements, setProductMovements] = useState<StockAdjustment[]>([])
+  const [productMovementsLoading, setProductMovementsLoading] = useState(false)
+
   // Stock history dialog state
   const [historyOpen, setHistoryOpen] = useState(false)
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([])
@@ -183,6 +189,41 @@ export function InventoryScreen() {
   const [historyDateTo, setHistoryDateTo] = useState<Date | undefined>()
   const [dateFromOpen, setDateFromOpen] = useState(false)
   const [dateToOpen, setDateToOpen] = useState(false)
+
+  // ─── Per-product stock history fetch ─────────────────────────
+  const fetchProductMovements = useCallback(async (productId: string) => {
+    setProductMovementsLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.set('productId', productId)
+      params.set('page', '1')
+      params.set('limit', '5')
+      const res = await fetch(`/api/stock-adjustments?${params.toString()}`)
+      const data = await res.json()
+      if (data.success) {
+        setProductMovements(data.data || [])
+      } else {
+        setProductMovements([])
+      }
+    } catch {
+      setProductMovements([])
+    } finally {
+      setProductMovementsLoading(false)
+    }
+  }, [])
+
+  // Stock movement type config for mini timeline
+  const movementTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+    in: { label: 'إضافة', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    purchase: { label: 'شراء', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    return: { label: 'إرجاع', icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    out: { label: 'خصم', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+    sale: { label: 'بيع', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+    adjustment: { label: 'تعديل', icon: ArrowUpDown, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+    addition: { label: 'إضافة', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    subtraction: { label: 'خصم', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+    correction: { label: 'تصحيح', icon: ArrowUpDown, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+  }
 
   // Image upload handler with compression
   const handleImageUpload = useCallback(async (file: File) => {
@@ -912,7 +953,7 @@ export function InventoryScreen() {
                   return (
                     <TableRow
                       key={product.id}
-                      className={`group transition-colors ${isSelected ? 'bg-primary/5' : ''} ${isLowStock && !isSelected ? 'bg-destructive/[0.03] hover:bg-destructive/[0.06]' : ''}`}
+                      className={`pricing-row group transition-colors ${isSelected ? 'bg-primary/5' : ''} ${isLowStock && !isSelected ? 'bg-destructive/[0.03] hover:bg-destructive/[0.06]' : ''}`}
                     >
                       {/* Checkbox */}
                       <TableCell className="w-10 text-center">
@@ -963,7 +1004,7 @@ export function InventoryScreen() {
                             {product.quantity}
                           </span>
                           {isLowStock && (
-                            <span className="badge-warning text-[10px] flex items-center gap-0.5 mt-0.5 px-1.5 py-0 rounded-full">
+                            <span className="chip chip-warning text-[10px] flex items-center gap-0.5 mt-0.5">
                               <AlertTriangle className="w-2.5 h-2.5" />
                               حد أدنى: {product.minQuantity}
                             </span>
@@ -988,6 +1029,123 @@ export function InventoryScreen() {
                       {/* Actions */}
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {/* Per-product stock history button */}
+                          <Popover
+                            open={productHistoryId === product.id}
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setProductHistoryId(product.id)
+                                fetchProductMovements(product.id)
+                              } else {
+                                setProductHistoryId(null)
+                                setProductMovements([])
+                              }
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-muted-foreground hover:text-blue-700 dark:hover:text-blue-400"
+                                title="سجل الحركة"
+                              >
+                                <Activity className="w-4 h-4" />
+                                <span className="sr-only">سجل الحركة</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-0" dir="rtl" side="left" align="start">
+                              {/* Popover Header */}
+                              <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+                                <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                  <Activity className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-foreground truncate">آخر الحركات</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{product.name}</p>
+                                </div>
+                              </div>
+                              {/* Popover Content */}
+                              <div className="max-h-72 overflow-y-auto">
+                                {productMovementsLoading ? (
+                                  <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                  </div>
+                                ) : productMovements.length === 0 ? (
+                                  <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                                    <History className="w-8 h-8 text-muted-foreground/20 mb-2" />
+                                    <p className="text-xs text-muted-foreground">لا توجد حركات مسجلة</p>
+                                  </div>
+                                ) : (
+                                  <div className="divide-y">
+                                    {productMovements.map((mov) => {
+                                      const cfg = movementTypeConfig[mov.type] || movementTypeConfig.adjustment
+                                      const MovIcon = cfg.icon
+                                      const change = mov.newQty - mov.previousQty
+                                      const isUp = change > 0
+                                      const isDown = change < 0
+                                      return (
+                                        <div key={mov.id} className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                                          {/* Icon */}
+                                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
+                                            <MovIcon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                                          </div>
+                                          {/* Info */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                                              <span className={`text-[10px] font-semibold ${cfg.color}`}>{cfg.label}</span>
+                                              <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+                                                <Clock className="w-2.5 h-2.5" />
+                                                {new Date(mov.createdAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+                                            {/* Quantities */}
+                                            <div className="flex items-center gap-1.5 text-[10px]">
+                                              <span className="text-muted-foreground tabular-nums">{mov.previousQty}</span>
+                                              <ArrowLeft className={`w-3 h-3 ${isUp ? 'text-emerald-500' : isDown ? 'text-red-500' : 'text-amber-500'}`} />
+                                              <span className={`font-bold tabular-nums ${isUp ? 'text-emerald-600 dark:text-emerald-400' : isDown ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                {mov.newQty}
+                                              </span>
+                                              {change !== 0 && (
+                                                <span className={`rounded-full px-1.5 py-0 text-[9px] font-bold ${
+                                                  isUp ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                }`}>
+                                                  {isUp ? '+' : ''}{change}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {/* Reason */}
+                                            {mov.reason && (
+                                              <p className="text-[9px] text-muted-foreground truncate mt-0.5 max-w-[180px]">{mov.reason}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Footer */}
+                              {!productMovementsLoading && productMovements.length > 0 && (
+                                <div className="border-t px-4 py-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full h-7 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                    onClick={() => {
+                                      setProductHistoryId(null)
+                                      setProductMovements([])
+                                      setHistoryFilterProduct(product.id)
+                                      setHistoryOpen(true)
+                                    }}
+                                  >
+                                    <History className="w-3 h-3" />
+                                    عرض السجل الكامل
+                                  </Button>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
                           {/* Quick stock adjust button */}
                           <Button
                             variant="ghost"

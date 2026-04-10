@@ -43,7 +43,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
-import { formatWithSettings } from '@/lib/currency'
+import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface TopProduct {
@@ -117,6 +117,12 @@ function useAnimatedNumber(target: number, duration = 1200) {
 // Format currency (delegates to centralized utility)
 const formatCurrency = formatWithSettings
 
+// Dual currency format helper (uses settings from store)
+function dualFormat(amount: number): { primary: string; secondary: string | null; display: string } {
+  const settings = useAppStore.getState().settings
+  return formatDualCurrency(amount, settings)
+}
+
 function getTodayArabic(): string {
   const now = new Date()
   try {
@@ -138,7 +144,7 @@ function HourlyTooltip({ active, payload, label }: { active?: boolean; payload?:
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(payload[0].value)}
+        {dualFormat(payload[0].value).display}
       </p>
     </div>
   )
@@ -151,7 +157,7 @@ function ComparisonTooltip({ active, payload, label }: { active?: boolean; paylo
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="text-sm font-bold text-foreground">
-          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {formatCurrency(item.value)}
+          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {dualFormat(item.value).display}
         </p>
       ))}
     </div>
@@ -177,6 +183,7 @@ function StatCard({
   isInteger?: boolean
 }) {
   const animatedValue = useAnimatedNumber(value)
+  const dual = dualFormat(value)
 
   return (
     <Card className={`rounded-2xl border-0 shadow-sm card-hover data-card-micro ${statClass}`}>
@@ -185,7 +192,7 @@ function StatCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatWithSettings(animatedValue)}
+              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : dual.display}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
           </div>
@@ -511,7 +518,7 @@ export function DailyCloseScreen() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">متوسط قيمة الفاتورة</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{formatCurrency(data.averageInvoice)}</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{dualFormat(data.averageInvoice).display}</p>
                 </div>
               </div>
             </CardContent>
@@ -530,7 +537,7 @@ export function DailyCloseScreen() {
                   </p>
                   {data.topSellingProduct && (
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {data.topSellingProduct.quantity} وحدة — {formatCurrency(data.topSellingProduct.revenue)}
+                      {data.topSellingProduct.quantity} وحدة — {dualFormat(data.topSellingProduct.revenue).display}
                     </p>
                   )}
                 </div>
@@ -724,7 +731,7 @@ export function DailyCloseScreen() {
                           </td>
                           <td className="py-3 px-4">
                             <span className="text-sm font-bold text-foreground tabular-nums">
-                              {formatCurrency(product.revenue)}
+                              {dualFormat(product.revenue).display}
                             </span>
                           </td>
                         </tr>
@@ -762,7 +769,7 @@ export function DailyCloseScreen() {
                 <div>
                   <p className="text-sm text-muted-foreground">مدفوعات نقدية</p>
                   <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-                    {formatCurrency(data.paymentMethods.cash.total)}
+                    {dualFormat(data.paymentMethods.cash.total).display}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {data.paymentMethods.cash.count} فاتورة نقدية
@@ -794,7 +801,7 @@ export function DailyCloseScreen() {
                 <div>
                   <p className="text-sm text-muted-foreground">مدفوعات آجلة</p>
                   <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-                    {formatCurrency(data.paymentMethods.credit.total)}
+                    {dualFormat(data.paymentMethods.credit.total).display}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {data.paymentMethods.credit.count} فاتورة آجلة

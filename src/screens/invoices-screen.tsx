@@ -86,7 +86,7 @@ function formatTime(dateStr: string): string {
 export function InvoicesScreen() {
   const [activeTab, setActiveTab] = useState<'sale' | 'purchase'>('sale')
   const settings = useAppStore((s) => s.settings)
-  const { formatCurrency } = useCurrency()
+  const { formatCurrency, formatDual, isDualActive } = useCurrency()
 
   // Filters
   const [search, setSearch] = useState('')
@@ -779,35 +779,35 @@ export function InvoicesScreen() {
                         <div className="text-left hidden sm:block">
                           <p className="text-[10px] text-muted-foreground">الإجمالي</p>
                           <p className="text-sm font-bold text-foreground">
-                            {formatCurrency(invoice.totalAmount)}
+                            {formatDual(invoice.totalAmount).display}
                           </p>
                         </div>
                         <div className="text-left hidden md:block">
                           <p className="text-[10px] text-muted-foreground">الخصم</p>
                           <p className="text-sm font-semibold text-orange-600">
-                            {invoice.discount > 0 ? `-${formatCurrency(invoice.discount)}` : '—'}
+                            {invoice.discount > 0 ? `-${formatDual(invoice.discount).display}` : '—'}
                           </p>
                         </div>
                         <div className="text-left hidden md:block">
                           <p className="text-[10px] text-muted-foreground">المدفوع</p>
                           <p className="text-sm font-semibold text-emerald-600">
-                            {formatCurrency(invoice.paidAmount)}
+                            {formatDual(invoice.paidAmount).display}
                           </p>
                         </div>
                         <div className="text-left hidden lg:block">
                           <p className="text-[10px] text-muted-foreground">المتبقي</p>
                           <p className={`text-sm font-semibold ${remaining > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                            {remaining > 0 ? formatCurrency(remaining) : '✓'}
+                            {remaining > 0 ? formatDual(remaining).display : '✓'}
                           </p>
                         </div>
 
                         {/* Mobile total */}
                         <div className="text-left sm:hidden">
                           <p className="text-xs font-bold text-foreground">
-                            {formatCurrency(invoice.totalAmount)}
+                            {formatDual(invoice.totalAmount).display}
                           </p>
                           {remaining > 0 && (
-                            <p className="text-[10px] text-destructive">متبقي {formatCurrency(remaining)}</p>
+                            <p className="text-[10px] text-destructive">متبقي {formatDual(remaining).display}</p>
                           )}
                         </div>
 
@@ -1021,38 +1021,38 @@ export function InvoicesScreen() {
                   <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">الإجمالي</span>
-                      <span className="font-bold">{formatCurrency(selectedInvoice.totalAmount)}</span>
+                      <span className="font-bold">{formatDual(selectedInvoice.totalAmount).display}</span>
                     </div>
                     {selectedInvoice.discount > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">الخصم</span>
                         <span className="font-semibold text-orange-600">
-                          -{formatCurrency(selectedInvoice.discount)}
+                          -{formatDual(selectedInvoice.discount).display}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">المدفوع</span>
                       <span className="font-semibold text-emerald-600">
-                        {formatCurrency(selectedInvoice.paidAmount)}
+                        {formatDual(selectedInvoice.paidAmount).display}
                       </span>
                     </div>
                     {selectedInvoice.totalAmount - selectedInvoice.discount - selectedInvoice.paidAmount > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">المتبقي</span>
                         <span className="font-semibold text-destructive">
-                          {formatCurrency(
+                          {formatDual(
                             selectedInvoice.totalAmount -
                               selectedInvoice.discount -
                               selectedInvoice.paidAmount
-                          )}
+                          ).display}
                         </span>
                       </div>
                     )}
                     <div className="border-t border-border/70 pt-2 flex justify-between items-center">
                       <span className="text-sm font-bold">الصافي</span>
                       <span className="text-lg font-bold text-primary">
-                        {formatCurrency(selectedInvoice.totalAmount - selectedInvoice.discount)}
+                        {formatDual(selectedInvoice.totalAmount - selectedInvoice.discount).display}
                       </span>
                     </div>
                   </div>
@@ -1129,7 +1129,7 @@ export function InvoicesScreen() {
                       <div className="bg-muted/50 rounded-lg p-3 space-y-1">
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">سعر الوحدة</span>
-                          <span className="font-medium">{formatCurrency(returnProductItem.price)}</span>
+                          <span className="font-medium">{formatDual(returnProductItem.price).display}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">الكمية</span>
@@ -1138,7 +1138,7 @@ export function InvoicesScreen() {
                         <div className="border-t border-border/50 pt-1 flex justify-between text-sm">
                           <span className="font-semibold">إجمالي الإرجاع</span>
                           <span className="font-bold text-amber-600">
-                            {formatCurrency(returnProductItem.price * returnQuantity)}
+                            {formatDual(returnProductItem.price * returnQuantity).display}
                           </span>
                         </div>
                       </div>

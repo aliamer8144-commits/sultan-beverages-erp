@@ -45,6 +45,8 @@ import {
   ToggleRight,
   Globe,
   Eye,
+  ArrowLeftRight,
+  Star,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
@@ -980,9 +982,326 @@ export function SettingsScreen() {
               onCheckedChange={(v) => handleChange('showProductImages', v)}
             />
           </SettingsCard>
+
+          {/* ─── Section 5: Dual Currency ────────────────────── */}
+          <SettingsCard
+            icon={ArrowLeftRight}
+            title="العملات"
+            description="عرض الأسعار بعملتين مختلفات"
+          >
+            {/* Secondary Currency Toggle */}
+            <SwitchRow
+              label="تفعيل العملة الثانوية"
+              description="عرض الأسعار بعملتين في وقت واحد"
+              checked={localSettings.secondaryCurrencyEnabled}
+              onCheckedChange={(v) => handleChange('secondaryCurrencyEnabled', v)}
+            />
+
+            {localSettings.secondaryCurrencyEnabled && (
+              <>
+                <Separator className="opacity-40" />
+
+                {/* Primary Currency Info */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5 text-primary" />
+                    العملة الأساسية
+                  </Label>
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                    <Badge variant="secondary" className="badge-active text-xs font-bold">
+                      {CURRENCY_MAP[localSettings.currency].symbol}
+                    </Badge>
+                    <span className="text-sm font-medium">
+                      {CURRENCY_MAP[localSettings.currency].name}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    لتغيير العملة الأساسية، انتقل إلى قسم إعدادات الفاتورة
+                  </p>
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Secondary Currency Selector */}
+                <div className="space-y-2">
+                  <Label htmlFor="secondaryCurrency" className="text-sm font-medium flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                    العملة الثانوية
+                  </Label>
+                  <Select
+                    value={localSettings.secondaryCurrency}
+                    onValueChange={(v) => {
+                      handleChange('secondaryCurrency', v as CurrencyCode)
+                      const meta = CURRENCY_MAP[v as CurrencyCode]
+                      if (meta) {
+                        handleChange('secondaryCurrencySymbol', '')
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="secondaryCurrency" className="w-full text-right">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(CURRENCY_MAP) as [CurrencyCode, { symbol: string; name: string; decimalPlaces: number }][]).map(
+                        ([code, { symbol, name }]) => (
+                          <SelectItem key={code} value={code}>
+                            <span className="flex items-center gap-2">
+                              <span className="font-bold text-sm">{symbol}</span>
+                              <span className="text-muted-foreground">{name}</span>
+                            </span>
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Secondary Custom Symbol */}
+                <div className="space-y-2">
+                  <Label htmlFor="secondarySymbol" className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    رمز العملة الثانوية المخصص
+                    <span className="text-[10px] text-muted-foreground">(اختياري)</span>
+                  </Label>
+                  <Input
+                    id="secondarySymbol"
+                    value={localSettings.secondaryCurrencySymbol}
+                    onChange={(e) => handleChange('secondaryCurrencySymbol', e.target.value)}
+                    placeholder={CURRENCY_MAP[localSettings.secondaryCurrency].symbol}
+                    className="text-right"
+                    dir="ltr"
+                    maxLength={10}
+                  />
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Exchange Rate */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-muted-foreground" />
+                    سعر الصرف
+                  </Label>
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <p className="text-[10px] text-muted-foreground mb-1">
+                          ١ {CURRENCY_MAP[localSettings.currency].symbol} =
+                        </p>
+                        <Input
+                          type="number"
+                          min={0.0001}
+                          step={0.001}
+                          value={localSettings.exchangeRate || ''}
+                          onChange={(e) => handleChange('exchangeRate', parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="h-10 text-right text-lg font-bold tabular-nums"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div className="flex items-center pt-4">
+                        <span className="text-lg font-bold text-primary">
+                          {getCurrencySymbol(localSettings.secondaryCurrency, localSettings.secondaryCurrencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      مثال: إذا كان ١ ريال = ١.٤٨ دولار، أدخل ١.٤٨
+                    </p>
+                  </div>
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Display Mode */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                    طريقة العرض
+                  </Label>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleChange('currencyDisplayMode', 'primary-only')}
+                      className={`w-full p-3 rounded-xl border-2 text-right transition-all text-sm ${
+                        localSettings.currencyDisplayMode === 'primary-only'
+                          ? 'border-primary bg-primary/5 text-primary font-bold'
+                          : 'border-border/50 hover:border-primary/30 text-muted-foreground'
+                      }`}
+                    >
+                      <span className="block">العملة الأساسية فقط</span>
+                      <span className="block text-[10px] mt-1 font-normal opacity-70">مثال: ١,٥٠٠ {CURRENCY_MAP[localSettings.currency].symbol}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('currencyDisplayMode', 'secondary-parentheses')}
+                      className={`w-full p-3 rounded-xl border-2 text-right transition-all text-sm ${
+                        localSettings.currencyDisplayMode === 'secondary-parentheses'
+                          ? 'border-primary bg-primary/5 text-primary font-bold'
+                          : 'border-border/50 hover:border-primary/30 text-muted-foreground'
+                      }`}
+                    >
+                      <span className="block">العملة الثانوية بين أقواس</span>
+                      <span className="block text-[10px] mt-1 font-normal opacity-70">
+                        مثال: ١,٥٠٠ {CURRENCY_MAP[localSettings.currency].symbol}{' '}
+                        ({(1500 * (localSettings.exchangeRate || 1)).toLocaleString('ar-SA', { maximumFractionDigits: 2 })}{' '}
+                        {getCurrencySymbol(localSettings.secondaryCurrency, localSettings.secondaryCurrencySymbol)})
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('currencyDisplayMode', 'secondary-main')}
+                      className={`w-full p-3 rounded-xl border-2 text-right transition-all text-sm ${
+                        localSettings.currencyDisplayMode === 'secondary-main'
+                          ? 'border-primary bg-primary/5 text-primary font-bold'
+                          : 'border-border/50 hover:border-primary/30 text-muted-foreground'
+                      }`}
+                    >
+                      <span className="block">العملة الثانوية كأساسية</span>
+                      <span className="block text-[10px] mt-1 font-normal opacity-70">
+                        مثال: {(1500 * (localSettings.exchangeRate || 1)).toLocaleString('ar-SA', { maximumFractionDigits: 2 })}{' '}
+                        {getCurrencySymbol(localSettings.secondaryCurrency, localSettings.secondaryCurrencySymbol)}{' '}
+                        (١,٥٠٠ {CURRENCY_MAP[localSettings.currency].symbol})
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Live Preview */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                    معاينة مباشرة
+                  </Label>
+                  <div className="p-4 rounded-xl bg-muted/40 border border-border/50 space-y-2">
+                    <p className="text-[10px] text-muted-foreground">مثال على تنسيق المبالغ:</p>
+                    <div className="space-y-1.5">
+                      {[1500, 25000, 150, 1234567.89].map((amt) => (
+                        <p key={amt} className="text-sm font-bold text-primary tabular-nums">
+                          {fc(amt, localSettings.currency, localSettings.currencySymbol, localSettings.currencyPosition, localSettings.decimalPlaces)}
+                          {localSettings.exchangeRate > 0 && (
+                            <span className="text-xs text-muted-foreground font-medium">{' '}({fc(amt * localSettings.exchangeRate, localSettings.secondaryCurrency, localSettings.secondaryCurrencySymbol, localSettings.currencyPosition, CURRENCY_MAP[localSettings.secondaryCurrency]?.decimalPlaces ?? 2)})</span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </SettingsCard>
+
+          {/* ─── Section 6: Loyalty Settings ───────────────────── */}
+          <SettingsCard
+            icon={Star}
+            title="برنامج الولاء"
+            description="إدارة نقاط المكافآت للعملاء"
+          >
+            {/* Enable Loyalty */}
+            <SwitchRow
+              label="تفعيل برنامج الولاء"
+              description="منح العملاء نقاط على مشترياتهم"
+              checked={localSettings.loyaltyEnabled}
+              onCheckedChange={(v) => handleChange('loyaltyEnabled', v)}
+            />
+
+            {localSettings.loyaltyEnabled && (
+              <>
+                <Separator className="opacity-40" />
+
+                {/* Points per Currency Unit */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Star className="w-3.5 h-3.5 text-muted-foreground" />
+                    نقاط لكل وحدة عملة
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={localSettings.loyaltyPointsPerUnit}
+                      onChange={(e) => handleChange('loyaltyPointsPerUnit', Number(e.target.value) || 0)}
+                      className="text-right"
+                      dir="ltr"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      نقطة / {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    مثال: إذا كان 1 نقطة لكل 1000 {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}، اكتب 0.001
+                  </p>
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Redemption Value */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    قيمة استبدال النقطة
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={localSettings.loyaltyRedemptionValue}
+                      onChange={(e) => handleChange('loyaltyRedemptionValue', Number(e.target.value) || 0)}
+                      className="text-right"
+                      dir="ltr"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)} / نقطة
+                    </span>
+                  </div>
+                </div>
+
+                <Separator className="opacity-40" />
+
+                {/* Minimum Points to Redeem */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                    الحد الأدنى لاستبدال النقاط
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={localSettings.loyaltyMinPointsToRedeem}
+                      onChange={(e) => handleChange('loyaltyMinPointsToRedeem', Number(e.target.value) || 0)}
+                      className="text-right"
+                      dir="ltr"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      نقطة
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    أقل عدد نقاط يسمح للعميل بتحويلها إلى خصم
+                  </p>
+                </div>
+
+                {/* Summary */}
+                <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-1">
+                  <p className="text-[11px] font-bold text-primary">ملخص البرنامج:</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    كل {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}1,000 = {localSettings.loyaltyPointsPerUnit * 1000} نقطة
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    كل {localSettings.loyaltyMinPointsToRedeem} نقطة = {getCurrencySymbol(localSettings.currency, localSettings.currencySymbol)}{(localSettings.loyaltyMinPointsToRedeem * localSettings.loyaltyRedemptionValue).toFixed(0)} خصم
+                  </p>
+                </div>
+              </>
+            )}
+          </SettingsCard>
         </div>
 
-        {/* ─── Section 5: Sales Targets (Full Width) ────────── */}
+        {/* ─── Section 7: Sales Targets (Full Width) ────────── */}
         <SalesTargetsSection />
 
         {/* Bottom Save Bar (Mobile) */}

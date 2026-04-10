@@ -178,10 +178,33 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // 4. Restore product quantity
+      // 4. Restore product quantity and log stock adjustment
+      const productBefore = await tx.product.findUnique({
+        where: { id: productId },
+        select: { quantity: true },
+      })
+      const previousQty = productBefore?.quantity || 0
+      const newQty = previousQty + quantity
+
       await tx.product.update({
         where: { id: productId },
-        data: { quantity: { increment: quantity } },
+        data: { quantity: newQty },
+      })
+
+      // Auto-log stock adjustment for return
+      await tx.stockAdjustment.create({
+        data: {
+          productId,
+          type: 'return',
+          quantity,
+          previousQty,
+          newQty,
+          reason: `إرجاع - مرتجع ${returnNo}`,
+          reference: returnNo,
+          referenceType: 'return',
+          userId: userId || '',
+          userName: userName || null,
+        },
       })
 
       // 5. Adjust customer debt if applicable (reduce by return amount)

@@ -72,3 +72,82 @@ export function formatWithSettings(amount: number): string {
     settings.decimalPlaces
   )
 }
+
+/**
+ * Convert an amount from one currency to another using an exchange rate.
+ * The exchange rate represents: how many `to` units = 1 `from` unit.
+ *
+ * @param amount       - The amount in the source currency
+ * @param exchangeRate - How many `to` currency units = 1 `from` currency unit
+ */
+export function convertCurrency(amount: number, exchangeRate: number): number {
+  if (!exchangeRate || exchangeRate <= 0) return 0
+  return amount * exchangeRate
+}
+
+/**
+ * Format dual currency string based on settings.
+ * Returns the formatted amount in primary and/or secondary currency.
+ *
+ * @param amount       - The amount in primary currency
+ * @param settings     - The app settings containing dual currency config
+ * @returns Formatted string(s) based on display mode
+ */
+export function formatDualCurrency(
+  amount: number,
+  settings: {
+    currency: CurrencyCode
+    currencySymbol: string
+    currencyPosition: 'before' | 'after'
+    decimalPlaces: number
+    secondaryCurrencyEnabled: boolean
+    secondaryCurrency: CurrencyCode
+    secondaryCurrencySymbol: string
+    exchangeRate: number
+    currencyDisplayMode: 'primary-only' | 'secondary-parentheses' | 'secondary-main'
+  }
+): { primary: string; secondary: string | null; display: string } {
+  const {
+    currency,
+    currencySymbol,
+    currencyPosition,
+    decimalPlaces,
+    secondaryCurrencyEnabled,
+    secondaryCurrency,
+    secondaryCurrencySymbol,
+    exchangeRate,
+    currencyDisplayMode,
+  } = settings
+
+  const primaryFormatted = formatCurrency(amount, currency, currencySymbol, currencyPosition, decimalPlaces)
+
+  if (!secondaryCurrencyEnabled || currencyDisplayMode === 'primary-only') {
+    return { primary: primaryFormatted, secondary: null, display: primaryFormatted }
+  }
+
+  const secondaryMeta = CURRENCY_MAP[secondaryCurrency]
+  const secondaryDecimals = secondaryMeta?.decimalPlaces ?? 2
+  const convertedAmount = convertCurrency(amount, exchangeRate)
+  const secondaryFormatted = formatCurrency(
+    convertedAmount,
+    secondaryCurrency,
+    secondaryCurrencySymbol,
+    currencyPosition,
+    secondaryDecimals
+  )
+
+  if (currencyDisplayMode === 'secondary-parentheses') {
+    return {
+      primary: primaryFormatted,
+      secondary: secondaryFormatted,
+      display: `${primaryFormatted} (${secondaryFormatted})`,
+    }
+  }
+
+  // 'secondary-main' — secondary is shown prominently, primary in parentheses
+  return {
+    primary: primaryFormatted,
+    secondary: secondaryFormatted,
+    display: `${secondaryFormatted} (${primaryFormatted})`,
+  }
+}

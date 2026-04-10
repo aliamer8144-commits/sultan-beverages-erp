@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 // Currency Types
-export type CurrencyCode = 'YER' | 'SAR' | 'USD' | 'EUR' | 'AED' | 'EGP' | 'QAR'
+export type CurrencyCode = 'YER' | 'SAR' | 'USD' | 'EUR' | 'AED' | 'EGP' | 'QAR' | 'GBP' | 'KWD' | 'BHD' | 'OMR' | 'JOD'
 
 export const CURRENCY_MAP: Record<CurrencyCode, { symbol: string; name: string; decimalPlaces: number }> = {
   YER: { symbol: 'ر.ي', name: 'ريال يمني', decimalPlaces: 0 },
@@ -12,6 +12,11 @@ export const CURRENCY_MAP: Record<CurrencyCode, { symbol: string; name: string; 
   AED: { symbol: 'د.إ', name: 'درهم إماراتي', decimalPlaces: 2 },
   EGP: { symbol: 'ج.م', name: 'جنيه مصري', decimalPlaces: 2 },
   QAR: { symbol: 'ر.ق', name: 'ريال قطري', decimalPlaces: 2 },
+  GBP: { symbol: '£', name: 'جنيه إسترليني', decimalPlaces: 2 },
+  KWD: { symbol: 'د.ك', name: 'دينار كويتي', decimalPlaces: 3 },
+  BHD: { symbol: 'د.ب', name: 'دينار بحريني', decimalPlaces: 3 },
+  OMR: { symbol: 'ر.ع', name: 'ريال عماني', decimalPlaces: 3 },
+  JOD: { symbol: 'د.ا', name: 'دينار أردني', decimalPlaces: 3 },
 }
 
 // Types
@@ -72,6 +77,19 @@ export interface SettingsState {
   animationSpeed: 'slow' | 'normal' | 'fast'
   compactMode: boolean
   showProductImages: boolean
+
+  // Dual Currency Settings
+  secondaryCurrencyEnabled: boolean
+  secondaryCurrency: CurrencyCode
+  secondaryCurrencySymbol: string
+  exchangeRate: number // how many secondary = 1 primary
+  currencyDisplayMode: 'primary-only' | 'secondary-parentheses' | 'secondary-main'
+
+  // Loyalty Settings
+  loyaltyEnabled: boolean
+  loyaltyPointsPerUnit: number
+  loyaltyRedemptionValue: number
+  loyaltyMinPointsToRedeem: number
 }
 
 export const defaultSettings: SettingsState = {
@@ -102,6 +120,19 @@ export const defaultSettings: SettingsState = {
   animationSpeed: 'normal',
   compactMode: false,
   showProductImages: true,
+
+  // Dual Currency Settings
+  secondaryCurrencyEnabled: false,
+  secondaryCurrency: 'SAR',
+  secondaryCurrencySymbol: '',
+  exchangeRate: 1,
+  currencyDisplayMode: 'primary-only' as const,
+
+  // Loyalty Settings
+  loyaltyEnabled: true,
+  loyaltyPointsPerUnit: 1,
+  loyaltyRedemptionValue: 5,
+  loyaltyMinPointsToRedeem: 100,
 }
 
 export type Screen = 
@@ -121,6 +152,7 @@ export type Screen =
   | 'backup'
   | 'analytics'
   | 'sales-targets'
+  | 'loyalty'
 
 interface AppState {
   // Auth

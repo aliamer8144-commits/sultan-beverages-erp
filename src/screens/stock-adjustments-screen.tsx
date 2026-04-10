@@ -23,13 +23,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from 'sonner'
 import {
   SlidersHorizontal,
@@ -45,7 +42,18 @@ import {
   PackageOpen,
   ClipboardEdit,
   AlertTriangle,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  Truck,
+  RotateCcw,
+  ArrowRight,
+  Clock,
+  User,
+  FileText,
 } from 'lucide-react'
+import { exportToCSV } from '@/lib/export-csv'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +67,7 @@ interface StockAdjustmentItem {
   newQty: number
   reason: string
   reference: string | null
+  referenceType: string | null
   userId: string
   userName: string | null
   createdAt: string
@@ -76,6 +85,12 @@ interface AdjustmentStats {
   inCount: number
   outCount: number
   adjustmentCount: number
+  saleCount: number
+  purchaseCount: number
+  returnCount: number
+  totalIncrease: number
+  totalDecrease: number
+  netChange: number
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -85,6 +100,11 @@ function formatDate(dateStr: string): string {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+  })
+}
+
+function formatTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString('ar-SA', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -98,41 +118,72 @@ function formatShortDate(dateStr: string): string {
   })
 }
 
-function getTypeBadge(type: string) {
-  switch (type) {
-    case 'in':
-      return (
-        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold badge-active">
-          <ArrowDownToLine className="w-3 h-3 ml-1" />
-          إضافة
-        </Badge>
-      )
-    case 'out':
-      return (
-        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold badge-danger">
-          <ArrowUpFromLine className="w-3 h-3 ml-1" />
-          خصم
-        </Badge>
-      )
-    case 'adjustment':
-      return (
-        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 text-[10px] px-2 py-0 h-5 font-semibold badge-warning">
-          <Equal className="w-3 h-3 ml-1" />
-          تعديل
-        </Badge>
-      )
-    default:
-      return <Badge variant="outline">{type}</Badge>
-  }
+function getDateKey(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('ar-SA', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  })
 }
 
-function getTypeLabel(type: string): string {
-  switch (type) {
-    case 'in': return 'إضافة'
-    case 'out': return 'خصم'
-    case 'adjustment': return 'تعديل'
-    default: return type
-  }
+// Type badge configuration
+const typeConfig: Record<string, {
+  label: string
+  icon: React.ElementType
+  colorClass: string
+  bgClass: string
+  badgeClass: string
+  direction: 'up' | 'down' | 'neutral'
+}> = {
+  in: {
+    label: 'إضافة',
+    icon: ArrowDownToLine,
+    colorClass: 'text-emerald-600 dark:text-emerald-400',
+    bgClass: 'bg-emerald-50 dark:bg-emerald-900/20',
+    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0',
+    direction: 'up',
+  },
+  out: {
+    label: 'خصم',
+    icon: ArrowUpFromLine,
+    colorClass: 'text-red-600 dark:text-red-400',
+    bgClass: 'bg-red-50 dark:bg-red-900/20',
+    badgeClass: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0',
+    direction: 'down',
+  },
+  adjustment: {
+    label: 'تعديل',
+    icon: Equal,
+    colorClass: 'text-amber-600 dark:text-amber-400',
+    bgClass: 'bg-amber-50 dark:bg-amber-900/20',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0',
+    direction: 'neutral',
+  },
+  sale: {
+    label: 'بيع',
+    icon: ShoppingCart,
+    colorClass: 'text-red-600 dark:text-red-400',
+    bgClass: 'bg-red-50 dark:bg-red-900/20',
+    badgeClass: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0',
+    direction: 'down',
+  },
+  purchase: {
+    label: 'شراء',
+    icon: Truck,
+    colorClass: 'text-emerald-600 dark:text-emerald-400',
+    bgClass: 'bg-emerald-50 dark:bg-emerald-900/20',
+    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0',
+    direction: 'up',
+  },
+  return: {
+    label: 'إرجاع',
+    icon: RotateCcw,
+    colorClass: 'text-blue-600 dark:text-blue-400',
+    bgClass: 'bg-blue-50 dark:bg-blue-900/20',
+    badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0',
+    direction: 'up',
+  },
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -153,7 +204,7 @@ export function StockAdjustmentsScreen() {
   const [totalPages, setTotalPages] = useState(0)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const limit = 20
+  const limit = 25
 
   // New Adjustment Dialog
   const [newAdjOpen, setNewAdjOpen] = useState(false)
@@ -199,21 +250,6 @@ export function StockAdjustmentsScreen() {
     }
   }, [page, typeFilter, search, dateFrom, dateTo])
 
-  // ── Fetch Stats Only ──────────────────────────────────────────────────
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const res = await fetch(`/api/stock-adjustments?dateFrom=${today}&dateTo=${today}&limit=1`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.stats) setStats(data.stats)
-      }
-    } catch {
-      // Silently fail for stats
-    }
-  }, [])
-
   useEffect(() => {
     fetchAdjustments()
   }, [fetchAdjustments])
@@ -225,6 +261,32 @@ export function StockAdjustmentsScreen() {
     setTypeFilter('all')
     setDateFrom('')
     setDateTo('')
+  }
+
+  // ── Export CSV ───────────────────────────────────────────────────────
+
+  const handleExportCSV = () => {
+    if (adjustments.length === 0) {
+      toast.error('لا توجد بيانات للتصدير')
+      return
+    }
+
+    const csvData = adjustments.map((adj) => ({
+      'المنتج': adj.product.name,
+      'التصنيف': adj.product.category?.name || '—',
+      'النوع': typeConfig[adj.type]?.label || adj.type,
+      'الكمية': adj.quantity,
+      'قبل': adj.previousQty,
+      'بعد': adj.newQty,
+      'التغيير': adj.newQty - adj.previousQty,
+      'السبب': adj.reason || '—',
+      'المستخدم': adj.userName || adj.userId || '—',
+      'المرجع': adj.reference || '—',
+      'التاريخ': new Date(adj.createdAt).toLocaleString('ar-SA'),
+    }))
+
+    exportToCSV(csvData, `stock-movements-${formatShortDate(new Date().toISOString())}`)
+    toast.success('تم تصدير البيانات بنجاح')
   }
 
   // ── New Adjustment Dialog ─────────────────────────────────────────────
@@ -292,6 +354,7 @@ export function StockAdjustmentsScreen() {
           quantity: adjQuantity,
           reason: adjReason,
           reference: adjReference || null,
+          referenceType: 'manual',
           userId: user.id,
           userName: user.name,
         }),
@@ -301,7 +364,6 @@ export function StockAdjustmentsScreen() {
         toast.success(data.message || 'تم تعديل المخزون بنجاح')
         setNewAdjOpen(false)
         fetchAdjustments()
-        fetchStats()
       } else {
         toast.error(data.error || 'حدث خطأ أثناء تعديل المخزون')
       }
@@ -312,10 +374,156 @@ export function StockAdjustmentsScreen() {
     }
   }
 
+  // ── Group adjustments by date ─────────────────────────────────────────
+
+  const groupedAdjustments: Record<string, StockAdjustmentItem[]> = {}
+  for (const adj of adjustments) {
+    const dateKey = getDateKey(adj.createdAt)
+    if (!groupedAdjustments[dateKey]) {
+      groupedAdjustments[dateKey] = []
+    }
+    groupedAdjustments[dateKey].push(adj)
+  }
+
+  // ── Loading Skeleton ─────────────────────────────────────────────────
+
+  const renderSkeleton = () => (
+    <div className="space-y-6">
+      {/* Stats skeleton */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />
+        ))}
+      </div>
+      {/* Timeline skeleton */}
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="space-y-3">
+            <div className="h-8 w-64 rounded-lg skeleton-shimmer" />
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="h-28 rounded-xl skeleton-shimmer" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  // ── Timeline Entry ───────────────────────────────────────────────────
+
+  const renderTimelineEntry = (adj: StockAdjustmentItem) => {
+    const config = typeConfig[adj.type] || typeConfig.adjustment
+    const Icon = config.icon
+    const change = adj.newQty - adj.previousQty
+    const isIncrease = change > 0
+    const isDecrease = change < 0
+
+    return (
+      <div
+        key={adj.id}
+        className={`relative flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border/50 bg-card transition-all duration-200 hover:shadow-md card-hover`}
+      >
+        {/* Icon & connector line */}
+        <div className="flex flex-col items-center flex-shrink-0">
+          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${
+            config.bgClass
+          }`}>
+            <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${config.colorClass}`} />
+          </div>
+          <div className={`w-0.5 flex-1 mt-2 rounded-full ${
+            isIncrease ? 'bg-emerald-200 dark:bg-emerald-800/50' :
+            isDecrease ? 'bg-red-200 dark:bg-red-800/50' :
+            'bg-amber-200 dark:bg-amber-800/50'
+          }`} />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-bold text-foreground truncate">
+                  {adj.product.name}
+                </h4>
+                <Badge className={`${config.badgeClass} text-[10px] px-2 py-0 h-5 font-semibold`}>
+                  {config.label}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0 text-[10px] text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              {formatTime(adj.createdAt)}
+            </div>
+          </div>
+
+          {/* Stock change info */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs mb-2">
+            <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1">
+              <span className="text-muted-foreground">قبل</span>
+              <span className="font-semibold text-foreground tabular-nums">{adj.previousQty}</span>
+            </div>
+
+            <ArrowRight className={`w-3.5 h-3.5 ${
+              isIncrease ? 'text-emerald-500' : isDecrease ? 'text-red-500' : 'text-amber-500'
+            }`} />
+
+            <div className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${
+              isIncrease ? 'bg-emerald-50 dark:bg-emerald-900/20' :
+              isDecrease ? 'bg-red-50 dark:bg-red-900/20' :
+              'bg-amber-50 dark:bg-amber-900/20'
+            }`}>
+              <span className={`font-semibold tabular-nums ${
+                isIncrease ? 'text-emerald-600 dark:text-emerald-400' :
+                isDecrease ? 'text-red-600 dark:text-red-400' :
+                'text-amber-600 dark:text-amber-400'
+              }`}>
+                {adj.newQty}
+              </span>
+            </div>
+
+            {/* Change indicator */}
+            {change !== 0 && (
+              <div className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                isIncrease
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                {isIncrease ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {isIncrease ? '+' : ''}{change}
+              </div>
+            )}
+          </div>
+
+          {/* Meta info row */}
+          <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+            {adj.reason && (
+              <div className="flex items-center gap-1">
+                <FileText className="w-3 h-3" />
+                <span className="truncate max-w-[200px]">{adj.reason}</span>
+              </div>
+            )}
+            {adj.reference && (
+              <div className="flex items-center gap-1 font-mono text-[10px]">
+                <span className="opacity-50">مرجع:</span>
+                {adj.reference}
+              </div>
+            )}
+            {adj.userName && (
+              <div className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                <span>{adj.userName}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 animate-fade-in-up">
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5 animate-fade-in-up">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -323,82 +531,120 @@ export function StockAdjustmentsScreen() {
             <ClipboardEdit className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-foreground">تعديلات المخزون</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">تتبع جميع تعديلات كميات المنتجات</p>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground">حركة المخزون</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">تتبع جميع حركات المنتجات والتعديلات</p>
           </div>
         </div>
-        <Button
-          onClick={openNewAdjustmentDialog}
-          className="gap-2 btn-ripple shimmer"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">تسجيل تعديل</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={loading || adjustments.length === 0}
+            className="gap-1.5 text-xs"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">تصدير CSV</span>
+          </Button>
+          <Button
+            onClick={openNewAdjustmentDialog}
+            className="gap-2 btn-ripple shimmer"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">تسجيل تعديل</span>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 stagger-children">
         {/* Total Today */}
-        <div className="bg-card rounded-2xl border border-border/50 p-4 card-hover stat-card-gradient stat-card-blue">
+        <div className="bg-card rounded-2xl border border-border/50 p-3 sm:p-4 card-hover stat-card-gradient stat-card-blue">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">إجمالي اليوم</p>
-              <p className="text-2xl font-bold text-foreground mt-1 number-animate-in">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">إجمالي اليوم</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 number-animate-in tabular-nums">
                 {stats?.todayTotal ?? 0}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">تعديل مسجل اليوم</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">حركة مسجلة</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <SlidersHorizontal className="w-5 h-5 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        {/* In (Additions) */}
-        <div className="bg-card rounded-2xl border border-border/50 p-4 card-hover stat-card-gradient stat-card-green">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">إضافات</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1 number-animate-in">
-                {stats?.inCount ?? 0}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">عملية إضافة مخزون</p>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <ArrowDownToLine className="w-5 h-5 text-emerald-500" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             </div>
           </div>
         </div>
 
-        {/* Out (Subtractions) */}
-        <div className="bg-card rounded-2xl border border-border/50 p-4 card-hover stat-card-gradient stat-card-red">
+        {/* Total Increases */}
+        <div className="bg-card rounded-2xl border border-border/50 p-3 sm:p-4 card-hover stat-card-gradient stat-card-green">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">خصومات</p>
-              <p className="text-2xl font-bold text-red-600 mt-1 number-animate-in">
-                {stats?.outCount ?? 0}
+              <p className="text-[10px] sm:text-xs text-muted-foreground">الإضافات</p>
+              <p className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1 number-animate-in tabular-nums">
+                +{stats?.totalIncrease ?? 0}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">عملية خصم من المخزون</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">وحدة واردة</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-              <ArrowUpFromLine className="w-5 h-5 text-red-500" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
             </div>
           </div>
         </div>
 
-        {/* Adjustments */}
-        <div className="bg-card rounded-2xl border border-border/50 p-4 card-hover stat-card-gradient" style={{ '--card-gradient': 'linear-gradient(135deg, rgba(245,158,11,0.08), transparent)' } as React.CSSProperties}>
+        {/* Total Decreases */}
+        <div className="bg-card rounded-2xl border border-border/50 p-3 sm:p-4 card-hover stat-card-gradient stat-card-red">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">تعديلات يدوية</p>
-              <p className="text-2xl font-bold text-amber-600 mt-1 number-animate-in">
-                {stats?.adjustmentCount ?? 0}
+              <p className="text-[10px] sm:text-xs text-muted-foreground">الخصومات</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600 mt-1 number-animate-in tabular-nums">
+                -{stats?.totalDecrease ?? 0}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">تعديل الكمية يدوياً</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">وحدة صادرة</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <Equal className="w-5 h-5 text-amber-500" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
             </div>
+          </div>
+        </div>
+
+        {/* Net Change */}
+        <div className="bg-card rounded-2xl border border-border/50 p-3 sm:p-4 card-hover">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">صافي التغيير</p>
+              <p className={`text-xl sm:text-2xl font-bold mt-1 number-animate-in tabular-nums ${
+                (stats?.netChange ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+              }`}>
+                {(stats?.netChange ?? 0) >= 0 ? '+' : ''}{stats?.netChange ?? 0}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">التغير الصافي</p>
+            </div>
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${
+              (stats?.netChange ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'
+            }`}>
+              {(stats?.netChange ?? 0) >= 0
+                ? <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                : <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+              }
+            </div>
+          </div>
+        </div>
+
+        {/* Quick type breakdown */}
+        <div className="bg-card rounded-2xl border border-border/50 p-3 sm:p-4 card-hover col-span-2 lg:col-span-1">
+          <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">تفصيل الحركات</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: 'إضافة', count: stats?.inCount ?? 0, color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' },
+              { label: 'خصم', count: stats?.outCount ?? 0, color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30' },
+              { label: 'بيع', count: stats?.saleCount ?? 0, color: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30' },
+              { label: 'شراء', count: stats?.purchaseCount ?? 0, color: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30' },
+              { label: 'إرجاع', count: stats?.returnCount ?? 0, color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30' },
+              { label: 'تعديل', count: stats?.adjustmentCount ?? 0, color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30' },
+            ].map((item) => (
+              <Badge key={item.label} className={`${item.color} border-0 text-[10px] px-2 py-0 h-5 font-semibold`}>
+                {item.label}: {item.count}
+              </Badge>
+            ))}
           </div>
         </div>
       </div>
@@ -406,7 +652,7 @@ export function StockAdjustmentsScreen() {
       {/* Filter Bar */}
       <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground">تصفية التعديلات</p>
+          <p className="text-sm font-semibold text-foreground">تصفية الحركات</p>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs gap-1 text-destructive hover:text-destructive">
@@ -446,8 +692,11 @@ export function StockAdjustmentsScreen() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">جميع الأنواع</SelectItem>
-              <SelectItem value="in">إضافة (إدخال مخزون)</SelectItem>
-              <SelectItem value="out">خصم (إخراج مخزون)</SelectItem>
+              <SelectItem value="sale">بيع (POS)</SelectItem>
+              <SelectItem value="purchase">شراء (مشتريات)</SelectItem>
+              <SelectItem value="return">إرجاع</SelectItem>
+              <SelectItem value="in">إضافة يدوية</SelectItem>
+              <SelectItem value="out">خصم يدوي</SelectItem>
               <SelectItem value="adjustment">تعديل يدوي</SelectItem>
             </SelectContent>
           </Select>
@@ -481,18 +730,13 @@ export function StockAdjustmentsScreen() {
       {/* Adjustments Count */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {loading ? 'جاري التحميل...' : `${total} تعديل`}
+          {loading ? 'جاري التحميل...' : `${total} حركة مسجلة`}
         </p>
       </div>
 
-      {/* Adjustments Table */}
+      {/* Timeline View */}
       {loading && adjustments.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm text-muted-foreground">جاري تحميل التعديلات...</p>
-          </div>
-        </div>
+        renderSkeleton()
       ) : adjustments.length === 0 ? (
         <div className="flex items-center justify-center py-16 empty-state">
           <div className="flex flex-col items-center gap-4 text-center">
@@ -500,11 +744,11 @@ export function StockAdjustmentsScreen() {
               <PackageOpen className="w-8 h-8 text-muted-foreground/50" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground empty-state-title">لا توجد تعديلات</p>
+              <p className="text-sm font-semibold text-foreground empty-state-title">لا توجد حركات</p>
               <p className="text-xs text-muted-foreground mt-1 empty-state-description">
                 {hasActiveFilters
-                  ? 'لم يتم العثور على تعديلات تطابق معايير البحث'
-                  : 'لم يتم تسجيل أي تعديل على المخزون بعد'}
+                  ? 'لم يتم العثور على حركات تطابق معايير البحث'
+                  : 'لم يتم تسجيل أي حركة على المخزون بعد'}
               </p>
             </div>
             {!hasActiveFilters && (
@@ -515,93 +759,33 @@ export function StockAdjustmentsScreen() {
                 className="gap-2 mt-2"
               >
                 <Plus className="w-4 h-4" />
-                تسجيل أول تعديل
+                تسجيل أول حركة
               </Button>
             )}
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border/50 overflow-hidden">
-          <ScrollArea className="max-h-[500px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="text-xs font-semibold py-3 px-4">التاريخ</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4">المنتج</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 hidden sm:table-cell">الفئة</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 text-center">النوع</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 text-center">الكمية</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 text-center hidden md:table-cell">قبل</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 text-center hidden md:table-cell">بعد</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 hidden lg:table-cell">السبب</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 px-4 hidden lg:table-cell">المرجع</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {adjustments.map((adj) => (
-                  <TableRow
-                    key={adj.id}
-                    className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <TableCell className="py-3 px-4">
-                      <span className="text-xs text-muted-foreground block">
-                        {formatShortDate(adj.createdAt)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/70 block">
-                        {new Date(adj.createdAt).toLocaleTimeString('ar-SA', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4">
-                      <span className="text-sm text-foreground font-medium">{adj.product.name}</span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 hidden sm:table-cell">
-                      <span className="text-xs text-muted-foreground">
-                        {adj.product.category?.name || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-center">
-                      {getTypeBadge(adj.type)}
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-center">
-                      <span className={`text-sm font-bold ${
-                        adj.type === 'in' ? 'text-emerald-600' :
-                        adj.type === 'out' ? 'text-red-600' :
-                        'text-amber-600'
-                      }`}>
-                        {adj.type === 'out' ? '-' : adj.type === 'in' ? '+' : ''}
-                        {adj.type === 'adjustment' ? adj.newQty : adj.quantity}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-center hidden md:table-cell">
-                      <span className="text-xs text-muted-foreground">{adj.previousQty}</span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-center hidden md:table-cell">
-                      <span className={`text-xs font-semibold ${
-                        adj.newQty > adj.previousQty ? 'text-emerald-600' :
-                        adj.newQty < adj.previousQty ? 'text-red-600' :
-                        'text-muted-foreground'
-                      }`}>
-                        {adj.newQty}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground truncate max-w-[140px] block">
-                        {adj.reason || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground font-mono truncate max-w-[100px] block">
-                        {adj.reference || '—'}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+        <div className="space-y-6">
+          {Object.entries(groupedAdjustments).map(([dateLabel, items]) => (
+            <div key={dateLabel}>
+              {/* Date header */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">{dateLabel}</span>
+                </div>
+                <div className="flex-1 section-divider" />
+                <Badge variant="secondary" className="text-[10px] font-medium">
+                  {items.length} حركة
+                </Badge>
+              </div>
+
+              {/* Timeline entries */}
+              <div className="space-y-2">
+                {items.map(renderTimelineEntry)}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -617,8 +801,33 @@ export function StockAdjustmentsScreen() {
           >
             السابق
           </Button>
-          <span className="text-xs text-muted-foreground px-3">
-            {page} / {totalPages}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let pageNum: number
+              if (totalPages <= 5) {
+                pageNum = i + 1
+              } else if (page <= 3) {
+                pageNum = i + 1
+              } else if (page >= totalPages - 2) {
+                pageNum = totalPages - 4 + i
+              } else {
+                pageNum = page - 2 + i
+              }
+              return (
+                <Button
+                  key={pageNum}
+                  variant={page === pageNum ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 w-8 text-xs p-0"
+                  onClick={() => setPage(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              )
+            })}
+          </div>
+          <span className="text-xs text-muted-foreground px-2">
+            / {totalPages}
           </span>
           <Button
             variant="outline"

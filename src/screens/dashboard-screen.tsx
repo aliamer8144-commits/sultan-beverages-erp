@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import { DollarSign, TrendingUp, FileText, AlertTriangle, RefreshCw, Download, Target, Clock, Flame } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
-import { formatWithSettings } from '@/lib/currency'
+import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
+import { useAppStore } from '@/store/app-store'
 
 // Chart color palette matching the theme
 const CHART_COLORS = ['#3b5bdb', '#364fc7', '#5c7cfa', '#e03131', '#c92a2a', '#0ca678', '#f08c00', '#9c36b5', '#1c7ed6', '#e8590c']
@@ -116,14 +117,21 @@ function formatDate(dateStr: string): string {
 // Format currency (delegates to centralized utility)
 const formatCurrency = formatWithSettings
 
+// Dual currency format helper (uses settings from store)
+function dualFormat(amount: number): { primary: string; secondary: string | null; display: string } {
+  const settings = useAppStore.getState().settings
+  return formatDualCurrency(amount, settings)
+}
+
 // Custom tooltip for bar charts
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload?: { name?: string } }>; label?: string }) {
   if (!active || !payload?.length) return null
+  const dual = dualFormat(payload[0].value)
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(payload[0].value)}
+        {dual.display}
       </p>
     </div>
   )
@@ -146,11 +154,12 @@ function TopProductTooltip({ active, payload }: { active?: boolean; payload?: Ar
 function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { name: string; value: number } }> }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
+  const dual = dualFormat(item.value)
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
       <p className="text-sm font-bold text-foreground">
-        {formatCurrency(item.value)}
+        {dual.display}
       </p>
     </div>
   )
@@ -218,6 +227,7 @@ function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteg
   isInteger?: boolean
 }) {
   const animatedValue = useAnimatedNumber(value)
+  const dual = dualFormat(value)
 
   return (
     <Card className={`rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro ${statClass}`}>
@@ -226,7 +236,7 @@ function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteg
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : formatWithSettings(animatedValue)}
+              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : dual.display}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
           </div>

@@ -42,6 +42,7 @@ import {
   Clock,
   Play,
   Target,
+  Star,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
@@ -75,6 +76,7 @@ interface Customer {
   name: string
   phone?: string
   debt: number
+  loyaltyPoints?: number
 }
 
 interface LastInvoice {
@@ -162,7 +164,7 @@ export function POSScreen() {
     recallOrder,
     deleteHeldOrder,
   } = useAppStore()
-  const { symbol } = useCurrency()
+  const { symbol, formatDual, isDualActive } = useCurrency()
 
   // ── Data state ──
   const [products, setProducts] = useState<Product[]>([])
@@ -178,6 +180,84 @@ export function POSScreen() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [paidAmount, setPaidAmount] = useState('')
   const [processingPayment, setProcessingPayment] = useState(false)
+
+  // ── Loyalty state ──
+  const [loyaltyRedeemDialogOpen, setLoyaltyRedeemDialogOpen] = useState(false)
+  const [redeemPoints, setRedeemPoints] = useState('')
+  const [redeemingPoints, setRedeemingPoints] = useState(false)
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
+
+  // ── Compute selected customer ──
+  const selectedCustomer = cartCustomerId ? customers.find((c) => c.id === cartCustomerId) : null
+  const customerPoints = selectedCustomer?.loyaltyPoints || 0
+  const loyaltySettings = settings
+  const isLoyaltyActive = loyaltySettings.loyaltyEnabled && !!cartCustomerId && customerPoints >= (loyaltySettings.loyaltyMinPointsToRedeem || 0)
+
+  // ── Fetch customers (needed before loyalty handlers) ──
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/customers')
+      const json = await res.json()
+      if (json.success) {
+        setCustomers(json.data)
+      }
+    } catch {
+      // Silent fail
+    }
+  }, [])
+
+  // ── Loyalty redeem handler ──
+  const handleOpenLoyaltyRedeem = useCallback(() => {
+    if (!isLoyaltyActive) return
+    setRedeemPoints('')
+    setLoyaltyRedeemDialogOpen(true)
+  }, [isLoyaltyActive])
+
+  const handleConfirmLoyaltyRedeem = useCallback(async () => {
+    if (!selectedCustomer || !redeemPoints) return
+    const pts = parseInt(redeemPoints)
+    if (!pts || pts < (loyaltySettings.loyaltyMinPointsToRedeem || 0)) {
+      toast.error(`الحد الأدنى للاستبدال ${loyaltySettings.loyaltyMinPointsToRedeem || 0} نقطة`)
+      return
+    }
+    if (pts > customerPoints) {
+      toast.error('النقاط المطلوبة أكبر من رصيد العميل')
+      return
+    }
+
+    setRedeemingPoints(true)
+    try {
+      const res = await fetch('/api/loyalty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: selectedCustomer.id,
+          points: -pts,
+          transactionType: 'redeemed',
+          description: `استبدال ${pts} نقطة كخصم في نقطة البيع`,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const discountValue = pts * (loyaltySettings.loyaltyRedemptionValue || 0)
+        setLoyaltyDiscount(discountValue)
+        toast.success(`تم استبدال ${pts} نقطة — خصم ${formatDual(discountValue).display}`)
+        setLoyaltyRedeemDialogOpen(false)
+        fetchCustomers()
+      } else {
+        toast.error(data.error || 'حدث خطأ أثناء استبدال النقاط')
+      }
+    } catch {
+      toast.error('حدث خطأ في الاتصال بالخادم')
+    } finally {
+      setRedeemingPoints(false)
+    }
+  }, [selectedCustomer, redeemPoints, customerPoints, loyaltySettings, formatDual, fetchCustomers])
+
+  // ── Reset loyalty discount when customer changes ──
+  useEffect(() => {
+    setLoyaltyDiscount(0)
+  }, [cartCustomerId])
 
   // ── Barcode state ──
   const [barcodeInput, setBarcodeInput] = useState('')
@@ -234,18 +314,6 @@ export function POSScreen() {
       const json = await res.json()
       if (json.success) {
         setCategories(json.data)
-      }
-    } catch {
-      // Silent fail
-    }
-  }, [])
-
-  const fetchCustomers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/customers')
-      const json = await res.json()
-      if (json.success) {
-        setCustomers(json.data)
       }
     } catch {
       // Silent fail
@@ -324,7 +392,8 @@ export function POSScreen() {
   )
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const grandTotal = cartTotal()
+  const effectiveTotal = Math.max(0, cartTotal() - loyaltyDiscount)
+  const grandTotal = effectiveTotal
   const change = parseFloat(paidAmount) - grandTotal
 
   // ── Payment ──
@@ -333,6 +402,29 @@ export function POSScreen() {
     setPaidAmount(grandTotal.toFixed(2))
     setPaymentDialogOpen(true)
   }, [cart.length, grandTotal])
+
+  // ── Auto-award loyalty points after payment ──
+  const awardLoyaltyPoints = useCallback(async (invoiceId: string, totalAmount: number, customerId: string | null) => {
+    if (!loyaltySettings.loyaltyEnabled || !customerId || totalAmount <= 0) return
+    try {
+      const earnedPoints = Math.floor(totalAmount * (loyaltySettings.loyaltyPointsPerUnit || 0))
+      if (earnedPoints <= 0) return
+      await fetch('/api/loyalty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId,
+          points: earnedPoints,
+          transactionType: 'earned',
+          invoiceId,
+          description: `كسب ${earnedPoints} نقطة من مشتريات بقيمة ${formatDual(totalAmount).display}`,
+        }),
+      })
+      fetchCustomers()
+    } catch {
+      // Silent — don't block payment for loyalty
+    }
+  }, [loyaltySettings, formatDual, fetchCustomers])
 
   const handleConfirmPayment = useCallback(async () => {
     if (!user) {
@@ -371,7 +463,10 @@ export function POSScreen() {
 
       if (json.success) {
         toast.success(`تم إنشاء الفاتورة ${json.data.invoiceNo} بنجاح`)
+        // Auto-award loyalty points after successful payment
+        awardLoyaltyPoints(json.data.id, json.data.totalAmount || subtotal, cartCustomerId)
         clearCart()
+        setLoyaltyDiscount(0)
         setPaymentDialogOpen(false)
         // Refresh products to update stock
         fetchProducts(searchQuery, selectedCategoryId)
@@ -394,6 +489,9 @@ export function POSScreen() {
     fetchProducts,
     searchQuery,
     selectedCategoryId,
+    awardLoyaltyPoints,
+    subtotal,
+    loyaltyDiscount,
   ])
 
   const handleClearCart = useCallback(() => {
@@ -705,7 +803,7 @@ export function POSScreen() {
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-foreground">{inv.invoiceNo}</span>
                             <span className="text-xs font-bold text-primary">
-                              {inv.totalAmount.toFixed(2)} {symbol}
+                              {formatDual(inv.totalAmount).display}
                             </span>
                           </div>
                           <div className="flex items-center justify-between mt-0.5">
@@ -859,7 +957,7 @@ export function POSScreen() {
 
                       {/* Product info */}
                       <h3 className="text-sm font-semibold text-center truncate mb-1">{product.name}</h3>
-                      <p className="text-lg font-bold text-primary text-center">{product.price.toFixed(2)} {symbol}</p>
+                      <p className="text-lg font-bold text-primary text-center">{formatDual(product.price).display}</p>
 
                       {/* Stock indicator */}
                       {isOutOfStock ? (
@@ -1041,7 +1139,7 @@ export function POSScreen() {
                 {cart.map((item) => (
                   <div
                     key={item.productId}
-                    className="cart-item-enter flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                    className="cart-item-enter pricing-row-hover flex items-center gap-3 p-3 rounded-xl bg-muted/30 transition-colors"
                   >
                     {/* Item thumbnail */}
                     {item.image ? (
@@ -1061,7 +1159,7 @@ export function POSScreen() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.price.toFixed(2)} {symbol} × {item.quantity}
+                        {formatDual(item.price).display} × {item.quantity}
                       </p>
                     </div>
 
@@ -1085,7 +1183,7 @@ export function POSScreen() {
                     {/* Item total & remove */}
                     <div className="flex flex-col items-end gap-1 min-w-[70px]">
                       <span className="text-sm font-bold text-primary tabular-nums">
-                        {(item.price * item.quantity).toFixed(2)}
+                        {formatDual(item.price * item.quantity).display}
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeFromCart(item.productId) }}
@@ -1127,6 +1225,19 @@ export function POSScreen() {
                 </Select>
               </div>
 
+              {/* Loyalty points display & redeem button */}
+              {selectedCustomer && loyaltySettings.loyaltyEnabled && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-medium">نقاط {selectedCustomer.name}</span>
+                  </div>
+                  <span className="text-sm font-bold text-amber-600 tabular-nums">
+                    {customerPoints} <span className="text-[10px] font-normal text-muted-foreground">نقطة</span>
+                  </span>
+                </div>
+              )}
+
               {/* Discount */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-medium text-muted-foreground">الخصم</label>
@@ -1151,20 +1262,44 @@ export function POSScreen() {
             <div className="p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">المجموع الفرعي</span>
-                <span className="font-medium tabular-nums">{subtotal.toFixed(2)} {symbol}</span>
+                <span className="font-medium tabular-nums">{formatDual(subtotal).display}</span>
               </div>
               {cartDiscount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">الخصم</span>
-                  <span className="font-medium text-destructive tabular-nums">-{cartDiscount.toFixed(2)} {symbol}</span>
+                  <span className="font-medium text-destructive tabular-nums">-{formatDual(cartDiscount).display}</span>
+                </div>
+              )}
+              {loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3 text-amber-500" />
+                    خصم النقاط
+                  </span>
+                  <span className="font-medium text-amber-600 tabular-nums">-{formatDual(loyaltyDiscount).display}</span>
                 </div>
               )}
               <Separator className="!my-2" />
               <div className="flex justify-between items-center">
                 <span className="text-base font-bold">الإجمالي</span>
-                <span className="text-xl font-bold text-primary tabular-nums">{grandTotal.toFixed(2)} {symbol}</span>
+                <span className="text-xl font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
               </div>
             </div>
+
+            {/* Loyalty redeem button */}
+            {isLoyaltyActive && (
+              <div className="px-4 pb-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenLoyaltyRedeem}
+                  className="w-full h-9 rounded-xl gap-2 text-xs font-medium border-amber-500/30 bg-amber-500/5 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600 transition-colors"
+                >
+                  <Star className="w-3.5 h-3.5" />
+                  استخدام النقاط ({customerPoints})
+                </Button>
+              </div>
+            )}
 
             {/* Action buttons */}
             <div className="p-4 pt-0 flex gap-2">
@@ -1216,18 +1351,27 @@ export function POSScreen() {
             <div className="rounded-xl bg-muted/40 p-4 space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">المجموع الفرعي</span>
-                <span className="font-medium tabular-nums">{subtotal.toFixed(2)} {symbol}</span>
+                <span className="font-medium tabular-nums">{formatDual(subtotal).display}</span>
               </div>
               {cartDiscount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">الخصم</span>
-                  <span className="font-medium text-destructive tabular-nums">-{cartDiscount.toFixed(2)} {symbol}</span>
+                  <span className="font-medium text-destructive tabular-nums">-{formatDual(cartDiscount).display}</span>
+                </div>
+              )}
+              {loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3 text-amber-500" />
+                    خصم النقاط
+                  </span>
+                  <span className="font-medium text-amber-600 tabular-nums">-{formatDual(loyaltyDiscount).display}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between items-center">
                 <span className="font-bold">الإجمالي المطلوب</span>
-                <span className="text-lg font-bold text-primary tabular-nums">{grandTotal.toFixed(2)} {symbol}</span>
+                <span className="text-lg font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
               </div>
             </div>
 
@@ -1323,6 +1467,122 @@ export function POSScreen() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Loyalty Redeem Dialog ── */}
+      <Dialog open={loyaltyRedeemDialogOpen} onOpenChange={setLoyaltyRedeemDialogOpen}>
+        <DialogContent className="sm:max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <Star className="w-5 h-5 text-amber-500" />
+              </div>
+              استبدال النقاط
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Customer info */}
+            {selectedCustomer && (
+              <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">{selectedCustomer.name}</p>
+                  <p className="text-[10px] text-muted-foreground">رصيد النقاط</p>
+                </div>
+                <div className="text-left">
+                  <p className="text-xl font-bold text-amber-600 tabular-nums">{customerPoints}</p>
+                  <p className="text-[10px] text-muted-foreground">نقطة</p>
+                </div>
+              </div>
+            )}
+
+            {/* Points input */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">عدد النقاط للاستبدال</label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={loyaltySettings.loyaltyMinPointsToRedeem || 0}
+                  max={customerPoints}
+                  value={redeemPoints}
+                  onChange={(e) => setRedeemPoints(e.target.value)}
+                  placeholder="0"
+                  className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
+                  autoFocus
+                />
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">نقطة</span>
+              </div>
+              {redeemPoints && parseInt(redeemPoints) > customerPoints && (
+                <p className="text-[11px] text-destructive">النقاط المطلوبة أكبر من المتاح ({customerPoints})</p>
+              )}
+            </div>
+
+            {/* Quick points buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {(() => {
+                const minPts = loyaltySettings.loyaltyMinPointsToRedeem || 100
+                const quarterPts = Math.floor(customerPoints / 4)
+                const halfPts = Math.floor(customerPoints / 2)
+                const buttons = []
+                if (quarterPts >= minPts) buttons.push({ label: `١/٤ (${quarterPts})`, value: quarterPts })
+                if (halfPts >= minPts) buttons.push({ label: `نصف (${halfPts})`, value: halfPts })
+                buttons.push({ label: `الكل (${customerPoints})`, value: customerPoints })
+                return buttons.map((btn) => (
+                  <button
+                    key={btn.value}
+                    onClick={() => setRedeemPoints(String(btn.value))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                      parseInt(redeemPoints) === btn.value
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))
+              })()}
+            </div>
+
+            {/* Discount preview */}
+            {redeemPoints && parseInt(redeemPoints) > 0 && parseInt(redeemPoints) <= customerPoints && (
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">قيمة الخصم</p>
+                <p className="text-lg font-bold text-emerald-600 tabular-nums">
+                  {formatDual(parseInt(redeemPoints) * (loyaltySettings.loyaltyRedemptionValue || 0)).display}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {redeemPoints} نقطة × {loyaltySettings.loyaltyRedemptionValue || 0} {symbol} = {formatDual(parseInt(redeemPoints) * (loyaltySettings.loyaltyRedemptionValue || 0)).display}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLoyaltyRedeemDialogOpen(false)}
+              className="flex-1 h-10 rounded-xl"
+              disabled={redeemingPoints}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleConfirmLoyaltyRedeem}
+              disabled={redeemingPoints || !redeemPoints || parseInt(redeemPoints) <= 0 || parseInt(redeemPoints) > customerPoints}
+              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-amber-500/25 bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {redeemingPoints ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>جاري المعالجة...</span>
+                </>
+              ) : (
+                <>
+                  <Star className="w-4 h-4" />
+                  <span>تأكيد الاستبدال</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Clear Cart Confirmation Dialog ── */}
       <Dialog open={clearCartDialogOpen} onOpenChange={setClearCartDialogOpen}>
         <DialogContent className="sm:max-w-sm" dir="rtl">
@@ -1402,7 +1662,7 @@ export function POSScreen() {
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-[10px] text-muted-foreground mb-0.5">السعر</p>
                   <p className="text-base font-bold text-primary tabular-nums">
-                    {quickViewProduct.price.toFixed(2)} {symbol}
+                    {formatDual(quickViewProduct.price).display}
                   </p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -1444,7 +1704,7 @@ export function POSScreen() {
                 </div>
                 {quickViewQuantity > 0 && (
                   <p className="text-[10px] text-muted-foreground text-center">
-                    الإجمالي: {(quickViewProduct.price * quickViewQuantity).toFixed(2)} {symbol}
+                    الإجمالي: {formatDual(quickViewProduct.price * quickViewQuantity).display}
                   </p>
                 )}
               </div>
@@ -1489,7 +1749,7 @@ export function POSScreen() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">الإجمالي</span>
-                <span className="font-bold text-primary tabular-nums">{grandTotal.toFixed(2)} {symbol}</span>
+                <span className="font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
               </div>
             </div>
             {/* Note */}

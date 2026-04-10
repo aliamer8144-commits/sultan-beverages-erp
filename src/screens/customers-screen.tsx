@@ -41,6 +41,8 @@ import {
   Wallet,
   History,
   Banknote,
+  Star,
+  Minus,
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
@@ -50,6 +52,7 @@ interface Customer {
   name: string
   phone: string | null
   debt: number
+  loyaltyPoints: number
   isActive: boolean
 }
 
@@ -65,6 +68,15 @@ interface Payment {
   amount: number
   method: string
   notes: string | null
+  createdAt: string
+}
+
+interface LoyaltyTransaction {
+  id: string
+  customerId: string
+  points: number
+  transactionType: string
+  description: string
   createdAt: string
 }
 
@@ -96,6 +108,16 @@ export function CustomersScreen() {
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // ── Loyalty state ──
+  const [openLoyaltyDialog, setOpenLoyaltyDialog] = useState(false)
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<Customer | null>(null)
+  const [loyaltyHistory, setLoyaltyHistory] = useState<LoyaltyTransaction[]>([])
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false)
+  const [loyaltyPointsInput, setLoyaltyPointsInput] = useState('')
+  const [loyaltyDescription, setLoyaltyDescription] = useState('')
+  const [loyaltySubmitting, setLoyaltySubmitting] = useState(false)
+  const [loyaltyMode, setLoyaltyMode] = useState<'grant' | 'deduct'>('grant')
 
   // ─── Fetch Customers ───────────────────────────────────────────────
   const fetchCustomers = async (query = '') => {
@@ -298,6 +320,79 @@ export function CustomersScreen() {
     }
   }
 
+  // ─── Open Loyalty History ────────────────────────────────────────
+  const openLoyaltyHistory = async (customer: Customer) => {
+    setLoyaltyCustomer(customer)
+    setLoyaltyHistory([])
+    setOpenLoyaltyDialog(true)
+    setLoyaltyLoading(true)
+    try {
+      const res = await fetch(`/api/loyalty?customerId=${customer.id}`)
+      const data = await res.json()
+      if (data.success) {
+        setLoyaltyHistory(data.data)
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تحميل سجل النقاط')
+    } finally {
+      setLoyaltyLoading(false)
+    }
+  }
+
+  // ─── Open Loyalty Adjust Dialog ──────────────────────────────────
+  const openLoyaltyAdjust = (customer: Customer, mode: 'grant' | 'deduct') => {
+    setLoyaltyCustomer(customer)
+    setLoyaltyMode(mode)
+    setLoyaltyPointsInput('')
+    setLoyaltyDescription('')
+    setOpenLoyaltyDialog(false)
+    setTimeout(() => {
+      setLoyaltyCustomer(customer)
+    }, 0)
+  }
+
+  // ─── Submit Loyalty Adjustment ──────────────────────────────────
+  const handleLoyaltyAdjust = async () => {
+    if (!loyaltyCustomer) return
+    const points = parseInt(loyaltyPointsInput)
+    if (!points || points <= 0) {
+      toast.error('يرجى إدخال عدد نقاط صحيح')
+      return
+    }
+    if (loyaltyMode === 'deduct' && points > loyaltyCustomer.loyaltyPoints) {
+      toast.error('النقاط المطلوبة أكبر من رصيد العميل')
+      return
+    }
+
+    setLoyaltySubmitting(true)
+    try {
+      const res = await fetch('/api/loyalty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: loyaltyCustomer.id,
+          points: loyaltyMode === 'grant' ? points : -points,
+          transactionType: 'adjusted',
+          description: loyaltyDescription.trim() || (loyaltyMode === 'grant' ? 'منح نقاط يدوي' : 'خصم نقاط يدوي'),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const action = loyaltyMode === 'grant' ? 'منح' : 'خصم'
+        toast.success(`تم ${action} ${points} نقطة ${loyaltyMode === 'grant' ? 'لـ' : 'من'} ${loyaltyCustomer.name}`)
+        setOpenLoyaltyDialog(false)
+        setLoyaltyCustomer(null)
+        fetchCustomers(search)
+      } else {
+        toast.error(data.error || 'حدث خطأ أثناء تحديث النقاط')
+      }
+    } catch {
+      toast.error('حدث خطأ في الاتصال بالخادم')
+    } finally {
+      setLoyaltySubmitting(false)
+    }
+  }
+
   // ─── Stats ────────────────────────────────────────────────────────
   const totalCustomers = customers.length
   const totalDebt = customers.reduce((sum, c) => sum + c.debt, 0)
@@ -412,6 +507,7 @@ export function CustomersScreen() {
                 <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>اسم العميل</TableHead>
                 <TableHead>رقم الهاتف</TableHead>
+                <TableHead className="text-center">النقاط</TableHead>
                 <TableHead className="text-center">المديونية</TableHead>
                 <TableHead className="text-center">الحالة</TableHead>
                 <TableHead className="text-center">الإجراءات</TableHead>
@@ -431,7 +527,7 @@ export function CustomersScreen() {
                 ))
               ) : customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center">
+                  <TableCell colSpan={7} className="h-48 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Users className="h-10 w-10 opacity-40" />
                       <p className="font-medium">لا يوجد عملاء</p>
@@ -459,8 +555,25 @@ export function CustomersScreen() {
                       )}
                     </TableCell>
                     <TableCell className="text-center">
+                      {customer.loyaltyPoints > 0 ? (
+                        <button
+                          onClick={() => openLoyaltyHistory(customer)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-500/10 px-2.5 py-0.5 rounded-full hover:bg-amber-500/20 transition-colors"
+                          title="سجل النقاط"
+                        >
+                          <Star className="w-3 h-3" />
+                          {customer.loyaltyPoints}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Star className="w-3 h-3" />
+                          0
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {customer.debt > 0 ? (
-                        <span className="badge-danger font-bold text-xs px-2.5 py-0.5 rounded-full">
+                        <span className="chip chip-danger font-bold">
                           {formatCurrency(customer.debt)}
                         </span>
                       ) : (
@@ -469,9 +582,9 @@ export function CustomersScreen() {
                     </TableCell>
                     <TableCell className="text-center">
                       {customer.isActive ? (
-                        <span className="badge-active text-xs px-2.5 py-0.5 rounded-full">نشط</span>
+                        <span className="chip chip-success">نشط</span>
                       ) : (
-                        <span className="badge-inactive text-xs px-2.5 py-0.5 rounded-full">غير نشط</span>
+                        <span className="chip chip-neutral">غير نشط</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
@@ -496,6 +609,35 @@ export function CustomersScreen() {
                         >
                           <History className="h-4 w-4 text-muted-foreground" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
+                          onClick={() => openLoyaltyHistory(customer)}
+                          title="سجل النقاط"
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600"
+                          onClick={() => openLoyaltyAdjust(customer, 'grant')}
+                          title="منح نقاط"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        {customer.loyaltyPoints > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-orange-600 hover:bg-orange-500/10 hover:text-orange-600"
+                            onClick={() => openLoyaltyAdjust(customer, 'deduct')}
+                            title="خصم نقاط"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -872,6 +1014,212 @@ export function CustomersScreen() {
                 <>
                   <Wallet className="w-4 h-4" />
                   تسجيل الدفعة
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Loyalty History Dialog ─────────────────────────────── */}
+      <Dialog open={openLoyaltyDialog && loyaltyCustomer !== null} onOpenChange={setOpenLoyaltyDialog}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col glass-card" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                <Star className="h-5 w-5 text-amber-500" />
+              </div>
+              سجل النقاط — {loyaltyCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {loyaltyCustomer && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="mb-3 rounded-xl bg-amber-500/5 p-3 border border-amber-500/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">رصيد النقاط</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-amber-600 tabular-nums">
+                      {loyaltyCustomer.loyaltyPoints}
+                    </span>
+                    <Star className="w-4 h-4 text-amber-500" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 gap-1 text-xs bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-0"
+                    onClick={() => openLoyaltyAdjust(loyaltyCustomer, 'grant')}
+                  >
+                    <Plus className="w-3 h-3" />
+                    منح نقاط
+                  </Button>
+                  {loyaltyCustomer.loyaltyPoints > 0 && (
+                    <Button
+                      size="sm"
+                      className="flex-1 h-8 gap-1 text-xs bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-0"
+                      onClick={() => openLoyaltyAdjust(loyaltyCustomer, 'deduct')}
+                    >
+                      <Minus className="w-3 h-3" />
+                      خصم نقاط
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {loyaltyLoading ? (
+                <div className="flex-1 flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                </div>
+              ) : loyaltyHistory.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
+                  <Star className="w-10 h-10 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">لا توجد عمليات نقاط مسجلة</p>
+                </div>
+              ) : (
+                <ScrollArea className="flex-1">
+                  <div className="space-y-2 pb-2">
+                    {loyaltyHistory.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 ${
+                          tx.points > 0 ? 'bg-emerald-500/10' : 'bg-orange-500/10'
+                        }`}>
+                          {tx.points > 0 ? (
+                            <Plus className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <Minus className="w-4 h-4 text-orange-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-bold tabular-nums ${
+                            tx.points > 0 ? 'text-emerald-600' : 'text-orange-600'
+                          }`}>
+                            {tx.points > 0 ? '+' : ''}{tx.points} نقطة
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {tx.description}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground flex-shrink-0">
+                          {new Date(tx.createdAt).toLocaleDateString('ar-SA', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Loyalty Adjust Dialog ───────────────────────────────── */}
+      <Dialog open={openLoyaltyDialog === false && loyaltyCustomer !== null && loyaltyPointsInput !== '' || false} onOpenChange={(open) => {
+        if (!open) {
+          setLoyaltyCustomer(null)
+          setLoyaltyPointsInput('')
+          setLoyaltyDescription('')
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                loyaltyMode === 'grant' ? 'bg-emerald-500/10' : 'bg-orange-500/10'
+              }`}>
+                {loyaltyMode === 'grant' ? (
+                  <Plus className="h-5 w-5 text-emerald-600" />
+                ) : (
+                  <Minus className="h-5 w-5 text-orange-600" />
+                )}
+              </div>
+              {loyaltyMode === 'grant' ? 'منح نقاط' : 'خصم نقاط'}
+            </DialogTitle>
+          </DialogHeader>
+          {loyaltyCustomer && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl bg-muted/40 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold">{loyaltyCustomer.name}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] text-muted-foreground">الرصيد الحالي</p>
+                    <p className="text-base font-bold text-amber-600 tabular-nums">
+                      {loyaltyCustomer.loyaltyPoints} <Star className="w-3 h-3 inline" />
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>عدد النقاط <span className="text-destructive">*</span></Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={loyaltyMode === 'deduct' ? loyaltyCustomer.loyaltyPoints : undefined}
+                  value={loyaltyPointsInput}
+                  onChange={(e) => setLoyaltyPointsInput(e.target.value)}
+                  placeholder="أدخل عدد النقاط"
+                  className="h-11 text-base font-bold pr-4 tabular-nums"
+                  dir="ltr"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>الوصف (اختياري)</Label>
+                <Input
+                  value={loyaltyDescription}
+                  onChange={(e) => setLoyaltyDescription(e.target.value)}
+                  placeholder={loyaltyMode === 'grant' ? 'سبب المنح...' : 'سبب الخصم...'}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLoyaltyCustomer(null)
+                setLoyaltyPointsInput('')
+                setLoyaltyDescription('')
+              }}
+              disabled={loyaltySubmitting}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleLoyaltyAdjust}
+              disabled={loyaltySubmitting || !loyaltyPointsInput || parseInt(loyaltyPointsInput) <= 0}
+              className={`gap-2 shadow-lg ${
+                loyaltyMode === 'grant'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/25'
+                  : 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/25'
+              }`}
+            >
+              {loyaltySubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>جاري التنفيذ...</span>
+                </>
+              ) : (
+                <>
+                  {loyaltyMode === 'grant' ? (
+                    <Plus className="w-4 h-4" />
+                  ) : (
+                    <Minus className="w-4 h-4" />
+                  )}
+                  {loyaltyMode === 'grant' ? 'منح النقاط' : 'خصم النقاط'}
                 </>
               )}
             </Button>
