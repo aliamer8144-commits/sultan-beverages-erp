@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  password  String
+  name      String
+  role      String    @default("cashier") // admin, cashier
+  isActive  Boolean   @default(true)
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  icon     String    @default("CupSoda")
+  products Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  categoryId  String
+  price       Float           // selling price
+  costPrice   Float           // purchase cost
+  quantity    Int             @default(0)
+  minQuantity Int             @default(5) // minimum stock level for alerts
+  image       String?         @db.Text
+  barcode     String?         @unique
+  isActive    Boolean         @default(true)
+  category    Category        @relation(fields: [categoryId], references: [id])
+  invoiceItems     InvoiceItem[]
+  returns          ProductReturn[]
+  stockAdjustments StockAdjustment[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Customer {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  phone    String?
+  debt     Float     @default(0)
+  isActive Boolean   @default(true)
+  invoices Invoice[]
+  payments Payment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Supplier {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  phone           String?
+  address         String?
+  isActive        Boolean           @default(true)
+  invoices        Invoice[]
+  supplierPayments SupplierPayment[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Invoice {
+  id          String         @id @default(cuid())
+  invoiceNo   String         @unique
+  type        String         @default("sale") // sale, purchase
+  customerId  String?
+  customer    Customer?      @relation(fields: [customerId], references: [id])
+  supplierId  String?
+  supplier    Supplier?      @relation(fields: [supplierId], references: [id])
+  totalAmount Float
+  discount    Float          @default(0)
+  paidAmount  Float
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+  items       InvoiceItem[]
+  returns     ProductReturn[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  total     Float
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  amount     Float
+  method     String   @default("cash") // cash, transfer
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SupplierPayment {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  amount     Float
+  method     String   @default("cash") // cash, transfer, check
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ProductReturn {
+  id          String   @id @default(cuid())
+  returnNo    String   @unique
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Float
+  totalAmount Float
+  reason      String   @default("")
+  status      String   @default("pending") // pending, approved, rejected
+  userId      String
+  userName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StockAdjustment {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  type        String   // in, out, adjustment
+  quantity    Int
+  previousQty Int
+  newQty      Int
+  reason      String   @default("")
+  userId      String   @default("")
+  userName    String?
+  reference   String?  // e.g., invoice number, return number
+  createdAt   DateTime @default(now())
+}
+
+model Expense {
+  id               String   @id @default(cuid())
+  category         String   // مصروفات تشغيلية, صيانة, إيجار, رواتب, نقل, متنوع
+  amount           Float
+  description      String   @db.Text
+  date             DateTime @default(now())
+  recurring        Boolean  @default(false)  // مصروف متكرر
+  recurringPeriod  String?  // daily, weekly, monthly
+  userId           String
+  userName         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // create, update, delete, login, logout, payment, backup, restore
+  entity    String   // User, Product, Customer, Invoice, Category, Supplier, Payment, System
+  entityId  String?
+  details   String?  @db.Text
+  userId    String?
+  userName  String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model SalesTarget {
+  id           String    @id @default(cuid())
+  type         String    // "daily", "weekly", "monthly"
+  targetAmount Float
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

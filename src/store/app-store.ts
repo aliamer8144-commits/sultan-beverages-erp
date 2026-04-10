@@ -1,0 +1,275 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+// Currency Types
+export type CurrencyCode = 'SAR' | 'USD' | 'EUR' | 'AED' | 'EGP' | 'QAR'
+
+export const CURRENCY_MAP: Record<CurrencyCode, { symbol: string; name: string }> = {
+  SAR: { symbol: 'ر.س', name: 'ريال سعودي' },
+  USD: { symbol: '$', name: 'دولار أمريكي' },
+  EUR: { symbol: '€', name: 'يورو' },
+  AED: { symbol: 'د.إ', name: 'درهم إماراتي' },
+  EGP: { symbol: 'ج.م', name: 'جنيه مصري' },
+  QAR: { symbol: 'ر.ق', name: 'ريال قطري' },
+}
+
+// Types
+export interface User {
+  id: string
+  username: string
+  name: string
+  role: 'admin' | 'cashier'
+  isActive: boolean
+}
+
+export interface CartItem {
+  productId: string
+  name: string
+  price: number
+  quantity: number
+  maxQuantity: number
+  image?: string
+}
+
+export interface HeldOrder {
+  id: string
+  cart: CartItem[]
+  discount: number
+  customerId: string | null
+  customerName: string | null
+  heldAt: string // ISO date string
+  heldBy: string // user name
+  note: string
+}
+
+// Settings Types
+export interface SettingsState {
+  // Store Information
+  storeName: string
+  storePhone: string
+  storeAddress: string
+  taxNumber: string
+  storeLogoUrl: string
+
+  // Receipt Settings
+  receiptHeaderText: string
+  receiptFooterText: string
+  showTaxOnReceipt: boolean
+  currency: CurrencyCode
+  autoPrintOnPayment: boolean
+
+  // POS Settings
+  defaultCustomerId: string
+  allowDebt: boolean
+  maxDebtAmount: number
+  soundOnPayment: boolean
+
+  // Display Preferences
+  animationSpeed: 'slow' | 'normal' | 'fast'
+  compactMode: boolean
+  showProductImages: boolean
+}
+
+export const defaultSettings: SettingsState = {
+  // Store Information
+  storeName: 'السلطان للمشروبات',
+  storePhone: '',
+  storeAddress: '',
+  taxNumber: '',
+  storeLogoUrl: '',
+
+  // Receipt Settings
+  receiptHeaderText: '',
+  receiptFooterText: 'شكراً لتعاملكم معنا',
+  showTaxOnReceipt: true,
+  currency: 'SAR',
+  autoPrintOnPayment: false,
+
+  // POS Settings
+  defaultCustomerId: '',
+  allowDebt: true,
+  maxDebtAmount: 5000,
+  soundOnPayment: true,
+
+  // Display Preferences
+  animationSpeed: 'normal',
+  compactMode: false,
+  showProductImages: true,
+}
+
+export type Screen = 
+  | 'pos' 
+  | 'inventory' 
+  | 'stock-adjustments'
+  | 'purchases' 
+  | 'customers' 
+  | 'invoices' 
+  | 'returns'
+  | 'dashboard' 
+  | 'users'
+  | 'settings'
+  | 'expenses'
+  | 'daily-close'
+  | 'audit-log'
+  | 'backup'
+  | 'analytics'
+  | 'sales-targets'
+
+interface AppState {
+  // Auth
+  user: User | null
+  isAuthenticated: boolean
+  login: (user: User) => void
+  logout: () => void
+
+  // Navigation
+  currentScreen: Screen
+  setScreen: (screen: Screen) => void
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+  toggleSidebar: () => void
+
+  // POS Cart
+  cart: CartItem[]
+  addToCart: (item: Omit<CartItem, 'quantity'>) => void
+  removeFromCart: (productId: string) => void
+  updateCartQuantity: (productId: string, quantity: number) => void
+  clearCart: () => void
+  cartDiscount: number
+  setCartDiscount: (discount: number) => void
+  cartCustomerId: string | null
+  setCartCustomerId: (id: string | null) => void
+
+  // Computed
+  cartTotal: () => number
+  cartItemCount: () => number
+
+  // Held Orders
+  heldOrders: HeldOrder[]
+  holdCurrentOrder: (note?: string) => string
+  recallOrder: (orderId: string) => void
+  deleteHeldOrder: (orderId: string) => void
+
+  // Settings
+  settings: SettingsState
+  updateSettings: (settings: Partial<SettingsState>) => void
+}
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      // Auth
+      user: null,
+      isAuthenticated: false,
+      login: (user) => set({ user, isAuthenticated: true }),
+      logout: () => set({ user: null, isAuthenticated: false, cart: [], cartDiscount: 0, cartCustomerId: null }),
+
+      // Navigation
+      currentScreen: 'pos',
+      setScreen: (screen) => set({ currentScreen: screen }),
+      sidebarOpen: true,
+      setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+      // POS Cart
+      cart: [],
+      addToCart: (item) => {
+        const { cart } = get()
+        const existing = cart.find((c) => c.productId === item.productId)
+        if (existing) {
+          if (existing.quantity < item.maxQuantity) {
+            set({
+              cart: cart.map((c) =>
+                c.productId === item.productId
+                  ? { ...c, quantity: Math.min(c.quantity + 1, item.maxQuantity) }
+                  : c
+              ),
+            })
+          }
+        } else {
+          set({ cart: [...cart, { ...item, quantity: 1 }] })
+        }
+      },
+      removeFromCart: (productId) => {
+        set({ cart: get().cart.filter((c) => c.productId !== productId) })
+      },
+      updateCartQuantity: (productId, quantity) => {
+        if (quantity <= 0) {
+          get().removeFromCart(productId)
+          return
+        }
+        set({
+          cart: get().cart.map((c) =>
+            c.productId === productId
+              ? { ...c, quantity: Math.min(quantity, c.maxQuantity) }
+              : c
+          ),
+        })
+      },
+      clearCart: () => set({ cart: [], cartDiscount: 0, cartCustomerId: null }),
+      cartDiscount: 0,
+      setCartDiscount: (discount) => set({ cartDiscount: discount }),
+      cartCustomerId: null,
+      setCartCustomerId: (id) => set({ cartCustomerId: id }),
+
+      // Computed
+      cartTotal: () => {
+        const { cart, cartDiscount } = get()
+        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+        return Math.max(0, subtotal - cartDiscount)
+      },
+      cartItemCount: () => {
+        return get().cart.reduce((sum, item) => sum + item.quantity, 0)
+      },
+
+      // Held Orders
+      heldOrders: [],
+      holdCurrentOrder: (note = '') => {
+        const { cart, cartDiscount, cartCustomerId, user } = get()
+        const id = Date.now().toString(36)
+        const heldOrder: HeldOrder = {
+          id,
+          cart: [...cart],
+          discount: cartDiscount,
+          customerId: cartCustomerId,
+          customerName: null, // Will be resolved from context
+          heldAt: new Date().toISOString(),
+          heldBy: user?.name || 'مستخدم',
+          note,
+        }
+        set({ heldOrders: [...get().heldOrders, heldOrder], cart: [], cartDiscount: 0, cartCustomerId: null })
+        return id
+      },
+      recallOrder: (orderId) => {
+        const { heldOrders, cart } = get()
+        const held = heldOrders.find((o) => o.id === orderId)
+        if (!held) return
+        set({
+          cart: [...cart, ...held.cart],
+          cartDiscount: held.discount,
+          cartCustomerId: held.customerId,
+          heldOrders: heldOrders.filter((o) => o.id !== orderId),
+        })
+      },
+      deleteHeldOrder: (orderId) => {
+        set({ heldOrders: get().heldOrders.filter((o) => o.id !== orderId) })
+      },
+
+      // Settings
+      settings: defaultSettings,
+      updateSettings: (newSettings) =>
+        set((s) => ({ settings: { ...s.settings, ...newSettings } })),
+    }),
+    {
+      name: 'sultan-erp-store',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        currentScreen: state.currentScreen,
+        sidebarOpen: state.sidebarOpen,
+        settings: state.settings,
+        heldOrders: state.heldOrders,
+      }),
+    }
+  )
+)
