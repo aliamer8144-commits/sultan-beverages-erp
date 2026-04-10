@@ -88,13 +88,20 @@ async function computeTargetData(target: {
     }
   }
 
+  // Calculate daily target needed
+  let dailyTargetNeeded = 0
+  if (remainingAmount > 0 && daysRemaining > 0) {
+    dailyTargetNeeded = Math.round((remainingAmount / daysRemaining) * 100) / 100
+  }
+
   return {
     ...target,
-    currentAmount,
-    progressPercent: Math.round(progressPercent * 10) / 10,
+    currentAmount: Math.round(currentAmount * 100) / 100,
+    progressPercentage: Math.round(progressPercent * 10) / 10,
     remainingAmount: Math.round(remainingAmount * 100) / 100,
     daysRemaining,
     hoursRemaining,
+    dailyTargetNeeded,
   }
 }
 

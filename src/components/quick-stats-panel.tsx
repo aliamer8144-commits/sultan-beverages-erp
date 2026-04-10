@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useCurrency } from '@/hooks/use-currency'
 import { toast } from 'sonner'
 import {
   BarChart3,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   FileText,
   AlertTriangle,
   Receipt,
@@ -14,160 +16,257 @@ import {
   X,
   ArrowLeft,
   RefreshCw,
+  Percent,
+  Trophy,
+  Activity,
+  Clock,
+  Package,
+  Target,
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────
+interface TopProduct {
+  name: string
+  quantity: number
+}
+
+interface RecentActivityItem {
+  id: string
+  action: string
+  entity: string
+  details: Record<string, unknown> | null
+  userName: string | null
+  createdAt: string
+}
+
 interface StatsData {
-  todaySales: number
-  netProfit: number
-  invoiceCount: number
-  lowStockCount: number
-  todayExpenses: number
-  customerCount: number
+  totalSalesToday: number
+  totalProfitToday: number
+  profitMargin: number
+  invoicesCountToday: number
+  lowStockProducts: number
+  totalCustomers: number
+  totalExpensesToday: number
+  topProducts: TopProduct[]
+  recentActivity: RecentActivityItem[]
+  salesTargetProgress: number | null
 }
 
-interface MetricConfig {
-  key: keyof StatsData
-  label: string
-  icon: React.ElementType
-  color: string
-  bgColor: string
-  iconColor: string
-  format: 'currency' | 'number'
-  trendIcon: React.ElementType
-  trendColor: string
-  trendLabel: string
+// ─── Relative Arabic time ───────────────────────────────────────────
+function relativeArabicTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (minutes < 1) return 'الآن'
+  if (minutes < 2) return 'منذ دقيقة'
+  if (minutes < 11) return `منذ ${minutes} دقائق`
+  if (minutes < 60) return 'منذ نصف ساعة'
+  if (hours < 2) return 'منذ ساعة'
+  if (hours < 11) return `منذ ${hours} ساعات`
+  if (hours < 24) return 'منذ ١٢ ساعة'
+  if (days < 2) return 'منذ يوم'
+  return `منذ ${days} أيام`
 }
 
-// ─── Metric Definitions ─────────────────────────────────────────────
-const metrics: MetricConfig[] = [
-  {
-    key: 'todaySales',
-    label: 'إجمالي المبيعات اليوم',
-    icon: DollarSign,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-500/10',
-    iconColor: 'text-emerald-500',
-    format: 'currency',
-    trendIcon: TrendingUp,
-    trendColor: 'text-emerald-500',
-    trendLabel: 'اليوم',
-  },
-  {
-    key: 'netProfit',
-    label: 'صافي الربح',
-    icon: TrendingUp,
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-50 dark:bg-green-500/10',
-    iconColor: 'text-green-500',
-    format: 'currency',
-    trendIcon: TrendingUp,
-    trendColor: 'text-green-500',
-    trendLabel: 'صافي',
-  },
-  {
-    key: 'invoiceCount',
-    label: 'عدد الفواتير',
-    icon: FileText,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-500/10',
-    iconColor: 'text-blue-500',
-    format: 'number',
-    trendIcon: FileText,
-    trendColor: 'text-blue-400',
-    trendLabel: 'فواتير',
-  },
-  {
-    key: 'lowStockCount',
-    label: 'منتجات منخفضة المخزون',
-    icon: AlertTriangle,
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-50 dark:bg-amber-500/10',
-    iconColor: 'text-amber-500',
-    format: 'number',
-    trendIcon: AlertTriangle,
-    trendColor: 'text-amber-500',
-    trendLabel: 'تحذير',
-  },
-  {
-    key: 'todayExpenses',
-    label: 'إجمالي المصروفات اليوم',
-    icon: Receipt,
-    color: 'text-red-600 dark:text-red-400',
-    bgColor: 'bg-red-50 dark:bg-red-500/10',
-    iconColor: 'text-red-500',
-    format: 'currency',
-    trendIcon: Receipt,
-    trendColor: 'text-red-400',
-    trendLabel: 'مصروفات',
-  },
-  {
-    key: 'customerCount',
-    label: 'عدد العملاء',
-    icon: Users,
-    color: 'text-violet-600 dark:text-violet-400',
-    bgColor: 'bg-violet-50 dark:bg-violet-500/10',
-    iconColor: 'text-violet-500',
-    format: 'number',
-    trendIcon: Users,
-    trendColor: 'text-violet-400',
-    trendLabel: 'عملاء',
-  },
-]
-
-// ─── Format helpers ─────────────────────────────────────────────────
-function formatCurrency(value: number): string {
-  return value.toLocaleString('ar-SA', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+// ─── Activity action labels (Arabic) ────────────────────────────────
+function activityLabel(action: string, entity: string, details: Record<string, unknown> | null): string {
+  const name = (details?.name as string) || ''
+  switch (action) {
+    case 'create':
+      if (entity === 'Invoice') return `فاتورة جديدة ${details?.invoiceNo ? `#${details.invoiceNo}` : ''}`
+      if (entity === 'Product') return `إضافة منتج: ${name}`
+      if (entity === 'Customer') return `عميل جديد: ${name}`
+      return `إنشاء ${entity}`
+    case 'update':
+      if (entity === 'Product') return `تحديث منتج: ${name}`
+      return `تحديث ${entity}`
+    case 'delete':
+      return `حذف ${entity}`
+    case 'login':
+      return `تسجيل دخول`
+    case 'logout':
+      return `تسجيل خروج`
+    case 'payment':
+      return `دفعة جديدة: ${(details?.amount ?? 0)} ${details?.customerName ? `— ${details.customerName}` : ''}`
+    case 'backup':
+      return `نسخ احتياطي`
+    case 'restore':
+      return `استعادة بيانات`
+    default:
+      return `${action} — ${entity}`
+  }
 }
 
-function formatNumber(value: number): string {
-  return value.toLocaleString('ar-SA')
+// ─── Activity icon + color ──────────────────────────────────────────
+function activityMeta(action: string) {
+  switch (action) {
+    case 'create':
+      return { icon: Package, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
+    case 'update':
+      return { icon: RefreshCw, color: 'text-blue-500', bg: 'bg-blue-500/10' }
+    case 'delete':
+      return { icon: X, color: 'text-red-500', bg: 'bg-red-500/10' }
+    case 'login':
+    case 'logout':
+      return { icon: Users, color: 'text-violet-500', bg: 'bg-violet-500/10' }
+    case 'payment':
+      return { icon: Receipt, color: 'text-green-500', bg: 'bg-green-500/10' }
+    case 'backup':
+    case 'restore':
+      return { icon: Activity, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+    default:
+      return { icon: Activity, color: 'text-muted-foreground', bg: 'bg-muted' }
+  }
 }
 
-// ─── Skeleton Loader ────────────────────────────────────────────────
+// ─── Skeleton Loaders ───────────────────────────────────────────────
 function MetricSkeleton() {
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl">
       <div className="skeleton-shimmer w-10 h-10 rounded-xl flex-shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="skeleton-shimmer h-3 w-24 rounded-md" />
-        <div className="skeleton-shimmer h-5 w-16 rounded-md" />
+        <div className="skeleton-shimmer h-5 w-20 rounded-md" />
       </div>
+      <div className="skeleton-shimmer h-5 w-12 rounded-lg" />
+    </div>
+  )
+}
+
+function TopProductsSkeleton() {
+  return (
+    <div className="p-3 space-y-2">
+      <div className="skeleton-shimmer h-3 w-28 rounded-md" />
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-2">
+          <div className="skeleton-shimmer w-5 h-5 rounded-full flex-shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton-shimmer h-3 w-24 rounded-md" />
+            <div className="skeleton-shimmer h-2 w-12 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RecentActivitySkeleton() {
+  return (
+    <div className="p-3 space-y-2.5">
+      <div className="skeleton-shimmer h-3 w-28 rounded-md" />
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-start gap-2.5">
+          <div className="skeleton-shimmer w-6 h-6 rounded-full flex-shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton-shimmer h-3 w-32 rounded-md" />
+            <div className="skeleton-shimmer h-2 w-16 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ProgressSkeleton() {
+  return (
+    <div className="p-3 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="skeleton-shimmer h-3 w-28 rounded-md" />
+        <div className="skeleton-shimmer h-4 w-10 rounded-md" />
+      </div>
+      <div className="skeleton-shimmer h-2.5 w-full rounded-full" />
     </div>
   )
 }
 
 // ─── Single Metric Row ──────────────────────────────────────────────
-function MetricRow({ config, value }: { config: MetricConfig; value: number }) {
-  const Icon = config.icon
-  const TrendIcon = config.trendIcon
-  const displayValue = config.format === 'currency'
-    ? `${formatCurrency(value)} ر.س`
-    : formatNumber(value)
-
+function MetricRow({
+  label,
+  value,
+  icon: Icon,
+  iconBg,
+  iconColor,
+  valueColor,
+  suffix,
+  trendIcon: TrendIcon,
+  trendBg,
+  trendColor,
+  trendLabel,
+}: {
+  label: string
+  value: string
+  icon: React.ElementType
+  iconBg: string
+  iconColor: string
+  valueColor: string
+  suffix?: string
+  trendIcon: React.ElementType
+  trendBg: string
+  trendColor: string
+  trendLabel: string
+}) {
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors group`}>
-      {/* Icon */}
-      <div className={`w-10 h-10 rounded-xl ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
-        <Icon className={`w-5 h-5 ${config.iconColor}`} />
+    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors group card-hover">
+      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center flex-shrink-0`}>
+        <Icon className={`w-5 h-5 ${iconColor}`} />
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground leading-tight">{config.label}</p>
-        <p className={`text-base font-bold ${config.color} tabular-nums leading-snug mt-0.5`}>
-          {displayValue}
+        <p className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</p>
+        <p className={`text-base font-bold ${valueColor} tabular-nums leading-snug mt-0.5`}>
+          {value}
+          {suffix && <span className="text-xs font-medium opacity-70 mr-1">{suffix}</span>}
         </p>
       </div>
 
-      {/* Trend indicator */}
-      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg ${config.bgColor}`}>
-        <TrendIcon className={`w-3 h-3 ${config.trendColor}`} />
-        <span className={`text-[10px] font-semibold ${config.trendColor}`}>{config.trendLabel}</span>
+      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg ${trendBg}`}>
+        <TrendIcon className={`w-3 h-3 ${trendColor}`} />
+        <span className={`text-[10px] font-semibold ${trendColor}`}>{trendLabel}</span>
       </div>
+    </div>
+  )
+}
+
+// ─── Sales Target Progress Bar ──────────────────────────────────────
+function SalesTargetProgress({ progress }: { progress: number }) {
+  const clamped = Math.min(Math.max(progress, 0), 100)
+  const barColor =
+    clamped >= 80
+      ? 'bg-emerald-500'
+      : clamped >= 50
+        ? 'bg-amber-500'
+        : 'bg-red-500'
+
+  const textColor =
+    clamped >= 80
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : clamped >= 50
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-red-600 dark:text-red-400'
+
+  return (
+    <div className="p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Target className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[11px] font-medium text-muted-foreground">هدف المبيعات الشهري</span>
+        </div>
+        <span className={`text-xs font-bold tabular-nums ${textColor}`}>{clamped}%</span>
+      </div>
+      <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full progress-bar-animated progress-bar-striped-animated ${barColor}`}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
+      {clamped >= 100 && (
+        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1.5 flex items-center gap-1">
+          <Trophy className="w-3 h-3" />
+          تم تحقيق الهدف! 🎉
+        </p>
+      )}
     </div>
   )
 }
@@ -175,6 +274,7 @@ function MetricRow({ config, value }: { config: MetricConfig; value: number }) {
 // ─── Main Component ─────────────────────────────────────────────────
 export function QuickStatsPanel() {
   const { setScreen } = useAppStore()
+  const { formatAmount, symbol } = useCurrency()
   const [isOpen, setIsOpen] = useState(false)
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -182,41 +282,29 @@ export function QuickStatsPanel() {
   const panelRef = useRef<HTMLDivElement>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Fetch all stats data ──────────────────────────────────────────
-  const fetchStats = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true)
+  // ── Fetch all stats from single endpoint ─────────────────────────
+  const fetchStats = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true)
 
-    try {
-      const [dashboardRes, expensesRes, customersRes] = await Promise.all([
-        fetch('/api/dashboard'),
-        fetch('/api/expenses?range=week&limit=1'),
-        fetch('/api/customers'),
-      ])
+      try {
+        const res = await fetch('/api/quick-stats')
+        const json = await res.json()
 
-      const [dashboardJson, expensesJson, customersJson] = await Promise.all([
-        dashboardRes.json(),
-        expensesRes.json(),
-        customersRes.json(),
-      ])
-
-      const dashboardData = dashboardJson.data ?? {}
-      const expensesSummary = expensesJson.data?.summary ?? {}
-
-      setStats({
-        todaySales: dashboardData.todaySales ?? 0,
-        netProfit: dashboardData.todayProfit ?? 0,
-        invoiceCount: dashboardData.todayInvoiceCount ?? 0,
-        lowStockCount: dashboardData.lowStockCount ?? 0,
-        todayExpenses: expensesSummary.todayExpenses ?? 0,
-        customerCount: Array.isArray(customersJson.data) ? customersJson.data.length : 0,
-      })
-    } catch {
-      toast.error('فشل في تحميل الإحصائيات')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [])
+        if (json.success && json.data) {
+          setStats(json.data)
+        } else {
+          toast.error('فشل في تحميل الإحصائيات')
+        }
+      } catch {
+        toast.error('فشل في تحميل الإحصائيات')
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [],
+  )
 
   // ── Initial load + auto-refresh every 30s ─────────────────────────
   useEffect(() => {
@@ -231,7 +319,6 @@ export function QuickStatsPanel() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as HTMLElement
-      // Close if clicking outside the panel and not on the FAB
       if (
         isOpen &&
         panelRef.current &&
@@ -256,21 +343,29 @@ export function QuickStatsPanel() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen])
 
+  // ── Derive profit margin color ────────────────────────────────────
+  const profitMarginColor =
+    stats && stats.profitMargin > 0
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : stats && stats.profitMargin < 0
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-muted-foreground'
+
   return (
     <>
       {/* ── Stats Panel ─────────────────────────────────────────── */}
       <div
         ref={panelRef}
-        className={`fixed bottom-24 left-6 z-[100] w-[340px] sm:w-[380px] transition-all duration-300 ease-out ${
+        className={`fixed bottom-24 left-4 sm:left-6 z-[100] w-[calc(100vw-2rem)] sm:w-[400px] transition-all duration-300 ease-out ${
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
         dir="rtl"
       >
-        <div className="glass-card rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden border border-border/50">
+        <div className="glass-card rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden border border-border/50 flex flex-col max-h-[85vh]">
           {/* Panel Header */}
-          <div className="flex items-center justify-between p-4 pb-2">
+          <div className="flex items-center justify-between p-4 pb-2 flex-shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                 <BarChart3 className="w-4.5 h-4.5 text-primary" />
@@ -301,31 +396,208 @@ export function QuickStatsPanel() {
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="mx-4 h-px bg-border/40" />
+          <div className="mx-4 h-px bg-border/40 flex-shrink-0" />
 
-          {/* Metrics Grid */}
-          <div className="p-3 space-y-1 max-h-[380px] overflow-y-auto">
+          {/* Scrollable content */}
+          <div className="overflow-y-auto flex-1 min-h-0">
             {loading ? (
-              // Skeleton loading
-              <div className="space-y-1">
+              // ── Skeleton Loading ─────────────────────────────
+              <div className="space-y-0.5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <MetricSkeleton key={i} />
+                  <MetricSkeleton key={`m-${i}`} />
                 ))}
+                <TopProductsSkeleton />
+                <ProgressSkeleton />
+                <RecentActivitySkeleton />
               </div>
             ) : stats ? (
-              // Actual data
-              <div className="animate-fade-in-up space-y-1">
-                {metrics.map((config) => (
+              // ── Actual Data ──────────────────────────────────
+              <div className="animate-fade-in-up">
+                {/* ── Metric Rows ─────────────────────────────── */}
+                <div className="space-y-0.5">
                   <MetricRow
-                    key={config.key}
-                    config={config}
-                    value={stats[config.key]}
+                    label="إجمالي المبيعات اليوم"
+                    value={`${formatAmount(stats.totalSalesToday)} ${symbol}`}
+                    icon={DollarSign}
+                    iconBg="bg-emerald-50 dark:bg-emerald-500/10"
+                    iconColor="text-emerald-500"
+                    valueColor="text-emerald-600 dark:text-emerald-400"
+                    trendIcon={TrendingUp}
+                    trendBg="bg-emerald-50 dark:bg-emerald-500/10"
+                    trendColor="text-emerald-500"
+                    trendLabel="اليوم"
                   />
-                ))}
+
+                  <MetricRow
+                    label="صافي الربح"
+                    value={`${formatAmount(stats.totalProfitToday)} ${symbol}`}
+                    icon={TrendingUp}
+                    iconBg={stats.totalProfitToday >= 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'}
+                    iconColor={stats.totalProfitToday >= 0 ? 'text-green-500' : 'text-red-500'}
+                    valueColor={stats.totalProfitToday >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+                    trendIcon={stats.totalProfitToday >= 0 ? TrendingUp : TrendingDown}
+                    trendBg={stats.totalProfitToday >= 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'}
+                    trendColor={stats.totalProfitToday >= 0 ? 'text-green-500' : 'text-red-500'}
+                    trendLabel={stats.totalProfitToday >= 0 ? 'إيجابي' : 'سلبي'}
+                  />
+
+                  {/* Profit Margin */}
+                  <MetricRow
+                    label="معدل الربح"
+                    value={`${Math.abs(stats.profitMargin)}%`}
+                    icon={Percent}
+                    iconBg={stats.profitMargin >= 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'}
+                    iconColor={stats.profitMargin >= 0 ? 'text-emerald-500' : 'text-red-500'}
+                    valueColor={profitMarginColor}
+                    trendIcon={stats.profitMargin >= 15 ? TrendingUp : TrendingDown}
+                    trendBg={stats.profitMargin >= 15 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}
+                    trendColor={stats.profitMargin >= 15 ? 'text-emerald-500' : 'text-amber-500'}
+                    trendLabel={stats.profitMargin >= 15 ? 'ممتاز' : stats.profitMargin >= 5 ? 'مقبول' : 'منخفض'}
+                  />
+
+                  <MetricRow
+                    label="عدد الفواتير"
+                    value={stats.invoicesCountToday.toLocaleString('ar-SA')}
+                    icon={FileText}
+                    iconBg="bg-blue-50 dark:bg-blue-500/10"
+                    iconColor="text-blue-500"
+                    valueColor="text-blue-600 dark:text-blue-400"
+                    trendIcon={FileText}
+                    trendBg="bg-blue-50 dark:bg-blue-500/10"
+                    trendColor="text-blue-400"
+                    trendLabel="فواتير"
+                  />
+
+                  <MetricRow
+                    label="منتجات منخفضة المخزون"
+                    value={stats.lowStockProducts.toLocaleString('ar-SA')}
+                    icon={AlertTriangle}
+                    iconBg="bg-amber-50 dark:bg-amber-500/10"
+                    iconColor="text-amber-500"
+                    valueColor={stats.lowStockProducts > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}
+                    trendIcon={AlertTriangle}
+                    trendBg={stats.lowStockProducts > 0 ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-green-50 dark:bg-green-500/10'}
+                    trendColor={stats.lowStockProducts > 0 ? 'text-amber-500' : 'text-green-500'}
+                    trendLabel={stats.lowStockProducts > 0 ? 'تحذير' : 'جيد'}
+                  />
+
+                  <MetricRow
+                    label="إجمالي المصروفات اليوم"
+                    value={`${formatAmount(stats.totalExpensesToday)} ${symbol}`}
+                    icon={Receipt}
+                    iconBg="bg-red-50 dark:bg-red-500/10"
+                    iconColor="text-red-500"
+                    valueColor="text-red-600 dark:text-red-400"
+                    trendIcon={Receipt}
+                    trendBg="bg-red-50 dark:bg-red-500/10"
+                    trendColor="text-red-400"
+                    trendLabel="مصروفات"
+                  />
+
+                  <MetricRow
+                    label="عدد العملاء"
+                    value={stats.totalCustomers.toLocaleString('ar-SA')}
+                    icon={Users}
+                    iconBg="bg-violet-50 dark:bg-violet-500/10"
+                    iconColor="text-violet-500"
+                    valueColor="text-violet-600 dark:text-violet-400"
+                    trendIcon={Users}
+                    trendBg="bg-violet-50 dark:bg-violet-500/10"
+                    trendColor="text-violet-400"
+                    trendLabel="عملاء"
+                  />
+                </div>
+
+                {/* ── Divider ─────────────────────────────────── */}
+                <div className="mx-3 h-px bg-border/40 my-1" />
+
+                {/* ── Top Selling Products ────────────────────── */}
+                <div className="p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-[11px] font-semibold text-foreground">المنتجات الأكثر مبيعاً</span>
+                    <span className="text-[10px] text-muted-foreground mr-auto">اليوم</span>
+                  </div>
+                  {stats.topProducts.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {stats.topProducts.map((product, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                              idx === 0
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+                                : idx === 1
+                                  ? 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                                  : 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
+                            }`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate">{product.name}</p>
+                          </div>
+                          <span className="text-[11px] font-semibold text-muted-foreground tabular-nums flex-shrink-0">
+                            {product.quantity} وحدة
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground text-center py-2">لا توجد مبيعات اليوم</p>
+                  )}
+                </div>
+
+                {/* ── Divider ─────────────────────────────────── */}
+                <div className="mx-3 h-px bg-border/40 my-0" />
+
+                {/* ── Sales Target Progress ───────────────────── */}
+                {stats.salesTargetProgress !== null ? (
+                  <SalesTargetProgress progress={stats.salesTargetProgress} />
+                ) : null}
+
+                {/* ── Divider ─────────────────────────────────── */}
+                <div className="mx-3 h-px bg-border/40 my-0" />
+
+                {/* ── Recent Activity Feed ────────────────────── */}
+                <div className="p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Activity className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-[11px] font-semibold text-foreground">آخر العمليات</span>
+                  </div>
+                  <div className="space-y-2">
+                    {stats.recentActivity.map((item) => {
+                      const meta = activityMeta(item.action)
+                      const Icon = meta.icon
+                      return (
+                        <div key={item.id} className="flex items-start gap-2.5 group/act">
+                          <div
+                            className={`w-6 h-6 rounded-full ${meta.bg} flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors group-hover/act:scale-110`}
+                          >
+                            <Icon className={`w-3 h-3 ${meta.color}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-medium text-foreground leading-tight truncate">
+                              {activityLabel(item.action, item.entity, item.details)}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock className="w-2.5 h-2.5 text-muted-foreground/60" />
+                              <span className="text-[10px] text-muted-foreground">
+                                {item.userName ? `${item.userName} · ` : ''}
+                                {relativeArabicTime(item.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             ) : (
-              // Error / empty state
+              // ── Error / empty state ──────────────────────────
               <div className="py-8 text-center">
                 <BarChart3 className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
                 <p className="text-xs text-muted-foreground">لا توجد بيانات متاحة</p>
@@ -334,7 +606,7 @@ export function QuickStatsPanel() {
           </div>
 
           {/* Panel Footer */}
-          <div className="p-3 pt-1">
+          <div className="p-3 pt-1 flex-shrink-0">
             <button
               onClick={() => {
                 setIsOpen(false)
@@ -353,7 +625,7 @@ export function QuickStatsPanel() {
       <button
         data-fab-button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 left-6 z-[101] w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 transition-all duration-300 ease-out group hover:shadow-xl hover:shadow-primary/30 hover:scale-105 active:scale-95 ${
+        className={`fixed bottom-6 left-4 sm:left-6 z-[101] w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 transition-all duration-300 ease-out group hover:shadow-xl hover:shadow-primary/30 hover:scale-105 active:scale-95 ${
           isOpen
             ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
             : 'glass-card bg-primary/90 text-primary-foreground animate-pulse-glow'

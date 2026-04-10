@@ -14,28 +14,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  LineChart,
-  Line,
-  Legend,
-  AreaChart,
-  Area,
-} from 'recharts'
 import { toast } from 'sonner'
 import {
   Target,
@@ -51,6 +29,9 @@ import {
   Zap,
   CalendarDays,
   Loader2,
+  DollarSign,
+  HourglassIcon,
+  ArrowTrendingUp,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -60,7 +41,7 @@ interface SalesTarget {
   type: string
   targetAmount: number
   currentAmount: number
-  progressPercent: number
+  progressPercentage: number
   remainingAmount: number
   daysRemaining: number
   hoursRemaining: number
@@ -68,14 +49,15 @@ interface SalesTarget {
   startDate: string
   endDate: string | null
   createdAt: string
+  dailyTargetNeeded: number
 }
 
 // ── Constants ──────────────────────────────────────────────────────
 
 const TARGET_TYPES = [
-  { value: 'daily', label: 'يومي', icon: '📅', color: '#3b5bdb' },
-  { value: 'weekly', label: 'أسبوعي', icon: '📆', color: '#0ca678' },
-  { value: 'monthly', label: 'شهري', icon: '🗓️', color: '#9c36b5' },
+  { value: 'daily', label: 'يومي', icon: '📅', color: '#3b5bdb', badgeBg: 'bg-blue-100 dark:bg-blue-900/30', badgeText: 'text-blue-700 dark:text-blue-400' },
+  { value: 'weekly', label: 'أسبوعي', icon: '📆', color: '#0ca678', badgeBg: 'bg-emerald-100 dark:bg-emerald-900/30', badgeText: 'text-emerald-700 dark:text-emerald-400' },
+  { value: 'monthly', label: 'شهري', icon: '🗓️', color: '#9c36b5', badgeBg: 'bg-purple-100 dark:bg-purple-900/30', badgeText: 'text-purple-700 dark:text-purple-400' },
 ]
 
 const TYPE_LABELS: Record<string, string> = {
@@ -84,12 +66,13 @@ const TYPE_LABELS: Record<string, string> = {
   monthly: 'الشهري',
 }
 
-const CHART_COLORS = ['#3b5bdb', '#0ca678', '#9c36b5', '#e03131', '#f08c00', '#1c7ed6']
-
 // ── Helpers ────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number): string {
-  return amount.toFixed(2)
+  return amount.toLocaleString('ar-SA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function formatDate(dateStr: string): string {
@@ -101,31 +84,25 @@ function formatDate(dateStr: string): string {
 }
 
 function getProgressColor(percent: number): string {
-  if (percent >= 100) return 'bg-emerald-500'
-  if (percent >= 80) return 'bg-emerald-500'
+  if (percent >= 80) return 'bg-green-500'
   if (percent >= 50) return 'bg-amber-500'
-  if (percent >= 25) return 'bg-orange-500'
   return 'bg-red-500'
 }
 
-function getProgressRingColor(percent: number): string {
-  if (percent >= 100) return 'stroke-emerald-500'
-  if (percent >= 80) return 'stroke-emerald-500'
-  if (percent >= 50) return 'stroke-amber-500'
-  if (percent >= 25) return 'stroke-orange-500'
-  return 'stroke-red-500'
+function getProgressRingClass(percent: number): string {
+  if (percent >= 80) return 'progress-ring-green'
+  if (percent >= 50) return 'progress-ring-amber'
+  return 'progress-ring-red'
 }
 
 function getProgressTextColor(percent: number): string {
-  if (percent >= 100) return 'text-emerald-600'
-  if (percent >= 80) return 'text-emerald-600'
-  if (percent >= 50) return 'text-amber-600'
-  if (percent >= 25) return 'text-orange-600'
-  return 'text-red-600'
+  if (percent >= 80) return 'text-green-500'
+  if (percent >= 50) return 'text-amber-500'
+  return 'text-red-500'
 }
 
 function getMotivationalMessage(percent: number): string {
-  if (percent >= 100) return '🎉 أحسنت! لقد حققت الهدف! استمر في العطاء'
+  if (percent >= 100) return '🎉 أحسنت! لقد حققت الهدف!'
   if (percent >= 80) return '🔥 قريب جداً! استمر بنفس الحماس'
   if (percent >= 50) return '💪 نصف الطريق! واصل المسيرة'
   if (percent >= 25) return '🌱 بداية جيدة! المزيد من الجهد'
@@ -137,27 +114,15 @@ function getTypeIcon(type: string): string {
   return t?.icon || '🎯'
 }
 
+function getTypeBadge(type: string) {
+  return TARGET_TYPES.find((t) => t.value === type) || TARGET_TYPES[0]
+}
+
 function getTimeLabel(target: SalesTarget): string {
-  if (!target.isActive && target.progressPercent >= 100) return 'مكتمل'
+  if (!target.isActive && target.progressPercentage >= 100) return 'مكتمل'
   if (target.daysRemaining > 0) return `${target.daysRemaining} يوم متبقي`
   if (target.hoursRemaining > 0) return `${target.hoursRemaining} ساعة متبقية`
   return target.isActive ? 'ينتهي اليوم' : 'منتهي'
-}
-
-// ── Custom Chart Tooltip ───────────────────────────────────────────
-
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} className="text-sm font-bold" style={{ color: entry.color }}>
-          {entry.dataKey === 'targetAmount' ? 'الهدف' : 'المحقق'}: {formatCurrency(entry.value)} ر.س
-        </p>
-      ))}
-    </div>
-  )
 }
 
 // ── Loading Skeleton ──────────────────────────────────────────────
@@ -180,35 +145,38 @@ function TargetCardSkeleton() {
   )
 }
 
-// ── Circular Progress Component ────────────────────────────────────
+// ── Progress Ring Component (CSS-based) ───────────────────────────
 
-function CircularProgress({ percent, size = 100, strokeWidth = 8 }: { percent: number; size?: number; strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (Math.min(percent, 100) / 100) * circumference
+function ProgressRing({ percent, size = 80 }: { percent: number; size?: number }) {
+  const clamped = Math.min(Math.max(percent, 0), 100)
   const isComplete = percent >= 100
+  const ringClass = getProgressRingClass(percent)
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" className="stroke-muted/30" strokeWidth={strokeWidth} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          className={`${getProgressRingColor(percent)} progress-bar-animated`}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-xl font-bold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-foreground'}`}>
+    <div className="progress-ring-container" style={{ width: size, height: size }}>
+      <div
+        className={`progress-ring ${size >= 80 ? 'progress-ring-lg' : size <= 48 ? 'progress-ring-sm' : 'progress-ring-md'} ${ringClass}`}
+        style={{ '--progress': clamped } as React.CSSProperties}
+      >
+        <span className={`progress-ring-text ${isComplete ? getProgressTextColor(percent) : ''}`}>
           {percent.toFixed(0)}%
         </span>
-        <span className="text-[9px] text-muted-foreground">مكتمل</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Stat Pill Component ────────────────────────────────────────────
+
+function StatPill({ icon: Icon, label, value, colorClass = '' }: { icon: React.ElementType; label: string; value: string; colorClass?: string }) {
+  return (
+    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/30 min-w-0">
+      <div className={`w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 ${colorClass}`}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] text-muted-foreground truncate">{label}</p>
+        <p className={`text-sm font-bold tabular-nums truncate ${colorClass || 'text-foreground'}`}>{value}</p>
       </div>
     </div>
   )
@@ -262,41 +230,8 @@ export function SalesTargetsScreen() {
   // ── Computed Data ─────────────────────────────────────────────
 
   const activeTargets = targets.filter((t) => t.isActive)
-  const completedTargets = targets.filter((t) => t.progressPercent >= 100)
+  const completedTargets = targets.filter((t) => t.progressPercentage >= 100)
   const totalTargets = targets.length
-
-  // Historical data for chart (group targets by type, show completion rates)
-  const historicalData = TARGET_TYPES.map((type) => {
-    const typeTargets = targets.filter((t) => t.type === type.value)
-    const avgProgress = typeTargets.length > 0
-      ? typeTargets.reduce((sum, t) => sum + t.progressPercent, 0) / typeTargets.length
-      : 0
-    const completed = typeTargets.filter((t) => t.progressPercent >= 100).length
-    const totalTargetAmount = typeTargets.reduce((sum, t) => sum + t.targetAmount, 0)
-    const totalCurrentAmount = typeTargets.reduce((sum, t) => sum + t.currentAmount, 0)
-    return {
-      name: type.label,
-      type: type.value,
-      avgProgress: Math.round(avgProgress * 10) / 10,
-      completed,
-      total: typeTargets.length,
-      targetAmount: Math.round(totalTargetAmount * 100) / 100,
-      currentAmount: Math.round(totalCurrentAmount * 100) / 100,
-      color: type.color,
-    }
-  })
-
-  // Time series data for trend (group by creation date)
-  const trendData = [...targets]
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-    .slice(-12)
-    .map((t) => ({
-      name: `${getTypeIcon(t.type)} ${TYPE_LABELS[t.type]}`,
-      date: formatDate(t.createdAt),
-      progress: t.progressPercent,
-      achieved: t.progressPercent >= 100 ? 100 : t.progressPercent,
-      color: t.progressPercent >= 100 ? '#0ca678' : t.progressPercent >= 50 ? '#f08c00' : '#e03131',
-    }))
 
   // ── Handlers ───────────────────────────────────────────────────
 
@@ -324,7 +259,7 @@ export function SalesTargetsScreen() {
 
     setSubmitting(true)
     try {
-      const url = editingTarget ? '/api/sales-targets' : '/api/sales-targets'
+      const url = '/api/sales-targets'
       const method = editingTarget ? 'PUT' : 'POST'
       const body: Record<string, unknown> = {
         type: formType,
@@ -404,7 +339,8 @@ export function SalesTargetsScreen() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium btn-ripple"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">هدف جديد</span>
+            <span className="hidden sm:inline">إنشاء هدف جديد</span>
+            <Plus className="w-4 h-4 sm:hidden" />
           </button>
         </div>
       </div>
@@ -440,13 +376,13 @@ export function SalesTargetsScreen() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">أهداف محققة</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1 number-animate-in">{completedTargets.length}</p>
+                  <p className="text-2xl font-bold text-green-500 mt-1 number-animate-in">{completedTargets.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {totalTargets > 0 ? `${((completedTargets.length / totalTargets) * 100).toFixed(0)}% نسبة الإنجاز` : 'لا توجد أهداف'}
                   </p>
                 </div>
-                <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <div className="w-11 h-11 rounded-2xl bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
                 </div>
               </div>
             </CardContent>
@@ -460,12 +396,12 @@ export function SalesTargetsScreen() {
                   <p className="text-sm text-muted-foreground">أفضل أداء</p>
                   <p className="text-lg font-bold text-purple-600 mt-1">
                     {activeTargets.length > 0
-                      ? `${getTypeIcon(activeTargets.sort((a, b) => b.progressPercent - a.progressPercent)[0]?.type || '')} ${TYPE_LABELS[activeTargets.sort((a, b) => b.progressPercent - a.progressPercent)[0]?.type || '']}`
+                      ? `${getTypeIcon(activeTargets.sort((a, b) => b.progressPercentage - a.progressPercentage)[0]?.type || '')} ${TYPE_LABELS[activeTargets.sort((a, b) => b.progressPercentage - a.progressPercentage)[0]?.type || '']}`
                       : '—'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {activeTargets.length > 0
-                      ? `${activeTargets.sort((a, b) => b.progressPercent - a.progressPercent)[0]?.progressPercent.toFixed(0)}% تحقيق`
+                      ? `${activeTargets.sort((a, b) => b.progressPercentage - a.progressPercentage)[0]?.progressPercentage.toFixed(0)}% تحقيق`
                       : 'لا توجد أهداف نشطة'}
                   </p>
                 </div>
@@ -478,7 +414,7 @@ export function SalesTargetsScreen() {
         </div>
       )}
 
-      {/* ── Active Targets with Animated Progress ────────────────── */}
+      {/* ── Active Targets with Progress Rings ───────────────────── */}
       {!loading && activeTargets.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -489,8 +425,9 @@ export function SalesTargetsScreen() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
             {activeTargets.map((target) => {
-              const percent = target.progressPercent
+              const percent = target.progressPercentage
               const isComplete = percent >= 100
+              const typeInfo = getTypeBadge(target.type)
 
               return (
                 <Card
@@ -498,12 +435,17 @@ export function SalesTargetsScreen() {
                   className={`rounded-2xl border-0 shadow-sm card-hover relative overflow-hidden ${isComplete ? 'stat-card-gradient stat-card-green' : ''}`}
                 >
                   <CardContent className="p-6 relative z-10">
+                    {/* Card Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <span className="text-2xl">{getTypeIcon(target.type)}</span>
                         <div>
                           <h4 className="text-base font-bold text-foreground flex items-center gap-2">
                             هدف {TYPE_LABELS[target.type]}
+                            {/* Type badge pill */}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border-0 ${typeInfo.badgeBg} ${typeInfo.badgeText}`}>
+                              {TYPE_LABELS[target.type]}
+                            </span>
                             {isComplete && (
                               <span className="badge-active text-[10px]">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -538,55 +480,59 @@ export function SalesTargetsScreen() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                      {/* Circular Progress */}
-                      <div className={isComplete ? 'animate-pulse-glow' : ''}>
-                        <CircularProgress percent={percent} size={96} strokeWidth={7} />
+                    {/* Main Content: Ring + Stats */}
+                    <div className="flex items-start gap-5">
+                      {/* CSS Progress Ring */}
+                      <div className={`shrink-0 ${isComplete ? 'animate-pulse-glow' : ''}`}>
+                        <ProgressRing percent={percent} size={80} />
                       </div>
 
                       {/* Details */}
-                      <div className="flex-1 space-y-3">
-                        {/* Stats Row */}
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="text-center p-2 rounded-xl bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">الهدف</p>
-                            <p className="text-sm font-bold text-foreground tabular-nums">
-                              {formatCurrency(target.targetAmount)}
-                            </p>
-                          </div>
-                          <div className="text-center p-2 rounded-xl bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">الحالي</p>
-                            <p className={`text-sm font-bold tabular-nums ${getProgressTextColor(percent)}`}>
-                              {formatCurrency(target.currentAmount)}
-                            </p>
-                          </div>
-                          <div className="text-center p-2 rounded-xl bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">المتبقي</p>
-                            <p className="text-sm font-bold text-foreground tabular-nums">
-                              {isComplete ? '0.00' : formatCurrency(target.remainingAmount)}
-                            </p>
-                          </div>
-                        </div>
-
+                      <div className="flex-1 space-y-3 min-w-0">
                         {/* Progress Bar */}
-                        <div className="space-y-1">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">التقدم</span>
+                            <span className={`text-xs font-bold tabular-nums ${getProgressTextColor(percent)}`}>
+                              {percent.toFixed(1)}%
+                            </span>
+                          </div>
                           <div className="relative h-3 rounded-full bg-muted/60 overflow-hidden">
                             <div
-                              className={`absolute inset-y-0 right-0 rounded-full progress-bar-animated progress-bar-striped-animated ${getProgressColor(percent)} ${isComplete ? 'shimmer' : ''}`}
+                              className={`absolute inset-y-0 right-0 rounded-full progress-bar-animated ${getProgressColor(percent)} ${isComplete ? 'shimmer' : ''}`}
                               style={{ width: `${Math.min(percent, 100)}%` }}
                             />
                           </div>
-                        </div>
-
-                        {/* Time & Message */}
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {getTimeLabel(target)}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-[10px] text-muted-foreground mt-1">
                             {getMotivationalMessage(percent)}
                           </p>
+                        </div>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <StatPill
+                            icon={DollarSign}
+                            label="المبلغ المتبقي"
+                            value={`${formatCurrency(target.remainingAmount)} ر.س`}
+                            colorClass={isComplete ? 'text-green-500' : ''}
+                          />
+                          <StatPill
+                            icon={Clock}
+                            label="الأيام المتبقية"
+                            value={isComplete ? 'مكتمل ✅' : target.daysRemaining > 0 ? `${target.daysRemaining} يوم` : target.hoursRemaining > 0 ? `${target.hoursRemaining} ساعة` : 'منتهي'}
+                            colorClass={!isComplete && target.daysRemaining <= 1 ? 'text-red-500' : ''}
+                          />
+                          <StatPill
+                            icon={ArrowTrendingUp}
+                            label="المعدل اليومي المطلوب"
+                            value={target.dailyTargetNeeded > 0 ? `${formatCurrency(target.dailyTargetNeeded)} ر.س` : isComplete ? '—' : '∞'}
+                            colorClass={target.dailyTargetNeeded > target.targetAmount * 0.05 ? 'text-amber-500' : ''}
+                          />
+                          <StatPill
+                            icon={HourglassIcon}
+                            label="الوقت"
+                            value={getTimeLabel(target)}
+                          />
                         </div>
                       </div>
                     </div>
@@ -598,275 +544,80 @@ export function SalesTargetsScreen() {
         </div>
       )}
 
-      {/* ── Charts Section ────────────────────────────────────────── */}
-      {!loading && targets.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
-          {/* Performance by Type - Bar Chart */}
-          <Card className="rounded-2xl border-0 shadow-sm card-hover">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    أداء الأهداف حسب النوع
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">الهدف مقابل المحقق لكل نوع</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {historicalData.some((d) => d.total > 0) ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={historicalData.filter((d) => d.total > 0)} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Bar dataKey="targetAmount" name="targetAmount" radius={[6, 6, 0, 0]} maxBarSize={50} fill="#3b5bdb" opacity={0.3} animationDuration={800} />
-                      <Bar dataKey="currentAmount" name="currentAmount" radius={[6, 6, 0, 0]} maxBarSize={50} animationDuration={1000}>
-                        {historicalData.filter((d) => d.total > 0).map((entry, index) => (
-                          <Cell key={`hist-cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <Target className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد بيانات</p>
-                  </div>
-                )}
-              </div>
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-6 mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-sm bg-[#3b5bdb] opacity-30" />
-                  <span className="text-xs text-muted-foreground">الهدف</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-sm bg-emerald-500" />
-                  <span className="text-xs text-muted-foreground">المحقق</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* ── Inactive / Completed Targets ──────────────────────────── */}
+      {!loading && targets.filter((t) => !t.isActive).length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-muted-foreground" />
+            <h3 className="text-base font-bold text-foreground">أهداف سابقة</h3>
+            <Badge variant="secondary" className="text-xs">{targets.filter((t) => !t.isActive).length}</Badge>
+          </div>
 
-          {/* Achievement Progress - Trend Area Chart */}
-          <Card className="rounded-2xl border-0 shadow-sm card-hover">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                    <Flame className="w-5 h-5 text-primary" />
-                    منحنى تقدم الأهداف
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">نسبة التحقيق لكل هدف</p>
-                </div>
-                <Badge variant="secondary" className="rounded-lg text-xs">
-                  {trendData.length} هدف
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {trendData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
-                      <defs>
-                        <linearGradient id="progressGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0ca678" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#0ca678" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${val}%`}
-                        domain={[0, 120]}
-                      />
-                      <Tooltip
-                        content={({ active, payload, label }) => {
-                          if (!active || !payload?.length) return null
-                          return (
-                            <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-                              <p className="text-sm font-bold text-foreground">
-                                التقدم: {payload[0].value}%
-                              </p>
-                            </div>
-                          )
-                        }}
-                      />
-                      {/* Reference line at 100% */}
-                      <Line type="monotone" dataKey={() => 100} stroke="#e03131" strokeDasharray="4 4" strokeWidth={1} dot={false} />
-                      <Area
-                        type="monotone"
-                        dataKey="progress"
-                        stroke="#0ca678"
-                        strokeWidth={2.5}
-                        fill="url(#progressGradient)"
-                        animationDuration={1200}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <Flame className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد بيانات</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-center gap-4 mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-muted-foreground">نسبة التحقيق</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-0 border-t-2 border-dashed border-red-400" />
-                  <span className="text-xs text-muted-foreground">خط الهدف (100%)</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
+            {targets.filter((t) => !t.isActive).map((target) => {
+              const percent = target.progressPercentage
+              const isComplete = percent >= 100
+              const typeInfo = getTypeBadge(target.type)
 
-      {/* ── All Targets History Table ──────────────────────────────── */}
-      {!loading && targets.length > 0 && (
-        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-bold text-foreground">سجل جميع الأهداف</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">{targets.length} هدف مسجل</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            <div className="max-h-[400px] overflow-y-auto rounded-xl border border-border/50">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-background z-10">
-                  <tr className="border-b border-border/50">
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 text-right">النوع</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 text-left">الهدف</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 text-left">المحقق</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 text-center">التقدم</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 hidden sm:table-cell">الحالة</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 hidden md:table-cell">التاريخ</th>
-                    <th className="text-xs font-semibold text-muted-foreground py-3 px-4 text-center">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {targets.map((target) => {
-                    const isComplete = target.progressPercent >= 100
-                    return (
-                      <tr
-                        key={target.id}
-                        className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors"
+              return (
+                <Card key={target.id} className="rounded-2xl border-0 shadow-sm card-hover">
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <ProgressRing percent={percent} size={56} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-bold text-foreground truncate">
+                            {TYPE_LABELS[target.type]}
+                          </h4>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold border-0 ${typeInfo.badgeBg} ${typeInfo.badgeText}`}>
+                            {typeInfo.label}
+                          </span>
+                        </div>
+                        <p className={`text-lg font-bold tabular-nums ${getProgressTextColor(percent)}`}>
+                          {percent.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="relative h-2 rounded-full bg-muted/60 overflow-hidden mb-3">
+                      <div
+                        className={`absolute inset-y-0 right-0 rounded-full ${getProgressColor(percent)}`}
+                        style={{ width: `${Math.min(percent, 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{formatCurrency(target.currentAmount)} / {formatCurrency(target.targetAmount)} ر.س</span>
+                      <span>{formatDate(target.createdAt)}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-1 mt-2">
+                      <button
+                        onClick={() => openEditDialog(target)}
+                        className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                        title="تعديل"
                       >
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <span>{getTypeIcon(target.type)}</span>
-                            <span className="text-sm font-medium text-foreground">{TYPE_LABELS[target.type]}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-left">
-                          <span className="text-sm font-bold text-foreground tabular-nums">
-                            {formatCurrency(target.targetAmount)}
-                            <span className="text-[10px] text-muted-foreground mr-1">ر.س</span>
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-left">
-                          <span className={`text-sm font-bold tabular-nums ${getProgressTextColor(target.progressPercent)}`}>
-                            {formatCurrency(target.currentAmount)}
-                            <span className="text-[10px] mr-1">ر.س</span>
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2 min-w-[120px]">
-                            <div className="relative h-2 flex-1 rounded-full bg-muted/60 overflow-hidden">
-                              <div
-                                className={`absolute inset-y-0 right-0 rounded-full ${getProgressColor(target.progressPercent)}`}
-                                style={{ width: `${Math.min(target.progressPercent, 100)}%` }}
-                              />
-                            </div>
-                            <span className={`text-xs font-bold tabular-nums min-w-[36px] ${getProgressTextColor(target.progressPercent)}`}>
-                              {target.progressPercent.toFixed(0)}%
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 hidden sm:table-cell">
-                          {isComplete ? (
-                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px]">
-                              <CheckCircle2 className="w-3 h-3 ml-1" />
-                              محقق
-                            </Badge>
-                          ) : target.isActive ? (
-                            <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0 text-[10px]">
-                              <Zap className="w-3 h-3 ml-1" />
-                              نشط
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px]">
-                              <XCircle className="w-3 h-3 ml-1" />
-                              منتهي
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 hidden md:table-cell">
-                          <span className="text-xs text-muted-foreground">{formatDate(target.createdAt)}</span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => openEditDialog(target)}
-                              className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteTarget(target)
-                                setDeleteDialogOpen(true)
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeleteTarget(target)
+                          setDeleteDialogOpen(true)
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {/* ── Empty State ────────────────────────────────────────────── */}
@@ -889,7 +640,7 @@ export function SalesTargetsScreen() {
               className="gap-2 mt-2"
             >
               <Plus className="w-4 h-4" />
-              إنشاء أول هدف
+              إنشاء هدف جديد
             </Button>
           </div>
         </div>
@@ -962,6 +713,17 @@ export function SalesTargetsScreen() {
               )}
             </div>
 
+            {/* Start Date */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">تاريخ البداية</Label>
+              <Input
+                type="date"
+                value={editingTarget ? new Date(editingTarget.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                disabled
+                className="h-10 text-sm opacity-60"
+              />
+            </div>
+
             {/* End Date (Optional) */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">تاريخ الانتهاء (اختياري)</Label>
@@ -1014,7 +776,7 @@ export function SalesTargetsScreen() {
                     هدف {TYPE_LABELS[deleteTarget.type]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    المبلغ: {formatCurrency(deleteTarget.targetAmount)} ر.س · التقدم: {deleteTarget.progressPercent.toFixed(0)}%
+                    المبلغ: {formatCurrency(deleteTarget.targetAmount)} ر.س · التقدم: {deleteTarget.progressPercentage.toFixed(0)}%
                   </p>
                 </div>
               </div>

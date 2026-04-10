@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type LucideIcon } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -24,10 +24,10 @@ import {
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
+  AreaChart,
+  Area,
   PieChart,
   Pie,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -53,20 +53,99 @@ import {
   TrendingDown,
   Repeat,
   Loader2,
+  Settings,
+  Wrench,
+  Building2,
+  Users,
+  Truck,
+  MoreHorizontal,
+  Clock,
+  BarChart3,
+  ArrowDownUp,
 } from 'lucide-react'
 
-// ── Constants ──────────────────────────────────────────────────────
+// ── Category Icon Mapping ──────────────────────────────────────────
 
-const EXPENSE_CATEGORIES = [
-  { value: 'مصروفات تشغيلية', label: 'مصروفات تشغيلية', color: '#3b5bdb', badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  { value: 'صيانة', label: 'صيانة', color: '#e03131', badgeClass: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  { value: 'إيجار', label: 'إيجار', color: '#0ca678', badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-  { value: 'رواتب', label: 'رواتب', color: '#9c36b5', badgeClass: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  { value: 'نقل', label: 'نقل', color: '#f08c00', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  { value: 'متنوع', label: 'متنوع', color: '#868e96', badgeClass: 'bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-400' },
+interface CategoryDef {
+  value: string
+  label: string
+  icon: LucideIcon
+  color: string          // tailwind text-* class (e.g. "text-blue-500")
+  bgClass: string        // tailwind bg-* class
+  borderClass: string    // tailwind border-* class
+  badgeClass: string
+  hexColor: string       // hex for charts
+  periodLabel: string
+}
+
+const EXPENSE_CATEGORIES: CategoryDef[] = [
+  {
+    value: 'مصروفات تشغيلية',
+    label: 'مصروفات تشغيلية',
+    icon: Settings,
+    color: 'text-blue-500',
+    bgClass: 'bg-blue-500/10',
+    borderClass: 'border-blue-500/30',
+    badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    hexColor: '#3b82f6',
+    periodLabel: 'تشغيلية',
+  },
+  {
+    value: 'صيانة',
+    label: 'صيانة',
+    icon: Wrench,
+    color: 'text-amber-500',
+    bgClass: 'bg-amber-500/10',
+    borderClass: 'border-amber-500/30',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    hexColor: '#f59e0b',
+    periodLabel: 'صيانة',
+  },
+  {
+    value: 'إيجار',
+    label: 'إيجار',
+    icon: Building2,
+    color: 'text-purple-500',
+    bgClass: 'bg-purple-500/10',
+    borderClass: 'border-purple-500/30',
+    badgeClass: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    hexColor: '#a855f7',
+    periodLabel: 'إيجار',
+  },
+  {
+    value: 'رواتب',
+    label: 'رواتب',
+    icon: Users,
+    color: 'text-green-500',
+    bgClass: 'bg-green-500/10',
+    borderClass: 'border-green-500/30',
+    badgeClass: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    hexColor: '#22c55e',
+    periodLabel: 'رواتب',
+  },
+  {
+    value: 'نقل',
+    label: 'نقل',
+    icon: Truck,
+    color: 'text-orange-500',
+    bgClass: 'bg-orange-500/10',
+    borderClass: 'border-orange-500/30',
+    badgeClass: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    hexColor: '#f97316',
+    periodLabel: 'نقل',
+  },
+  {
+    value: 'متنوع',
+    label: 'متنوع',
+    icon: MoreHorizontal,
+    color: 'text-gray-500',
+    bgClass: 'bg-gray-500/10',
+    borderClass: 'border-gray-500/30',
+    badgeClass: 'bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-400',
+    hexColor: '#6b7280',
+    periodLabel: 'متنوع',
+  },
 ]
-
-const CHART_COLORS = ['#3b5bdb', '#e03131', '#0ca678', '#9c36b5', '#f08c00', '#868e96', '#1c7ed6', '#e8590c']
 
 const DATE_RANGE_OPTIONS = [
   { value: 'all', label: 'الكل' },
@@ -77,9 +156,9 @@ const DATE_RANGE_OPTIONS = [
 ]
 
 const RECURRING_PERIODS = [
-  { value: 'daily', label: 'يومي' },
-  { value: 'weekly', label: 'أسبوعي' },
-  { value: 'monthly', label: 'شهري' },
+  { value: 'daily', label: 'يومي', short: 'يومياً' },
+  { value: 'weekly', label: 'أسبوعي', short: 'أسبوعياً' },
+  { value: 'monthly', label: 'شهري', short: 'شهرياً' },
 ]
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -104,24 +183,40 @@ interface CategorySummary {
   count: number
 }
 
-interface MonthlyTrend {
-  month: string
+interface DailyTrend {
+  date: string
   total: number
+}
+
+interface RecurringItem {
+  id: string
+  category: string
+  amount: number
+  description: string
+  recurringPeriod: string | null
+  nextDueDate: string
 }
 
 interface ExpenseSummary {
   totalExpenses: number
   todayExpenses: number
+  thisWeekExpenses: number
   thisMonthExpenses: number
   topCategory: string | null
   totalByCategory: CategorySummary[]
-  monthlyTrend: MonthlyTrend[]
+  monthlyTrend: { month: string; total: number }[]
+  dailyTrend: DailyTrend[]
+  recurringSummary: RecurringItem[]
+  averageDailyExpense: number
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number): string {
-  return amount.toFixed(2)
+  return amount.toLocaleString('ar-SA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function formatDate(dateStr: string): string {
@@ -133,8 +228,13 @@ function formatDate(dateStr: string): string {
   })
 }
 
-function getCategoryInfo(categoryValue: string) {
+function getCategoryDef(categoryValue: string): CategoryDef {
   return EXPENSE_CATEGORIES.find((c) => c.value === categoryValue) || EXPENSE_CATEGORIES[5]
+}
+
+function getPeriodLabel(period: string | null): string {
+  if (!period) return 'مرة واحدة'
+  return RECURRING_PERIODS.find((p) => p.value === period)?.label || 'متكرر'
 }
 
 function getDateRange(range: string): { from: string; to: string } {
@@ -168,6 +268,16 @@ function getDateRange(range: string): { from: string; to: string } {
 
 // ── Custom Chart Tooltips ──────────────────────────────────────────
 
+function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
+      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)} ر.س</p>
+    </div>
+  )
+}
+
 function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { name: string; value: number } }> }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
@@ -175,16 +285,6 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
       <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)} ر.س</p>
-    </div>
-  )
-}
-
-function BarTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)} ر.س</p>
     </div>
   )
 }
@@ -201,6 +301,19 @@ function CustomLegend({ payload }: { payload?: Array<{ value: string; color: str
       ))}
     </div>
   )
+}
+
+// ── Category Icon Component ────────────────────────────────────────
+
+function CategoryIcon({ category, size = 'sm' }: { category: string; size?: 'sm' | 'md' | 'lg' }) {
+  const cat = getCategoryDef(category)
+  const Icon = cat.icon
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6',
+  }
+  return <Icon className={`${sizeClasses[size]} ${cat.color}`} />
 }
 
 // ── Loading Skeletons ──────────────────────────────────────────────
@@ -250,6 +363,35 @@ function TableSkeleton() {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function CategoryCardSkeleton() {
+  return (
+    <Card className="rounded-2xl border-0 shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <div className="skeleton-shimmer w-11 h-11 rounded-xl flex-shrink-0" />
+        <div className="space-y-2 flex-1">
+          <div className="skeleton-shimmer h-4 w-24 rounded" />
+          <div className="skeleton-shimmer h-3 w-20 rounded" />
+          <div className="skeleton-shimmer h-2 w-16 rounded" />
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// ── Progress Bar ───────────────────────────────────────────────────
+
+function CategoryProgressBar({ total, categoryTotal, color }: { total: number; categoryTotal: number; color: string }) {
+  const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0
+  return (
+    <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden">
+      <div
+        className="h-full rounded-full transition-all duration-700 ease-out"
+        style={{ width: `${percentage}%`, backgroundColor: color }}
+      />
+    </div>
   )
 }
 
@@ -436,12 +578,23 @@ export function ExpenseScreen() {
 
   const hasActiveFilters = categoryFilter || dateRange !== 'all' || search.trim()
 
-  // ── Pie Chart Data ─────────────────────────────────────────────
+  // ── Computed Data ─────────────────────────────────────────────
 
-  const pieData = summary?.totalByCategory?.map((c) => ({
-    name: c.category,
-    value: c.total,
-  })) || []
+  const categoryChartData = summary?.totalByCategory?.map((c) => {
+    const catDef = getCategoryDef(c.category)
+    return {
+      name: c.category,
+      value: c.total,
+      color: catDef.hexColor,
+    }
+  }) || []
+
+  const dailyTrendData = summary?.dailyTrend || []
+
+  const categorySummaryData = summary?.totalByCategory || []
+  const totalAllCategories = categorySummaryData.reduce((sum, c) => sum + c.total, 0)
+
+  const recurringItems = summary?.recurringSummary || []
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -490,28 +643,24 @@ export function ExpenseScreen() {
         </div>
       </div>
 
-      {/* ── Summary Cards ─────────────────────────────────────────── */}
+      {/* ── Summary Stats Cards (5 cards) ──────────────────────────── */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCardSkeleton />
-          <SummaryCardSkeleton />
-          <SummaryCardSkeleton />
-          <SummaryCardSkeleton />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => <SummaryCardSkeleton key={i} />)}
         </div>
       ) : summary ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 stagger-children">
           {/* Total Expenses */}
           <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro stat-card-blue">
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">إجمالي المصروفات</p>
-                  <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">
+            <CardContent className="p-4 relative z-10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">إجمالي المصروفات</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums truncate">
                     {formatCurrency(summary.totalExpenses)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">ريال سعودي</p>
                 </div>
-                <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                   <Wallet className="w-5 h-5" />
                 </div>
               </div>
@@ -520,17 +669,33 @@ export function ExpenseScreen() {
 
           {/* Today Expenses */}
           <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro stat-card-green">
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">مصروفات اليوم</p>
-                  <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">
+            <CardContent className="p-4 relative z-10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">مصروفات اليوم</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums truncate">
                     {formatCurrency(summary.todayExpenses)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">ريال سعودي</p>
                 </div>
-                <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0">
                   <CalendarDays className="w-5 h-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* This Week */}
+          <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro">
+            <CardContent className="p-4 relative z-10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">هذا الأسبوع</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums truncate">
+                    {formatCurrency(summary.thisWeekExpenses)}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <CalendarRange className="w-5 h-5" />
                 </div>
               </div>
             </CardContent>
@@ -538,41 +703,292 @@ export function ExpenseScreen() {
 
           {/* This Month */}
           <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro stat-card-red">
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">مصروفات الشهر</p>
-                  <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">
+            <CardContent className="p-4 relative z-10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">هذا الشهر</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums truncate">
                     {formatCurrency(summary.thisMonthExpenses)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">ريال سعودي</p>
                 </div>
-                <div className="w-11 h-11 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">
-                  <CalendarRange className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 className="w-5 h-5" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Top Category */}
-          <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro stat-card-blue">
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">أعلى فئة</p>
-                  <p className="text-lg font-bold text-foreground mt-1 truncate max-w-[130px]">
-                    {summary.topCategory || '—'}
+          {/* Average Daily */}
+          <Card className="rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro">
+            <CardContent className="p-4 relative z-10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">متوسط يومي</p>
+                  <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums truncate">
+                    {formatCurrency(summary.averageDailyExpense)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">من إجمالي المصروفات</p>
                 </div>
-                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                  <TrendingDown className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
+                  <ArrowDownUp className="w-5 h-5" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       ) : null}
+
+      {/* ── Category Summary Cards (icon + name + total + percentage) ── */}
+      {!loading && categorySummaryData.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-semibold text-foreground">ملخص الفئات</h3>
+            <Badge variant="secondary" className="rounded-lg text-[10px] h-5 px-2">
+              {categorySummaryData.length} فئة
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
+            {categorySummaryData.map((cat) => {
+              const catDef = getCategoryDef(cat.category)
+              const Icon = catDef.icon
+              const percentage = totalAllCategories > 0 ? Math.round((cat.total / totalAllCategories) * 100) : 0
+              return (
+                <Card
+                  key={cat.category}
+                  className={`rounded-2xl border-0 shadow-sm card-hover p-4 cursor-default`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl ${catDef.bgClass} ${catDef.borderClass} border flex items-center justify-center flex-shrink-0`}>
+                      <Icon className={`w-5 h-5 ${catDef.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-foreground truncate">{cat.category}</p>
+                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 flex-shrink-0 mr-2">
+                          {percentage}%
+                        </Badge>
+                      </div>
+                      <p className="text-base font-bold text-foreground mt-0.5 tabular-nums">
+                        {formatCurrency(cat.total)}
+                        <span className="text-xs text-muted-foreground mr-1 font-normal">ر.س</span>
+                      </p>
+                      <div className="mt-1.5">
+                        <CategoryProgressBar
+                          total={totalAllCategories}
+                          categoryTotal={cat.total}
+                          color={catDef.hexColor}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">{cat.count} عملية</p>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Charts Section ────────────────────────────────────────── */}
+      {loading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      ) : summary ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
+          {/* Category Breakdown - Pie/Donut Chart */}
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-foreground">توزيع المصروفات حسب الفئة</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">نسبة كل فئة من إجمالي المصروفات</p>
+                </div>
+                <Badge variant="secondary" className="rounded-lg text-xs">
+                  {categoryChartData.length} فئة
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-2">
+              <div className="h-[280px] w-full">
+                {categoryChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {categoryChartData.map((entry, index) => (
+                          <Cell key={`pie-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieTooltip />} />
+                      <Legend content={<CustomLegend />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center empty-state">
+                    <div className="empty-state-icon">
+                      <Wallet className="w-6 h-6 text-primary/30" />
+                    </div>
+                    <p className="empty-state-title">لا توجد مصروفات بعد</p>
+                    <p className="empty-state-description mt-1">سيظهر توزيع المصروفات حسب الفئة هنا</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Daily Trend - Area Chart (last 30 days) */}
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-foreground">اتجاه المصروفات اليومي</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">آخر 30 يوم</p>
+                </div>
+                <Badge variant="secondary" className="rounded-lg text-xs">
+                  <TrendingDown className="w-3 h-3 ml-1" />
+                  يومي
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-2">
+              <div className="h-[280px] w-full">
+                {dailyTrendData.length > 0 && dailyTrendData.some((d) => d.total > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dailyTrendData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={4}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val)}
+                      />
+                      <Tooltip content={<AreaTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        stroke="#3b82f6"
+                        strokeWidth={2.5}
+                        fill="url(#expenseGradient)"
+                        animationDuration={1000}
+                        animationEasing="ease-out"
+                        dot={false}
+                        activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center empty-state">
+                    <div className="empty-state-icon">
+                      <TrendingDown className="w-6 h-6 text-primary/30" />
+                    </div>
+                    <p className="empty-state-title">لا توجد بيانات كافية</p>
+                    <p className="empty-state-description mt-1">سيظهر اتجاه المصروفات اليومي هنا</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* ── Recurring Expenses Section ──────────────────────────────── */}
+      {!loading && recurringItems.length > 0 && (
+        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up glass-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Repeat className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold text-foreground">المصروفات المتكررة</CardTitle>
+                  <p className="text-xs text-muted-foreground">مصروفات دورية مع التاريخ المتوقع التالي</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="rounded-lg text-xs badge-active">
+                <Repeat className="w-3 h-3 ml-1" />
+                {recurringItems.length} متكرر
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {recurringItems.map((item) => {
+                const catDef = getCategoryDef(item.category)
+                const Icon = catDef.icon
+                const nextDue = new Date(item.nextDueDate)
+                const now = new Date()
+                const isOverdue = nextDue <= now
+                const daysUntilDue = Math.ceil((nextDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-3 card-hover transition-all duration-200 ${
+                      isOverdue
+                        ? 'border-red-300 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/10'
+                        : 'border-border/50 bg-card/50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-lg ${catDef.bgClass} ${catDef.borderClass} border flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        <Icon className={`w-4 h-4 ${catDef.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-sm font-semibold text-foreground truncate">{item.description}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${catDef.badgeClass}`}>
+                            {item.category}
+                          </span>
+                          {item.recurringPeriod && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                              {getPeriodLabel(item.recurringPeriod)}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-sm font-bold text-foreground tabular-nums">
+                            {formatCurrency(item.amount)} <span className="text-[10px] text-muted-foreground font-normal">ر.س</span>
+                          </span>
+                          <div className={`flex items-center gap-1 text-[10px] ${isOverdue ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {isOverdue ? 'مستحقة' : `بعد ${daysUntilDue} يوم`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Filters Bar ───────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -644,128 +1060,11 @@ export function ExpenseScreen() {
         )}
       </div>
 
-      {/* ── Charts Section ────────────────────────────────────────── */}
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartSkeleton />
-          <ChartSkeleton />
-        </div>
-      ) : summary ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
-          {/* Category Breakdown - Pie/Donut Chart */}
-          <Card className="rounded-2xl border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold text-foreground">توزيع المصروفات حسب الفئة</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">نسبة كل فئة من إجمالي المصروفات</p>
-                </div>
-                <Badge variant="secondary" className="rounded-lg text-xs">
-                  {pieData.length} فئة
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {pieData.map((_, index) => (
-                          <Cell
-                            key={`pie-cell-${index}`}
-                            fill={CHART_COLORS[index % CHART_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<PieTooltip />} />
-                      <Legend content={<CustomLegend />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <Wallet className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد مصروفات بعد</p>
-                    <p className="empty-state-description mt-1">سيظهر توزيع المصروفات حسب الفئة هنا بعد إضافة أول مصروف</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Trend - Bar Chart */}
-          <Card className="rounded-2xl border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold text-foreground">اتجاه المصروفات الشهرية</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">آخر 6 أشهر</p>
-                </div>
-                <Badge variant="secondary" className="rounded-lg text-xs">
-                  {summary.monthlyTrend?.length ?? 0} شهر
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {summary.monthlyTrend && summary.monthlyTrend.some((m) => m.total > 0) ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={summary.monthlyTrend} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip content={<BarTooltip />} cursor={{ fill: 'oklch(0.55 0.2 260 / 8%)' }} />
-                      <Bar
-                        dataKey="total"
-                        radius={[8, 8, 0, 0]}
-                        maxBarSize={50}
-                        fill="#e03131"
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <TrendingDown className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد بيانات كافية</p>
-                    <p className="empty-state-description mt-1">سيظهر اتجاه المصروفات الشهرية هنا</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
-
       {/* ── Expenses Table ────────────────────────────────────────── */}
       {loading ? (
         <TableSkeleton />
       ) : (
-        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -786,22 +1085,26 @@ export function ExpenseScreen() {
                           <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4">الوصف</TableHead>
                           <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4 text-left">المبلغ</TableHead>
                           <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4">التاريخ</TableHead>
-                          <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4">نوع المصروف</TableHead>
+                          <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4">النوع</TableHead>
                           <TableHead className="text-xs font-semibold text-muted-foreground py-3 px-4 text-center">إجراء</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {expenses.map((expense) => {
-                          const catInfo = getCategoryInfo(expense.category)
+                          const catDef = getCategoryDef(expense.category)
+                          const Icon = catDef.icon
                           return (
                             <TableRow
                               key={expense.id}
                               className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors"
                             >
                               <TableCell className="py-3 px-4">
-                                <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 h-5 font-semibold ${catInfo.badgeClass}`}>
-                                  {expense.category}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-7 h-7 rounded-lg ${catDef.bgClass} ${catDef.borderClass} border flex items-center justify-center flex-shrink-0`}>
+                                    <Icon className={`w-3.5 h-3.5 ${catDef.color}`} />
+                                  </div>
+                                  <span className="text-xs font-medium text-foreground">{expense.category}</span>
+                                </div>
                               </TableCell>
                               <TableCell className="py-3 px-4">
                                 <div className="max-w-[200px]">
@@ -825,9 +1128,7 @@ export function ExpenseScreen() {
                                   <div className="flex items-center gap-1">
                                     <Repeat className="w-3.5 h-3.5 text-primary" />
                                     <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                                      {expense.recurringPeriod === 'daily' ? 'يومي' :
-                                       expense.recurringPeriod === 'weekly' ? 'أسبوعي' :
-                                       expense.recurringPeriod === 'monthly' ? 'شهري' : 'متكرر'}
+                                      {getPeriodLabel(expense.recurringPeriod)}
                                     </Badge>
                                   </div>
                                 ) : (
@@ -926,33 +1227,50 @@ export function ExpenseScreen() {
         </Card>
       )}
 
-      {/* ── Add Expense Dialog ─────────────────────────────────────── */}
+      {/* ── Add Expense Dialog (Enhanced) ──────────────────────────── */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="sm:max-w-lg" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
               إضافة مصروف جديد
             </DialogTitle>
             <DialogDescription>
-              أدخل بيانات المصروف الجديد
+              اختر الفئة وأدخل بيانات المصروف الجديد
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-2">
-            {/* Category */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">فئة المصروف <span className="text-destructive">*</span></Label>
-              <Select value={newCategory} onValueChange={setNewCategory}>
-                <SelectTrigger className="h-10 text-sm">
-                  <SelectValue placeholder="اختر الفئة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Category Selector as Icon Grid */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                فئة المصروف <span className="text-destructive">*</span>
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                {EXPENSE_CATEGORIES.map((cat) => {
+                  const Icon = cat.icon
+                  const isSelected = newCategory === cat.value
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => setNewCategory(cat.value)}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
+                        isSelected
+                          ? `${cat.borderClass} ${cat.bgClass} shadow-sm scale-[1.02]`
+                          : 'border-transparent bg-muted/40 hover:bg-muted/70'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg ${cat.bgClass} flex items-center justify-center transition-all duration-200`}>
+                        <Icon className={`w-4 h-4 ${cat.color}`} />
+                      </div>
+                      <span className={`text-[11px] font-medium text-center leading-tight ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        {cat.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Amount */}
@@ -970,18 +1288,6 @@ export function ExpenseScreen() {
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">الوصف <span className="text-destructive">*</span></Label>
-              <Input
-                type="text"
-                placeholder="وصف المصروف..."
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                className="h-10 text-sm"
-              />
-            </div>
-
             {/* Date */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">التاريخ</Label>
@@ -990,6 +1296,18 @@ export function ExpenseScreen() {
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
                 className="h-10 text-sm"
+              />
+            </div>
+
+            {/* Description / Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">الوصف / ملاحظات <span className="text-destructive">*</span></Label>
+              <textarea
+                placeholder="أدخل وصف المصروف أو ملاحظات إضافية..."
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/60"
               />
             </div>
 
@@ -1003,6 +1321,7 @@ export function ExpenseScreen() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setNewRecurring(!newRecurring)}
                 className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
                   newRecurring ? 'bg-primary' : 'bg-muted-foreground/30'
@@ -1018,18 +1337,31 @@ export function ExpenseScreen() {
 
             {/* Recurring Period (if recurring) */}
             {newRecurring && (
-              <div className="space-y-1.5 animate-fade-in-up">
+              <div className="space-y-2 animate-fade-in-up">
                 <Label className="text-sm font-medium">فترة التكرار</Label>
-                <Select value={newRecurringPeriod} onValueChange={setNewRecurringPeriod}>
-                  <SelectTrigger className="h-10 text-sm">
-                    <SelectValue placeholder="اختر الفترة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RECURRING_PERIODS.map((period) => (
-                      <SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-3 gap-2">
+                  {RECURRING_PERIODS.map((period) => {
+                    const isSelected = newRecurringPeriod === period.value
+                    return (
+                      <button
+                        key={period.value}
+                        type="button"
+                        onClick={() => setNewRecurringPeriod(period.value)}
+                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all duration-200 ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 shadow-sm'
+                            : 'border-transparent bg-muted/40 hover:bg-muted/70'
+                        }`}
+                      >
+                        <Repeat className={`w-4 h-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className={`text-xs font-medium ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                          {period.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">يتكرر {period.short}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -1045,7 +1377,7 @@ export function ExpenseScreen() {
             <Button
               onClick={handleAddExpense}
               disabled={submitting}
-              className="btn-ripple"
+              className="btn-ripple btn-primary-gradient shimmer"
             >
               {submitting ? (
                 <>
@@ -1079,13 +1411,13 @@ export function ExpenseScreen() {
           {deleteTarget && (
             <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 mt-2">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                  <Receipt className="w-4 h-4 text-destructive" />
+                <div className={`w-9 h-9 rounded-lg ${getCategoryDef(deleteTarget.category).bgClass} ${getCategoryDef(deleteTarget.category).borderClass} border flex items-center justify-center flex-shrink-0`}>
+                  <CategoryIcon category={deleteTarget.category} size="sm" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">{deleteTarget.description}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-4 ${getCategoryInfo(deleteTarget.category).badgeClass}`}>
+                    <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-4 ${getCategoryDef(deleteTarget.category).badgeClass}`}>
                       {deleteTarget.category}
                     </Badge>
                     <span className="text-xs font-bold text-foreground tabular-nums">{formatCurrency(deleteTarget.amount)} ر.س</span>

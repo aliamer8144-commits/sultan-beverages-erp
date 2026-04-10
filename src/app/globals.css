@@ -7707,4 +7707,1117 @@ button:active:not(:disabled) {
   .badge-gradient-purple {
     transition: none;
   }
+
+  /* --- Sections 64-72: Morphing Background Blobs --- */
+  .morph-blob,
+  .morph-blob-1,
+  .morph-blob-2,
+  .morph-blob-3,
+  .morph-blob-4 {
+    animation: none;
+  }
+
+  /* --- Section 65: Glass Stat Card Enhanced --- */
+  .stat-card-glass,
+  .stat-card-glass-blue,
+  .stat-card-glass-green,
+  .stat-card-glass-amber,
+  .stat-card-glass-red {
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .stat-card-glass:hover {
+    transform: none;
+  }
+
+  /* --- Section 66: Progress Ring --- */
+  .progress-ring {
+    transition: none;
+  }
+
+  /* --- Section 67: FAB --- */
+  .fab {
+    transition: box-shadow 0.15s ease;
+  }
+
+  .fab:hover {
+    transform: none;
+  }
+
+  .fab:active {
+    transform: none;
+  }
+
+  .fab-group .fab {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* --- Section 68: Chip --- */
+  .chip,
+  .chip-sm,
+  .chip-lg,
+  .chip-primary,
+  .chip-success,
+  .chip-warning,
+  .chip-danger,
+  .chip-outline {
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+
+  /* --- Section 69: Skeleton Card --- */
+  .skeleton-card .skeleton-shimmer,
+  .skeleton-card .skeleton-circle,
+  .skeleton-card-body .skeleton-line,
+  .skeleton-card-footer .skeleton-btn {
+    animation: none;
+    background: oklch(0.93 0.005 260);
+  }
+
+  .dark .skeleton-card .skeleton-shimmer,
+  .dark .skeleton-card .skeleton-circle,
+  .dark .skeleton-card-body .skeleton-line,
+  .dark .skeleton-card-footer .skeleton-btn {
+    background: oklch(0.28 0.02 260);
+  }
+
+  /* --- Section 70: Gradient Text --- */
+  .gradient-text,
+  .gradient-text-primary,
+  .gradient-text-success,
+  .gradient-text-warning,
+  .gradient-text-danger {
+    animation: none;
+    background-position: 0% center;
+  }
+
+  /* --- Section 71: Staggered List --- */
+  .stagger-list > *,
+  .stagger-list-fast > *,
+  .stagger-list-slow > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* --- Section 72: Aurora Background --- */
+  .aurora-bg::before,
+  .aurora-bg::after {
+    animation: none;
+    transform: none;
+  }
 }
+
+/* ============================================================================
+   64. MORPHING BACKGROUND BLOBS
+   ============================================================================ */
+
+@keyframes morph-blob-1 {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  25% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+  50% {
+    border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%;
+  }
+  75% {
+    border-radius: 60% 30% 60% 40% / 70% 40% 50% 60%;
+  }
+}
+
+@keyframes morph-blob-2 {
+  0%, 100% {
+    border-radius: 40% 60% 70% 30% / 40% 70% 30% 60%;
+  }
+  33% {
+    border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%;
+  }
+  66% {
+    border-radius: 30% 70% 40% 60% / 60% 40% 60% 40%;
+  }
+}
+
+.morph-blob {
+  position: absolute;
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  opacity: 0.15;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.morph-blob-1 {
+  width: 400px;
+  height: 400px;
+  top: -10%;
+  left: -5%;
+  background: oklch(0.55 0.2 260);
+  animation: morph-blob-1 8s ease-in-out infinite;
+}
+
+.morph-blob-2 {
+  width: 350px;
+  height: 350px;
+  top: 30%;
+  right: -8%;
+  background: oklch(0.60 0.18 240);
+  animation: morph-blob-2 10s ease-in-out infinite;
+  animation-delay: -2s;
+}
+
+.morph-blob-3 {
+  width: 300px;
+  height: 300px;
+  bottom: 5%;
+  left: 20%;
+  background: oklch(0.75 0.18 80);
+  animation: morph-blob-1 12s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.morph-blob-4 {
+  width: 280px;
+  height: 280px;
+  top: 15%;
+  left: 50%;
+  background: oklch(0.65 0.2 145);
+  animation: morph-blob-2 15s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+/* Dark mode blobs - slightly more visible */
+.dark .morph-blob {
+  opacity: 0.1;
+}
+
+.dark .morph-blob-1 {
+  background: oklch(0.45 0.22 260);
+}
+
+.dark .morph-blob-2 {
+  background: oklch(0.50 0.20 240);
+}
+
+.dark .morph-blob-3 {
+  background: oklch(0.65 0.15 80);
+}
+
+.dark .morph-blob-4 {
+  background: oklch(0.55 0.18 145);
+}
+
+/* RTL: flip blob positions */
+[dir="rtl"] .morph-blob-1 {
+  left: auto;
+  right: -5%;
+}
+
+[dir="rtl"] .morph-blob-2 {
+  right: auto;
+  left: -8%;
+}
+
+[dir="rtl"] .morph-blob-3 {
+  left: auto;
+  right: 20%;
+}
+
+[dir="rtl"] .morph-blob-4 {
+  left: auto;
+  right: 50%;
+}
+
+/* ============================================================================
+   65. GLASS STAT CARD ENHANCED
+   ============================================================================ */
+
+.stat-card-glass {
+  position: relative;
+  background: oklch(0.985 0.005 260 / 60%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid oklch(0.92 0.005 260 / 40%);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 60%),
+    0 4px 16px oklch(0.15 0.01 260 / 8%);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260 / 30%),
+    oklch(0.65 0.18 240 / 10%),
+    oklch(0.55 0.2 260 / 30%)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.stat-card-glass:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 80%),
+    0 16px 40px oklch(0.15 0.01 260 / 15%),
+    0 6px 20px oklch(0.15 0.01 260 / 10%);
+}
+
+.stat-card-glass:hover::before {
+  opacity: 1;
+}
+
+/* Dark mode glass stat card */
+.dark .stat-card-glass {
+  background: oklch(0.22 0.01 260 / 60%);
+  border-color: oklch(0.35 0.02 260 / 40%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 5%),
+    0 4px 16px oklch(0 0 0 / 20%);
+}
+
+.dark .stat-card-glass:hover {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 8%),
+    0 16px 40px oklch(0 0 0 / 30%),
+    0 6px 20px oklch(0 0 0 / 20%);
+}
+
+/* Color variants with accent gradient border */
+.stat-card-glass-blue::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260 / 50%),
+    oklch(0.65 0.18 240 / 20%),
+    oklch(0.55 0.2 260 / 50%)
+  );
+}
+
+.stat-card-glass-green::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.2 145 / 50%),
+    oklch(0.60 0.16 160 / 20%),
+    oklch(0.65 0.2 145 / 50%)
+  );
+}
+
+.stat-card-glass-amber::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.75 0.18 80 / 50%),
+    oklch(0.70 0.15 70 / 20%),
+    oklch(0.75 0.18 80 / 50%)
+  );
+}
+
+.stat-card-glass-red::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.58 0.24 27 / 50%),
+    oklch(0.55 0.20 20 / 20%),
+    oklch(0.58 0.24 27 / 50%)
+  );
+}
+
+/* ============================================================================
+   66. PROGRESS RING / CIRCLE
+   ============================================================================ */
+
+.progress-ring-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ring-color, oklch(0.55 0.2 260)) calc(var(--progress, 0) * 3.6deg),
+    oklch(0.92 0.005 260) calc(var(--progress, 0) * 3.6deg)
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 3px));
+  transition: background 0.3s ease;
+}
+
+/* Progress ring color variants */
+.progress-ring-green {
+  --ring-color: oklch(0.7 0.17 162);
+}
+
+.progress-ring-amber {
+  --ring-color: oklch(0.8 0.18 85);
+}
+
+.progress-ring-red {
+  --ring-color: oklch(0.6 0.22 25);
+}
+
+.progress-ring-purple {
+  --ring-color: oklch(0.6 0.25 305);
+}
+
+.progress-ring-blue {
+  --ring-color: oklch(0.55 0.2 260);
+}
+
+.progress-ring::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: oklch(0.985 0.005 260);
+}
+
+.dark .progress-ring::after {
+  background: oklch(0.2 0.01 260);
+}
+
+.progress-ring-text {
+  position: relative;
+  z-index: 1;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: oklch(0.35 0.02 260);
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .progress-ring-text {
+  color: oklch(0.85 0.005 260);
+}
+
+/* Size variants */
+.progress-ring-sm {
+  width: 48px;
+  height: 48px;
+}
+
+.progress-ring-sm::before {
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 2px));
+}
+
+.progress-ring-sm::after {
+  inset: 3px;
+}
+
+.progress-ring-md {
+  width: 64px;
+  height: 64px;
+}
+
+.progress-ring-lg {
+  width: 80px;
+  height: 80px;
+}
+
+.progress-ring-lg::before {
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px));
+}
+
+.progress-ring-lg::after {
+  inset: 5px;
+}
+
+/* RTL: progress ring is symmetric, no special RTL needed */
+
+/* ============================================================================
+   67. FLOATING ACTION BUTTON (FAB)
+   ============================================================================ */
+
+.fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  z-index: 50;
+  box-shadow: 0 8px 24px oklch(0.15 0.01 260 / 20%),
+              0 2px 8px oklch(0.15 0.01 260 / 10%);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 32px oklch(0.15 0.01 260 / 25%),
+              0 4px 12px oklch(0.15 0.01 260 / 15%);
+}
+
+.fab:active {
+  transform: scale(0.95);
+  box-shadow: 0 4px 12px oklch(0.15 0.01 260 / 15%);
+}
+
+/* FAB variants */
+.fab-primary {
+  background: oklch(0.55 0.2 260);
+  color: oklch(1 0 0);
+}
+
+.fab-primary:hover {
+  background: oklch(0.50 0.18 260);
+}
+
+.fab-danger {
+  background: oklch(0.58 0.24 27);
+  color: oklch(1 0 0);
+}
+
+.fab-danger:hover {
+  background: oklch(0.53 0.22 27);
+}
+
+.fab-success {
+  background: oklch(0.55 0.2 145);
+  color: oklch(1 0 0);
+}
+
+.fab-success:hover {
+  background: oklch(0.50 0.18 145);
+}
+
+/* Dark mode FAB */
+.dark .fab {
+  box-shadow: 0 8px 24px oklch(0 0 0 / 30%),
+              0 2px 8px oklch(0 0 0 / 20%);
+}
+
+.dark .fab:hover {
+  box-shadow: 0 12px 32px oklch(0 0 0 / 35%),
+              0 4px 12px oklch(0 0 0 / 25%);
+}
+
+.dark .fab-primary {
+  background: oklch(0.65 0.22 260);
+}
+
+.dark .fab-danger {
+  background: oklch(0.65 0.24 27);
+}
+
+.dark .fab-success {
+  background: oklch(0.60 0.2 145);
+}
+
+/* FAB group (stacked vertically) */
+.fab-group {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.75rem;
+  z-index: 50;
+}
+
+.fab-group .fab {
+  position: relative;
+  bottom: auto;
+  right: auto;
+}
+
+@keyframes fab-stagger-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.fab-group .fab:nth-child(1) { animation: fab-stagger-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.fab-group .fab:nth-child(2) { animation: fab-stagger-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.fab-group .fab:nth-child(3) { animation: fab-stagger-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.fab-group .fab:nth-child(4) { animation: fab-stagger-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
+
+/* RTL: flip FAB position */
+[dir="rtl"] .fab {
+  right: auto;
+  left: 1.5rem;
+}
+
+[dir="rtl"] .fab-group {
+  right: auto;
+  left: 1.5rem;
+}
+
+/* ============================================================================
+   68. CHIP / TAG COMPONENT
+   ============================================================================ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: oklch(0.94 0.005 260);
+  color: oklch(0.35 0.02 260);
+  border: 1px solid oklch(0.90 0.005 260);
+  transition: all 0.2s ease;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: oklch(0.90 0.008 260);
+  border-color: oklch(0.85 0.01 260);
+}
+
+/* Size variants */
+.chip-sm {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  gap: 0.125rem;
+}
+
+.chip-lg {
+  padding: 0.375rem 1rem;
+  font-size: 0.875rem;
+  gap: 0.375rem;
+}
+
+/* Chip close button */
+.chip-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  margin-inline-start: 0.125rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.5;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.chip-close:hover {
+  opacity: 1;
+  background: oklch(0.15 0.01 260 / 10%);
+}
+
+/* Chip-removable padding adjustment */
+.chip-removable {
+  padding-inline-end: 0.375rem;
+}
+
+/* Color variants */
+.chip-primary {
+  background: oklch(0.55 0.2 260 / 10%);
+  color: oklch(0.45 0.18 260);
+  border-color: oklch(0.55 0.2 260 / 20%);
+}
+
+.chip-primary:hover {
+  background: oklch(0.55 0.2 260 / 15%);
+  border-color: oklch(0.55 0.2 260 / 30%);
+}
+
+.chip-success {
+  background: oklch(0.65 0.2 145 / 10%);
+  color: oklch(0.45 0.16 145);
+  border-color: oklch(0.65 0.2 145 / 20%);
+}
+
+.chip-success:hover {
+  background: oklch(0.65 0.2 145 / 15%);
+  border-color: oklch(0.65 0.2 145 / 30%);
+}
+
+.chip-warning {
+  background: oklch(0.75 0.18 80 / 12%);
+  color: oklch(0.55 0.15 60);
+  border-color: oklch(0.75 0.18 80 / 25%);
+}
+
+.chip-warning:hover {
+  background: oklch(0.75 0.18 80 / 18%);
+  border-color: oklch(0.75 0.18 80 / 35%);
+}
+
+.chip-danger {
+  background: oklch(0.58 0.24 27 / 10%);
+  color: oklch(0.50 0.20 27);
+  border-color: oklch(0.58 0.24 27 / 20%);
+}
+
+.chip-danger:hover {
+  background: oklch(0.58 0.24 27 / 15%);
+  border-color: oklch(0.58 0.24 27 / 30%);
+}
+
+.chip-outline {
+  background: transparent;
+  border-color: oklch(0.75 0.01 260);
+}
+
+.chip-outline:hover {
+  background: oklch(0.96 0.005 260);
+  border-color: oklch(0.55 0.2 260 / 40%);
+}
+
+/* Dark mode chips */
+.dark .chip {
+  background: oklch(0.28 0.02 260);
+  color: oklch(0.8 0.005 260);
+  border-color: oklch(0.35 0.02 260);
+}
+
+.dark .chip:hover {
+  background: oklch(0.32 0.02 260);
+  border-color: oklch(0.40 0.02 260);
+}
+
+.dark .chip-primary {
+  background: oklch(0.65 0.22 260 / 15%);
+  color: oklch(0.70 0.18 260);
+  border-color: oklch(0.65 0.22 260 / 25%);
+}
+
+.dark .chip-success {
+  background: oklch(0.60 0.2 145 / 15%);
+  color: oklch(0.70 0.16 145);
+  border-color: oklch(0.60 0.2 145 / 25%);
+}
+
+.dark .chip-warning {
+  background: oklch(0.65 0.15 80 / 15%);
+  color: oklch(0.75 0.15 70);
+  border-color: oklch(0.65 0.15 80 / 25%);
+}
+
+.dark .chip-danger {
+  background: oklch(0.65 0.24 27 / 15%);
+  color: oklch(0.75 0.20 27);
+  border-color: oklch(0.65 0.24 27 / 25%);
+}
+
+.dark .chip-outline {
+  background: transparent;
+  border-color: oklch(0.40 0.02 260);
+}
+
+.dark .chip-outline:hover {
+  background: oklch(0.25 0.02 260);
+}
+
+.dark .chip-close:hover {
+  background: oklch(1 0 0 / 10%);
+}
+
+/* ============================================================================
+   69. SKELETON CARD ENHANCED
+   ============================================================================ */
+
+.skeleton-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: oklch(0.97 0.002 260);
+  border: 1px solid oklch(0.94 0.005 260);
+}
+
+.dark .skeleton-card {
+  background: oklch(0.22 0.01 260);
+  border-color: oklch(0.30 0.02 260);
+}
+
+.skeleton-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid oklch(0.94 0.005 260);
+}
+
+.dark .skeleton-card-header {
+  border-bottom-color: oklch(0.30 0.02 260);
+}
+
+.skeleton-card-header .skeleton-shimmer {
+  height: 0.875rem;
+  width: 60%;
+  border-radius: 0.375rem;
+}
+
+.skeleton-card-header .skeleton-circle {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: skeleton-shimmer-anim 1.8s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer-anim {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-card-body {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skeleton-card-body .skeleton-line {
+  height: 0.75rem;
+  border-radius: 0.375rem;
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 260) 25%,
+    oklch(0.97 0.002 260) 50%,
+    oklch(0.93 0.005 260) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer-anim 1.8s ease-in-out infinite;
+}
+
+.dark .skeleton-card-body .skeleton-line {
+  background: linear-gradient(
+    90deg,
+    oklch(0.28 0.02 260) 25%,
+    oklch(0.32 0.02 260) 50%,
+    oklch(0.28 0.02 260) 75%
+  );
+  background-size: 200% 100%;
+}
+
+.skeleton-card-body .skeleton-line:nth-child(1) { width: 100%; }
+.skeleton-card-body .skeleton-line:nth-child(2) { width: 85%; }
+.skeleton-card-body .skeleton-line:nth-child(3) { width: 60%; }
+
+.dark .skeleton-card-header .skeleton-circle {
+  background: linear-gradient(
+    90deg,
+    oklch(0.28 0.02 260) 25%,
+    oklch(0.32 0.02 260) 50%,
+    oklch(0.28 0.02 260) 75%
+  );
+  background-size: 200% 100%;
+}
+
+.skeleton-card-header .skeleton-shimmer,
+.skeleton-card-header .skeleton-circle {
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 260) 25%,
+    oklch(0.97 0.002 260) 50%,
+    oklch(0.93 0.005 260) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer-anim 1.8s ease-in-out infinite;
+}
+
+.skeleton-card-footer {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.skeleton-card-footer .skeleton-btn {
+  width: 5rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 260) 25%,
+    oklch(0.97 0.002 260) 50%,
+    oklch(0.93 0.005 260) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer-anim 1.8s ease-in-out infinite;
+}
+
+.dark .skeleton-card-footer .skeleton-btn {
+  background: linear-gradient(
+    90deg,
+    oklch(0.28 0.02 260) 25%,
+    oklch(0.32 0.02 260) 50%,
+    oklch(0.28 0.02 260) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* RTL: card padding direction is handled by inline logical properties */
+
+/* ============================================================================
+   70. GRADIENT TEXT EFFECT
+   ============================================================================ */
+
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% auto;
+  animation: gradient-text-shift 4s ease-in-out infinite;
+}
+
+@keyframes gradient-text-shift {
+  0%, 100% {
+    background-position: 0% center;
+  }
+  50% {
+    background-position: 100% center;
+  }
+}
+
+.gradient-text-primary {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260),
+    oklch(0.65 0.18 200),
+    oklch(0.55 0.2 260),
+    oklch(0.50 0.20 240)
+  );
+}
+
+.gradient-text-success {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.50 0.18 145),
+    oklch(0.60 0.20 165),
+    oklch(0.50 0.18 145),
+    oklch(0.45 0.16 155)
+  );
+}
+
+.gradient-text-warning {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.70 0.18 80),
+    oklch(0.75 0.20 60),
+    oklch(0.70 0.18 80),
+    oklch(0.65 0.15 70)
+  );
+}
+
+.gradient-text-danger {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.55 0.24 27),
+    oklch(0.60 0.22 15),
+    oklch(0.55 0.24 27),
+    oklch(0.50 0.20 22)
+  );
+}
+
+/* Dark mode: brighter gradients */
+.dark .gradient-text-primary {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.65 0.22 260),
+    oklch(0.75 0.20 200),
+    oklch(0.65 0.22 260),
+    oklch(0.60 0.22 240)
+  );
+}
+
+.dark .gradient-text-success {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.65 0.20 145),
+    oklch(0.75 0.22 165),
+    oklch(0.65 0.20 145),
+    oklch(0.60 0.18 155)
+  );
+}
+
+.dark .gradient-text-warning {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.78 0.18 80),
+    oklch(0.82 0.20 60),
+    oklch(0.78 0.18 80),
+    oklch(0.75 0.15 70)
+  );
+}
+
+.dark .gradient-text-danger {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.65 0.24 27),
+    oklch(0.70 0.22 15),
+    oklch(0.65 0.24 27),
+    oklch(0.60 0.20 22)
+  );
+}
+
+/* RTL: text gradient is direction-agnostic */
+
+/* ============================================================================
+   71. STAGGERED LIST ANIMATION
+   ============================================================================ */
+
+.stagger-list {
+  --stagger-speed: 0.05s;
+}
+
+.stagger-list > * {
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * var(--stagger-speed));
+}
+
+.stagger-list > *:nth-child(1) { --stagger-index: 0; }
+.stagger-list > *:nth-child(2) { --stagger-index: 1; }
+.stagger-list > *:nth-child(3) { --stagger-index: 2; }
+.stagger-list > *:nth-child(4) { --stagger-index: 3; }
+.stagger-list > *:nth-child(5) { --stagger-index: 4; }
+.stagger-list > *:nth-child(6) { --stagger-index: 5; }
+.stagger-list > *:nth-child(7) { --stagger-index: 6; }
+.stagger-list > *:nth-child(8) { --stagger-index: 7; }
+.stagger-list > *:nth-child(9) { --stagger-index: 8; }
+.stagger-list > *:nth-child(10) { --stagger-index: 9; }
+.stagger-list > *:nth-child(11) { --stagger-index: 10; }
+.stagger-list > *:nth-child(12) { --stagger-index: 11; }
+.stagger-list > *:nth-child(n+13) { --stagger-index: 12; }
+
+.stagger-list-fast {
+  --stagger-speed: 0.03s;
+}
+
+.stagger-list-slow {
+  --stagger-speed: 0.1s;
+}
+
+/* RTL: list items animate the same way */
+
+/* ============================================================================
+   72. AURORA BACKGROUND EFFECT
+   ============================================================================ */
+
+.aurora-bg {
+  position: relative;
+  overflow: hidden;
+  min-height: 100%;
+  background: oklch(0.15 0.02 260);
+}
+
+.aurora-bg::before,
+.aurora-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transform: translateZ(0);
+  pointer-events: none;
+}
+
+.aurora-bg::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, oklch(0.55 0.22 260 / 30%) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, oklch(0.50 0.20 280 / 25%) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 50% 80%, oklch(0.60 0.18 240 / 20%) 0%, transparent 70%);
+  animation: aurora-shift-1 12s ease-in-out infinite;
+  border-radius: 50% 60% 40% 70% / 60% 40% 70% 50%;
+}
+
+.aurora-bg::after {
+  background:
+    radial-gradient(ellipse 70% 50% at 70% 60%, oklch(0.65 0.18 240 / 20%) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 30% 30%, oklch(0.55 0.15 200 / 25%) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 50% at 80% 80%, oklch(0.60 0.20 260 / 15%) 0%, transparent 70%);
+  animation: aurora-shift-2 15s ease-in-out infinite;
+  border-radius: 40% 50% 60% 50% / 50% 60% 40% 60%;
+}
+
+@keyframes aurora-shift-1 {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 0.8;
+  }
+  25% {
+    transform: translate(5%, -10%) rotate(5deg) scale(1.05);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-3%, 5%) rotate(-3deg) scale(0.95);
+    opacity: 0.7;
+  }
+  75% {
+    transform: translate(8%, -5%) rotate(2deg) scale(1.02);
+    opacity: 0.9;
+  }
+}
+
+@keyframes aurora-shift-2 {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 0.6;
+  }
+  33% {
+    transform: translate(-8%, 8%) rotate(-4deg) scale(1.03);
+    opacity: 0.9;
+  }
+  66% {
+    transform: translate(5%, -8%) rotate(3deg) scale(0.97);
+    opacity: 0.7;
+  }
+}
+
+/* Light mode aurora - softer */
+.aurora-bg:not(.dark *) {
+  background: oklch(0.96 0.005 260);
+}
+
+.aurora-bg:not(.dark *)::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, oklch(0.55 0.2 260 / 8%) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, oklch(0.50 0.20 280 / 6%) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 50% 80%, oklch(0.60 0.18 240 / 5%) 0%, transparent 70%);
+  opacity: 0.6;
+}
+
+.aurora-bg:not(.dark *)::after {
+  background:
+    radial-gradient(ellipse 70% 50% at 70% 60%, oklch(0.65 0.18 240 / 5%) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 30% 30%, oklch(0.55 0.15 200 / 6%) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 50% at 80% 80%, oklch(0.60 0.20 260 / 4%) 0%, transparent 70%);
+  opacity: 0.5;
+}
+
+/* RTL: aurora is full-screen effect, no directional changes needed */
