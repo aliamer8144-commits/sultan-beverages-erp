@@ -30,7 +30,7 @@ import {
   PackageX, ImagePlus, X, History, PackagePlus, Download, ChevronLeft,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RotateCcw, PenLine,
   FileInput, ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
-  TrendingUp, TrendingDown, Clock, Activity,
+  TrendingUp, TrendingDown, Clock, Activity, Layers, Save,
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
@@ -111,6 +111,38 @@ const emptyAdjustmentForm: AdjustmentFormData = {
   reference: '',
 }
 
+// Variant types
+interface ProductVariant {
+  id: string
+  productId: string
+  name: string
+  sku?: string
+  barcode?: string
+  costPrice: number
+  sellPrice: number
+  stock: number
+  isActive: boolean
+  createdAt: string
+}
+
+interface VariantFormData {
+  name: string
+  sku: string
+  barcode: string
+  costPrice: string
+  sellPrice: string
+  stock: string
+}
+
+const emptyVariantForm: VariantFormData = {
+  name: '',
+  sku: '',
+  barcode: '',
+  costPrice: '',
+  sellPrice: '',
+  stock: '0',
+}
+
 // Adjustment type config
 const adjustmentTypeConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
   addition: { label: 'إضافة', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30', icon: ArrowUp },
@@ -189,6 +221,130 @@ export function InventoryScreen() {
   const [historyDateTo, setHistoryDateTo] = useState<Date | undefined>()
   const [dateFromOpen, setDateFromOpen] = useState(false)
   const [dateToOpen, setDateToOpen] = useState(false)
+
+  // ─── Variants Dialog State ────────────────────────────────────
+  const [variantsOpen, setVariantsOpen] = useState(false)
+  const [variantsProduct, setVariantsProduct] = useState<Product | null>(null)
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [variantsLoading, setVariantsLoading] = useState(false)
+  const [variantFormOpen, setVariantFormOpen] = useState(false)
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
+  const [variantForm, setVariantForm] = useState<VariantFormData>(emptyVariantForm)
+  const [variantSubmitting, setVariantSubmitting] = useState(false)
+
+  // ─── Variants Handlers ────────────────────────────────────────
+  const openVariantsDialog = useCallback(async (product: Product) => {
+    setVariantsProduct(product)
+    setVariantsOpen(true)
+    setVariantFormOpen(false)
+    setEditingVariant(null)
+    setVariantsLoading(true)
+    try {
+      const res = await fetch(`/api/product-variants?productId=${product.id}`)
+      const data = await res.json()
+      if (data.success) {
+        setVariants(data.data)
+      }
+    } catch {
+      toast.error('فشل في تحميل المتغيرات')
+    } finally {
+      setVariantsLoading(false)
+    }
+  }, [])
+
+  const openAddVariantDialog = () => {
+    setEditingVariant(null)
+    setVariantForm(emptyVariantForm)
+    setVariantFormOpen(true)
+  }
+
+  const openEditVariantDialog = (variant: ProductVariant) => {
+    setEditingVariant(variant)
+    setVariantForm({
+      name: variant.name,
+      sku: variant.sku || '',
+      barcode: variant.barcode || '',
+      costPrice: String(variant.costPrice),
+      sellPrice: String(variant.sellPrice),
+      stock: String(variant.stock),
+    })
+    setVariantFormOpen(true)
+  }
+
+  const handleVariantSubmit = async () => {
+    if (!variantsProduct) return
+    if (!variantForm.name.trim()) {
+      toast.error('يرجى إدخال اسم المتغير')
+      return
+    }
+
+    setVariantSubmitting(true)
+    try {
+      let res: Response
+      if (editingVariant) {
+        res = await fetch(`/api/product-variants?id=${editingVariant.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: variantForm.name.trim(),
+            sku: variantForm.sku.trim() || null,
+            barcode: variantForm.barcode.trim() || null,
+            costPrice: Number(variantForm.costPrice) || 0,
+            sellPrice: Number(variantForm.sellPrice) || 0,
+            stock: Number(variantForm.stock) || 0,
+          }),
+        })
+        toast.success('تم تحديث المتغير بنجاح')
+      } else {
+        res = await fetch('/api/product-variants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: variantsProduct.id,
+            name: variantForm.name.trim(),
+            sku: variantForm.sku.trim() || null,
+            barcode: variantForm.barcode.trim() || null,
+            costPrice: Number(variantForm.costPrice) || 0,
+            sellPrice: Number(variantForm.sellPrice) || 0,
+            stock: Number(variantForm.stock) || 0,
+          }),
+        })
+        toast.success('تم إضافة المتغير بنجاح')
+      }
+
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || 'حدث خطأ أثناء الحفظ')
+        return
+      }
+
+      setVariantFormOpen(false)
+      openVariantsDialog(variantsProduct)
+    } catch {
+      toast.error('حدث خطأ في الاتصال')
+    } finally {
+      setVariantSubmitting(false)
+    }
+  }
+
+  const handleDeleteVariant = async (variantId: string) => {
+    try {
+      const res = await fetch(`/api/product-variants?id=${variantId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('تم حذف المتغير بنجاح')
+        if (variantsProduct) {
+          openVariantsDialog(variantsProduct)
+        }
+      } else {
+        toast.error(data.error || 'فشل في حذف المتغير')
+      }
+    } catch {
+      toast.error('حدث خطأ في الاتصال')
+    }
+  }
 
   // ─── Per-product stock history fetch ─────────────────────────
   const fetchProductMovements = useCallback(async (productId: string) => {
@@ -1146,6 +1302,17 @@ export function InventoryScreen() {
                               )}
                             </PopoverContent>
                           </Popover>
+                          {/* Variants button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openVariantsDialog(product)}
+                            className="h-8 w-8 p-0 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-muted-foreground hover:text-violet-700 dark:hover:text-violet-400"
+                            title="المتغيرات"
+                          >
+                            <Layers className="w-4 h-4" />
+                            <span className="sr-only">المتغيرات</span>
+                          </Button>
                           {/* Quick stock adjust button */}
                           <Button
                             variant="ghost"
@@ -2274,6 +2441,229 @@ export function InventoryScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Product Variants Dialog ────────────────────────────── */}
+      <Dialog open={variantsOpen} onOpenChange={(open) => { setVariantsOpen(open); if (!open) { setVariantFormOpen(false); setEditingVariant(null) } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                <Layers className="w-5 h-5 text-violet-700 dark:text-violet-400" />
+              </div>
+              متغيرات المنتج
+            </DialogTitle>
+            <DialogDescription>
+              {variantsProduct?.name} — إدارة الأحجام والنكهات والتعبئات
+            </DialogDescription>
+          </DialogHeader>
+
+          {variantsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Variants list */}
+              {variants.length === 0 && !variantFormOpen ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Layers className="w-12 h-12 opacity-20 mb-3" />
+                  <p className="text-sm font-medium">لا توجد متغيرات</p>
+                  <p className="text-xs mt-1">أضف متغيراً جديداً لتحديد الأحجام أو النكهات</p>
+                </div>
+              ) : (
+                <ScrollArea className="flex-1 max-h-[40vh]">
+                  <div className="space-y-2 p-1">
+                    {variants.map((variant) => (
+                      <div
+                        key={variant.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                          variant.isActive
+                            ? 'bg-card hover:bg-muted/50'
+                            : 'bg-muted/30 opacity-60'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0 grid grid-cols-5 gap-3">
+                          {/* Name */}
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground mb-0.5">الاسم</p>
+                            <p className="text-sm font-semibold text-foreground truncate">{variant.name}</p>
+                          </div>
+                          {/* SKU */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-0.5">SKU</p>
+                            <p className="text-xs font-mono text-foreground">{variant.sku || '—'}</p>
+                          </div>
+                          {/* Cost Price */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-0.5">التكلفة</p>
+                            <p className="text-xs text-muted-foreground tabular-nums">{variant.costPrice.toLocaleString('ar-SA')} {symbol}</p>
+                          </div>
+                          {/* Sell Price */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-0.5">البيع</p>
+                            <p className="text-xs font-semibold text-foreground tabular-nums">{variant.sellPrice.toLocaleString('ar-SA')} {symbol}</p>
+                          </div>
+                          {/* Stock */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-0.5">المخزون</p>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              variant.stock <= 0
+                                ? 'bg-destructive/10 text-destructive chip-danger'
+                                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 chip-success'
+                            }`}>
+                              {variant.stock <= 0 ? (
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                              ) : null}
+                              {variant.stock}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditVariantDialog(variant)}
+                            className="h-7 w-7 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteVariant(variant.id)}
+                            className="h-7 w-7 p-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+
+              {/* Add/Edit variant form */}
+              {variantFormOpen && (
+                <div className="border-t pt-4 mt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                      <Save className="w-3.5 h-3.5 text-violet-700 dark:text-violet-400" />
+                    </div>
+                    <p className="text-sm font-bold text-foreground">
+                      {editingVariant ? 'تعديل المتغير' : 'إضافة متغير جديد'}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="col-span-2 sm:col-span-1 space-y-1.5">
+                      <Label className="text-xs font-medium">اسم المتغير <span className="text-destructive">*</span></Label>
+                      <Input
+                        placeholder="مثال: صغير، كبير، نكهة مانجو"
+                        value={variantForm.name}
+                        onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
+                        className="h-9 rounded-lg text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">SKU</Label>
+                      <Input
+                        placeholder="رمز SKU"
+                        value={variantForm.sku}
+                        onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
+                        className="h-9 rounded-lg text-sm font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">باركود</Label>
+                      <Input
+                        placeholder="باركود"
+                        value={variantForm.barcode}
+                        onChange={(e) => setVariantForm({ ...variantForm, barcode: e.target.value })}
+                        className="h-9 rounded-lg text-sm font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">سعر التكلفة</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={variantForm.costPrice}
+                        onChange={(e) => setVariantForm({ ...variantForm, costPrice: e.target.value })}
+                        className="h-9 rounded-lg text-sm text-left tabular-nums"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">سعر البيع</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={variantForm.sellPrice}
+                        onChange={(e) => setVariantForm({ ...variantForm, sellPrice: e.target.value })}
+                        className="h-9 rounded-lg text-sm text-left tabular-nums"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">المخزون</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={variantForm.stock}
+                        onChange={(e) => setVariantForm({ ...variantForm, stock: e.target.value })}
+                        className="h-9 rounded-lg text-sm text-left tabular-nums"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setVariantFormOpen(false); setEditingVariant(null) }}
+                      className="text-xs rounded-lg"
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleVariantSubmit}
+                      disabled={variantSubmitting || !variantForm.name.trim()}
+                      className="gap-1.5 text-xs rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20"
+                    >
+                      {variantSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <Save className="w-3.5 h-3.5" />
+                      {editingVariant ? 'حفظ التعديلات' : 'إضافة المتغير'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add variant button (when form not open) */}
+              {!variantFormOpen && (
+                <div className="border-t pt-3 mt-2">
+                  <Button
+                    variant="outline"
+                    onClick={openAddVariantDialog}
+                    className="gap-2 w-full rounded-lg border-dashed border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-800 dark:hover:text-violet-300"
+                  >
+                    <Plus className="w-4 h-4" />
+                    إضافة متغير
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Category Management Dialog ──────────────────────────── */}
       <Dialog open={catMgmtOpen} onOpenChange={setCatMgmtOpen}>

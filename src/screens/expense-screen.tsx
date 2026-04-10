@@ -909,7 +909,7 @@ export function ExpenseScreen() {
 
       {/* ── Recurring Expenses Section ──────────────────────────────── */}
       {!loading && recurringItems.length > 0 && (
-        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up glass-card">
+        <Card className="rounded-2xl border-0 shadow-sm animate-fade-in-up glass-card glass-card-frosted">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

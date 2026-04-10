@@ -10,12 +10,17 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
+    const customerId = searchParams.get('customerId')
 
     // Build where clause based on params
     const where: Record<string, unknown> = {}
 
     if (type) {
       where.type = type
+    }
+
+    if (customerId) {
+      where.customerId = customerId
     }
 
     if (search) {
@@ -180,15 +185,21 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // 6. Update customer debt if sale and not fully paid
+      // 6. Update customer debt if sale and not fully paid + visit tracking
       if (customerId && type === 'sale') {
         const remaining = totalAmount - (paidAmount || 0)
-        if (remaining > 0) {
-          await tx.customer.update({
-            where: { id: customerId },
-            data: { debt: { increment: remaining } },
-          })
+        const customerUpdate: Record<string, unknown> = {
+          visitCount: { increment: 1 },
+          lastVisit: new Date(),
+          totalPurchases: { increment: totalAmount },
         }
+        if (remaining > 0) {
+          customerUpdate.debt = { increment: remaining }
+        }
+        await tx.customer.update({
+          where: { id: customerId },
+          data: customerUpdate,
+        })
       }
 
       return createdInvoice

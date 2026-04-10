@@ -93,7 +93,7 @@ function SettingsCard({
   children: React.ReactNode
 }) {
   return (
-    <Card className="glass-card card-hover">
+    <Card className="glass-card glass-card-frosted card-hover">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -299,7 +299,7 @@ function SalesTargetsSection() {
   }
 
   return (
-    <Card className="glass-card card-hover col-span-full">
+    <Card className="glass-card glass-card-frosted card-hover col-span-full">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

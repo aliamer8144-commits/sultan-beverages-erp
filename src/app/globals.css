@@ -9801,3 +9801,402 @@ button:active:not(:disabled) {
     animation: none !important;
   }
 }
+
+/* ============================================================================
+   82. ANIMATED BORDER GRADIENT (Enhanced Spinner)
+   ============================================================================ */
+
+.animated-border-gradient {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.animated-border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    hsl(var(--primary)),
+    transparent 30%,
+    hsl(var(--primary)) 60%,
+    transparent 90%,
+    hsl(var(--primary))
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderSpin 3s linear infinite;
+}
+
+@keyframes borderSpin {
+  to {
+    --angle: 360deg;
+  }
+}
+
+.dark .animated-border-gradient::before {
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    hsl(var(--primary)),
+    transparent 25%,
+    hsl(var(--primary)) 50%,
+    transparent 75%,
+    hsl(var(--primary))
+  );
+}
+
+/* Inner content layer */
+.animated-border-gradient > * {
+  position: relative;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-border-gradient::before {
+    animation: none;
+  }
+}
+
+/* ============================================================================
+   83. NOTIFICATION BADGE PULSE
+   ============================================================================ */
+
+.badge-ping {
+  position: relative;
+}
+
+.badge-ping::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.58 0.24 27);
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.dark .badge-ping::after {
+  background: oklch(0.65 0.24 27);
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Badge dot (non-animated base) */
+.badge-ping::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.58 0.24 27);
+  z-index: 1;
+}
+
+.dark .badge-ping::before {
+  background: oklch(0.65 0.24 27);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-ping::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ============================================================================
+   84. NUMBER TICKER
+   ============================================================================ */
+
+.number-ticker {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 0;
+  letter-spacing: 0.02em;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+.number-ticker[data-updating="true"] {
+  opacity: 0.4;
+  transform: translateY(-2px);
+}
+
+.dark .number-ticker {
+  letter-spacing: 0.03em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .number-ticker {
+    transition: none;
+  }
+}
+
+/* ============================================================================
+   85. GLASS CARD FROSTED (Enhanced glassmorphism)
+   ============================================================================ */
+
+.glass-card-frosted {
+  background: oklch(1 0 0 / 70%);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid oklch(0.92 0.005 260 / 40%);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  position: relative;
+  box-shadow:
+    0 4px 6px oklch(0.15 0.01 260 / 4%),
+    0 1px 3px oklch(0.15 0.01 260 / 2%),
+    inset 0 1px 0 oklch(1 0 0 / 50%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle inner gradient border trick */
+.glass-card-frosted::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260 / 8%),
+    transparent 40%,
+    transparent 60%,
+    oklch(0.65 0.18 240 / 8%)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-card-frosted:hover {
+  box-shadow:
+    0 10px 25px oklch(0.15 0.01 260 / 8%),
+    0 4px 10px oklch(0.15 0.01 260 / 4%),
+    inset 0 1px 0 oklch(1 0 0 / 60%);
+  border-color: oklch(0.92 0.005 260 / 60%);
+}
+
+/* Dark mode */
+.dark .glass-card-frosted {
+  background: oklch(0.16 0.01 260 / 70%);
+  border-color: oklch(0.35 0.02 260 / 40%);
+  box-shadow:
+    0 4px 6px oklch(0 0 0 / 16%),
+    0 1px 3px oklch(0 0 0 / 8%),
+    inset 0 1px 0 oklch(1 0 0 / 4%);
+}
+
+.dark .glass-card-frosted::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.22 260 / 10%),
+    transparent 40%,
+    transparent 60%,
+    oklch(0.70 0.18 240 / 10%)
+  );
+}
+
+.dark .glass-card-frosted:hover {
+  box-shadow:
+    0 10px 25px oklch(0 0 0 / 24%),
+    0 4px 10px oklch(0 0 0 / 12%),
+    inset 0 1px 0 oklch(1 0 0 / 6%);
+  border-color: oklch(0.35 0.02 260 / 60%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-card-frosted {
+    transition: none;
+  }
+}
+
+/* ============================================================================
+   86. HOVER UNDERLINE EFFECT
+   ============================================================================ */
+
+.hover-underline {
+  position: relative;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.hover-underline::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: oklch(0.55 0.2 260);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s ease;
+}
+
+.hover-underline:hover::after {
+  transform: scaleX(1);
+}
+
+.dark .hover-underline::after {
+  background: oklch(0.65 0.22 260);
+}
+
+/* RTL: transform-origin on the left side */
+[dir="rtl"] .hover-underline::after {
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-underline::after {
+    transition: none;
+  }
+}
+
+/* ============================================================================
+   87. STAT CARD VARIANTS (Violet, Emerald, Amber, Rose)
+   ============================================================================ */
+
+.stat-card-violet {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.22 293 / 6%),
+    oklch(0.97 0.005 260 / 80%)
+  );
+  border-right: 4px solid oklch(0.55 0.22 293);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+.stat-card-violet:hover {
+  box-shadow: 0 4px 20px oklch(0.55 0.22 293 / 15%);
+  transform: translateY(-2px);
+}
+
+.stat-card-emerald {
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.18 160 / 6%),
+    oklch(0.97 0.005 260 / 80%)
+  );
+  border-right: 4px solid oklch(0.65 0.18 160);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+.stat-card-emerald:hover {
+  box-shadow: 0 4px 20px oklch(0.65 0.18 160 / 15%);
+  transform: translateY(-2px);
+}
+
+.stat-card-amber {
+  background: linear-gradient(
+    135deg,
+    oklch(0.75 0.16 75 / 6%),
+    oklch(0.97 0.005 260 / 80%)
+  );
+  border-right: 4px solid oklch(0.75 0.16 75);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+.stat-card-amber:hover {
+  box-shadow: 0 4px 20px oklch(0.75 0.16 75 / 15%);
+  transform: translateY(-2px);
+}
+
+.stat-card-rose {
+  background: linear-gradient(
+    135deg,
+    oklch(0.60 0.22 10 / 6%),
+    oklch(0.97 0.005 260 / 80%)
+  );
+  border-right: 4px solid oklch(0.60 0.22 10);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+.stat-card-rose:hover {
+  box-shadow: 0 4px 20px oklch(0.60 0.22 10 / 15%);
+  transform: translateY(-2px);
+}
+
+/* RTL: accent border on left side */
+[dir="rtl"] .stat-card-violet,
+[dir="rtl"] .stat-card-emerald,
+[dir="rtl"] .stat-card-amber,
+[dir="rtl"] .stat-card-rose {
+  border-right: none;
+  border-left: 4px solid;
+}
+
+[dir="rtl"] .stat-card-violet { border-left-color: oklch(0.55 0.22 293); }
+[dir="rtl"] .stat-card-emerald { border-left-color: oklch(0.65 0.18 160); }
+[dir="rtl"] .stat-card-amber { border-left-color: oklch(0.75 0.16 75); }
+[dir="rtl"] .stat-card-rose { border-left-color: oklch(0.60 0.22 10); }
+
+/* Dark mode variants */
+.dark .stat-card-violet {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.22 293 / 10%),
+    oklch(0.20 0.01 260 / 80%)
+  );
+  border-right-color: oklch(0.65 0.22 293);
+}
+
+.dark .stat-card-emerald {
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.18 160 / 10%),
+    oklch(0.20 0.01 260 / 80%)
+  );
+  border-right-color: oklch(0.70 0.18 160);
+}
+
+.dark .stat-card-amber {
+  background: linear-gradient(
+    135deg,
+    oklch(0.75 0.16 75 / 10%),
+    oklch(0.20 0.01 260 / 80%)
+  );
+  border-right-color: oklch(0.80 0.16 75);
+}
+
+.dark .stat-card-rose {
+  background: linear-gradient(
+    135deg,
+    oklch(0.60 0.22 10 / 10%),
+    oklch(0.20 0.01 260 / 80%)
+  );
+  border-right-color: oklch(0.68 0.22 10);
+}
+
+/* RTL dark mode borders */
+[dir="rtl"] .dark .stat-card-violet { border-left-color: oklch(0.65 0.22 293); }
+[dir="rtl"] .dark .stat-card-emerald { border-left-color: oklch(0.70 0.18 160); }
+[dir="rtl"] .dark .stat-card-amber { border-left-color: oklch(0.80 0.16 75); }
+[dir="rtl"] .dark .stat-card-rose { border-left-color: oklch(0.68 0.22 10); }
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card-violet,
+  .stat-card-emerald,
+  .stat-card-amber,
+  .stat-card-rose {
+    transition: none;
+    transform: none !important;
+  }
+}

@@ -496,7 +496,7 @@ export function DashboardScreen() {
             suffix="ريال سعودي"
             icon={DollarSign}
             iconBg="bg-primary/10 text-primary"
-            statClass="stat-card-blue"
+            statClass="stat-card-blue stat-card-violet"
           />
 
           {/* Today's Profit */}
@@ -506,7 +506,7 @@ export function DashboardScreen() {
             suffix="ريال سعودي"
             icon={TrendingUp}
             iconBg="bg-green-500/10 text-green-600"
-            statClass="stat-card-green"
+            statClass="stat-card-green stat-card-emerald"
           />
 
           {/* Today's Invoice Count */}
@@ -516,7 +516,7 @@ export function DashboardScreen() {
             suffix="فاتورة"
             icon={FileText}
             iconBg="bg-primary/10 text-primary"
-            statClass="stat-card-blue"
+            statClass="stat-card-blue stat-card-amber"
             isInteger
           />
 
@@ -527,7 +527,7 @@ export function DashboardScreen() {
             suffix="صنف يحتاج إعادة طلب"
             icon={AlertTriangle}
             iconBg="bg-red-500/10 text-red-500"
-            statClass="stat-card-red"
+            statClass="stat-card-red stat-card-rose"
             isInteger
           />
           </div>

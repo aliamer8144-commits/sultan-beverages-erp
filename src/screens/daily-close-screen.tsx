@@ -455,7 +455,7 @@ export function DailyCloseScreen() {
             suffix="ريال سعودي"
             icon={DollarSign}
             iconBg="bg-primary/10 text-primary"
-            statClass="stat-card-blue"
+            statClass="stat-card-blue stat-card-violet"
           />
           <StatCard
             label="صافي الربح"
@@ -463,7 +463,7 @@ export function DailyCloseScreen() {
             suffix="ريال سعودي"
             icon={TrendingUp}
             iconBg="bg-green-500/10 text-green-600"
-            statClass="stat-card-green"
+            statClass="stat-card-green stat-card-emerald"
           />
           <StatCard
             label="عدد الفواتير"
@@ -471,7 +471,7 @@ export function DailyCloseScreen() {
             suffix="فاتورة"
             icon={FileText}
             iconBg="bg-primary/10 text-primary"
-            statClass="stat-card-blue"
+            statClass="stat-card-blue stat-card-amber"
             isInteger
           />
           <StatCard
@@ -480,7 +480,7 @@ export function DailyCloseScreen() {
             suffix="ريال سعودي"
             icon={Receipt}
             iconBg="bg-red-500/10 text-red-500"
-            statClass="stat-card-red"
+            statClass="stat-card-red stat-card-rose"
           />
           </div>
           <div className="glow-orb-amber" style={{ top: '20%', right: '-10%' }} />

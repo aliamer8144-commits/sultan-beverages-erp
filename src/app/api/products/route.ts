@@ -30,7 +30,10 @@ export async function GET(request: NextRequest) {
 
     const products = await db.product.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
-      include: { category: true },
+      include: {
+        category: true,
+        _count: { select: { variants: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
 

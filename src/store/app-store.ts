@@ -30,6 +30,7 @@ export interface User {
 
 export interface CartItem {
   productId: string
+  variantId?: string
   name: string
   price: number
   quantity: number
@@ -171,8 +172,8 @@ interface AppState {
   // POS Cart
   cart: CartItem[]
   addToCart: (item: Omit<CartItem, 'quantity'>) => void
-  removeFromCart: (productId: string) => void
-  updateCartQuantity: (productId: string, quantity: number) => void
+  removeFromCart: (productId: string, variantId?: string) => void
+  updateCartQuantity: (productId: string, quantity: number, variantId?: string) => void
   clearCart: () => void
   cartDiscount: number
   setCartDiscount: (discount: number) => void
@@ -214,12 +215,13 @@ export const useAppStore = create<AppState>()(
       cart: [],
       addToCart: (item) => {
         const { cart } = get()
-        const existing = cart.find((c) => c.productId === item.productId)
+        const key = item.variantId || item.productId
+        const existing = cart.find((c) => (c.variantId || c.productId) === key)
         if (existing) {
           if (existing.quantity < item.maxQuantity) {
             set({
               cart: cart.map((c) =>
-                c.productId === item.productId
+                (c.variantId || c.productId) === key
                   ? { ...c, quantity: Math.min(c.quantity + 1, item.maxQuantity) }
                   : c
               ),
@@ -229,17 +231,19 @@ export const useAppStore = create<AppState>()(
           set({ cart: [...cart, { ...item, quantity: 1 }] })
         }
       },
-      removeFromCart: (productId) => {
-        set({ cart: get().cart.filter((c) => c.productId !== productId) })
+      removeFromCart: (productId, variantId) => {
+        const key = variantId || productId
+        set({ cart: get().cart.filter((c) => (c.variantId || c.productId) !== key) })
       },
-      updateCartQuantity: (productId, quantity) => {
+      updateCartQuantity: (productId, quantity, variantId) => {
+        const key = variantId || productId
         if (quantity <= 0) {
-          get().removeFromCart(productId)
+          get().removeFromCart(productId, variantId)
           return
         }
         set({
           cart: get().cart.map((c) =>
-            c.productId === productId
+            (c.variantId || c.productId) === key
               ? { ...c, quantity: Math.min(quantity, c.maxQuantity) }
               : c
           ),
@@ -263,7 +267,7 @@ export const useAppStore = create<AppState>()(
 
       // Held Orders
       heldOrders: [],
-      holdCurrentOrder: (note = '') => {
+      holdCurrentOrder: (note = '', customerName?: string | null) => {
         const { cart, cartDiscount, cartCustomerId, user } = get()
         const id = Date.now().toString(36)
         const heldOrder: HeldOrder = {
@@ -271,12 +275,15 @@ export const useAppStore = create<AppState>()(
           cart: [...cart],
           discount: cartDiscount,
           customerId: cartCustomerId,
-          customerName: null, // Will be resolved from context
+          customerName: customerName || null,
           heldAt: new Date().toISOString(),
           heldBy: user?.name || 'مستخدم',
           note,
         }
-        set({ heldOrders: [...get().heldOrders, heldOrder], cart: [], cartDiscount: 0, cartCustomerId: null })
+        const updated = [...get().heldOrders, heldOrder]
+        // Limit to max 5 held orders (remove oldest)
+        const trimmed = updated.length > 5 ? updated.slice(updated.length - 5) : updated
+        set({ heldOrders: trimmed, cart: [], cartDiscount: 0, cartCustomerId: null })
         return id
       },
       recallOrder: (orderId) => {

@@ -5,16 +5,23 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const category = searchParams.get("category") || "";
+
+    const where: Record<string, unknown> = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    if (category) {
+      where.category = category;
+    }
 
     const customers = await db.customer.findMany({
-      where: search
-        ? {
-            OR: [
-              { name: { contains: search } },
-              { phone: { contains: search } },
-            ],
-          }
-        : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: { createdAt: "desc" },
     });
 
@@ -29,7 +36,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, phone } = body;
+    const { name, phone, category, notes } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -52,7 +59,12 @@ export async function POST(request: NextRequest) {
     }
 
     const customer = await db.customer.create({
-      data: { name, phone },
+      data: {
+        name,
+        phone,
+        category: category || "عادي",
+        notes: notes || null,
+      },
     });
 
     return NextResponse.json({ success: true, data: customer }, { status: 201 });
@@ -66,7 +78,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, phone, debt } = body;
+    const { id, name, phone, debt, category, notes } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -75,9 +87,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const data: Record<string, unknown> = {};
+    if (name !== undefined) data.name = name;
+    if (phone !== undefined) data.phone = phone;
+    if (debt !== undefined) data.debt = debt;
+    if (category !== undefined) data.category = category;
+    if (notes !== undefined) data.notes = notes;
+
     const updated = await db.customer.update({
       where: { id },
-      data: { name, phone, debt },
+      data,
     });
 
     return NextResponse.json({ success: true, data: updated });

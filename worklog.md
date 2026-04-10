@@ -2056,3 +2056,337 @@ auth, products, categories, customers, suppliers, invoices, users, dashboard, da
 4. **MEDIUM: Product Variants** — Size, flavor, packaging options per product
 5. **LOW: WebSocket Real-time Updates** — Live multi-terminal sync
 6. **LOW: API Rate Limiting** — Production security hardening
+
+---
+Task ID: 9-C
+Agent: frontend-styling-expert
+Task: Add more CSS styling details and apply to screens
+
+Work Log:
+- Read globals.css (9804 lines, 81 sections), worklog.md (2059 lines), verified prefers-reduced-motion exists (19 instances)
+- Appended 6 new CSS sections (82-87, ~400 new lines) to globals.css, expanding to 10202 lines
+- 82. ANIMATED BORDER GRADIENT — `.animated-border-gradient` with conic-gradient spinning border using `var(--angle)`, `@keyframes borderSpin`, inner z-index layering, dark mode variant
+- 83. NOTIFICATION BADGE PULSE — `.badge-ping` with `::after` pseudo-element (6px red dot, `ping` animation 1.5s cubic-bezier scale+fade), `::before` base dot, dark mode variant
+- 84. NUMBER TICKER — `.number-ticker` with tabular-nums, letter-spacing, opacity+transform transitions, `[data-updating]` visual state, dark mode variant
+- 85. GLASS CARD FROSTED — `.glass-card-frosted` enhanced glassmorphism: blur(24px) saturate(1.8), inner gradient border via `::before` background-clip trick, white 70% bg, dark neutral 900/70 bg, 1.5rem padding
+- 86. HOVER UNDERLINE EFFECT — `.hover-underline` with `::after` bottom border scaleX(0→1) on hover, `transform-origin: right` for RTL, `[dir="rtl"]` override
+- 87. STAT CARD VARIANTS — `.stat-card-violet`, `.stat-card-emerald`, `.stat-card-amber`, `.stat-card-rose` with subtle gradient backgrounds, accent borders (4px), RTL-aware border side, dark mode variants
+- Applied new classes to 7 screen/component files:
+  - settings-screen.tsx: Added `.glass-card-frosted` to 2 Card components
+  - customers-screen.tsx: Added `.hover-underline` to customer name cells
+  - dashboard-screen.tsx: Added `.stat-card-violet/emerald/amber/rose` alongside existing stat classes on 4 stat cards
+  - app-layout.tsx: Added `.badge-ping` to notification bell button
+  - pos-screen.tsx: Added `.animated-border-gradient` to payment dialog
+  - daily-close-screen.tsx: Added `.stat-card-violet/emerald/amber/rose` alongside existing stat classes on 4 summary cards
+  - expense-screen.tsx: Added `.glass-card-frosted` to recurring expenses card
+- All sections include dark mode (`.dark`) variants, RTL support, and `prefers-reduced-motion` media queries
+- `bun run lint` → 0 errors
+
+Stage Summary:
+- globals.css expanded from 9804 to 10202 lines (81→87 sections)
+- 12 new utility classes added across 6 CSS sections
+- 7 existing screens/components enhanced with new classes
+- Zero lint errors, zero breaking changes
+
+---
+Task ID: 9-B
+Agent: full-stack-developer
+Task: Add Product Variants support (size, flavor, packaging)
+
+Work Log:
+- Added `ProductVariant` model to Prisma schema with fields: id, productId, name, sku (unique), barcode, costPrice, sellPrice, stock, isActive, createdAt
+- Added `variants ProductVariant[]` relation to Product model with onDelete: Cascade
+- Ran `bun run db:push` — schema synced successfully
+- Created `/api/product-variants/route.ts` with full CRUD:
+  - GET: List variants by productId
+  - POST: Create variant with SKU uniqueness check and product existence validation
+  - PUT: Update variant fields (name, sku, barcode, costPrice, sellPrice, stock, isActive)
+  - DELETE: Remove variant by id
+- Enhanced Products API (`/api/products/route.ts`): Added `_count: { select: { variants: true } }` to GET include
+- Updated Zustand store (`src/store/app-store.ts`):
+  - Added `variantId?: string` field to CartItem interface
+  - Updated `addToCart` to use composite key (variantId || productId) for deduplication
+  - Updated `removeFromCart(productId, variantId?)` and `updateCartQuantity(productId, quantity, variantId?)` signatures
+- Enhanced Inventory Screen (`src/screens/inventory-screen.tsx`):
+  - Added `Layers` and `Save` icons import
+  - Added `ProductVariant` and `VariantFormData` interfaces
+  - Added variants dialog state (8 new state variables)
+  - Added variants handlers: openVariantsDialog, openAddVariantDialog, openEditVariantDialog, handleVariantSubmit, handleDeleteVariant
+  - Added "المتغيرات" button (Layers icon, violet color) to each product's action column
+  - Added full Variants Dialog with:
+    - Product name header with description
+    - Variant list showing: name, SKU, cost price, sell price, stock (with chip-danger/chip-success)
+    - Edit/delete actions per variant
+    - Inline add/edit form with 6 fields (name, SKU, barcode, cost price, sell price, stock)
+    - Dashed "إضافة متغير" button
+- Enhanced POS Screen (`src/screens/pos-screen.tsx`):
+  - Added `ProductVariant` interface and `_count?: { variants: number }` to Product type
+  - Added variant selector state (4 new state variables)
+  - Modified `handleProductClick` to check for variants: if product has variants (> 0), show variant selector dialog instead of quick view
+  - Added `handleVariantSelect` handler: adds variant to cart with name format "المنتج (المتغير)", variantId, variant's sellPrice and stock
+  - Added Variant Selector Dialog: lists active variants with name, SKU, stock, price; click to add; out-of-stock disabled state
+  - Added Escape key support for variant selector dialog
+  - Variant items in cart show full name "المنتج (المتغير)"
+
+Stage Summary:
+- Product Variants fully functional across Inventory and POS screens
+- API supports full CRUD with SKU uniqueness validation
+- Cart system updated to track variant-based items with composite keys
+- Inventory screen has dedicated variants management dialog
+- POS screen shows variant selector when product has variants
+- `bun run lint` → 0 errors
+- `bun run db:push` → schema synced
+- All existing functionality preserved, RTL layout intact
+
+---
+Task ID: 9-D
+Agent: full-stack-developer
+Task: Add Customer Categories, Notes, and Purchase History
+
+Work Log:
+- Enhanced Prisma Customer model with 5 new fields:
+  - `category String @default("عادي")` — customer category (عادي, VIP, موظف, تاجر)
+  - `notes String?` — customer notes
+  - `totalPurchases Float @default(0)` — computed total purchases
+  - `visitCount Int @default(0)` — number of visits/purchases
+  - `lastVisit DateTime?` — last purchase date
+- Ran `bun run db:push` — schema synced successfully
+
+- Enhanced `/api/customers/route.ts`:
+  - GET: Added `?category=` query parameter for filtering by category
+  - POST: Added `category` and `notes` fields to customer creation
+  - PUT: Added `category` and `notes` fields to customer updates
+
+- Enhanced `/api/invoices/route.ts`:
+  - GET: Added `?customerId=` query parameter for fetching invoices by customer
+  - POST: When a sale invoice is created for a customer:
+    - Increments `visitCount`
+    - Updates `lastVisit` to current time
+    - Adds invoice total to `totalPurchases`
+    - Still updates debt for partial/unpaid invoices (existing behavior preserved)
+
+- Rewrote `src/screens/customers-screen.tsx` with full enhancements:
+  - **Customer Categories System**:
+    - Category filter chips at top: الكل, عادي, VIP, موظف, تاجر
+    - Each category has icon (Users, Crown, BadgeCheck, Store) and chip-* variant
+    - Category badges next to customer names in table
+    - VIP customers get golden right border on table row + animated Crown icon
+    - Category selector dropdown in add/edit dialogs with icons
+    - VIP count shown in header subtitle
+  
+  - **Customer Notes**:
+    - Notes textarea in add/edit customer dialogs
+    - StickyNote icon in table for customers with notes
+    - Tooltip on hover showing notes preview
+    - Expandable notes section in purchase history dialog (long notes truncated)
+  
+  - **Customer Purchase History**:
+    - ShoppingBag button for each customer in table actions
+    - Purchase history dialog shows:
+      - 3 summary cards: total purchases, visit count, last visit date
+      - Expandable notes section with StickyNote icon
+      - Last 10 sale invoices with: invoice number, date, total, status (paid/partial/unpaid)
+      - Invoice details: discount, paid amount, remaining balance
+      - Color-coded status chips (green/red/amber)
+  
+  - **Stats Enhancement**:
+    - Changed from 3 to 4 stat cards: Total Customers, Total Debt, VIP Count, Debtors Count
+    - VIP card with Crown icon and amber color
+  
+  - **Table Enhancement**:
+    - Hidden columns on mobile (phone, visits, status) for responsive design
+    - All action buttons wrapped in Tooltip components
+    - ShoppingBag (purchase history) button added as first action
+  
+  - **CSV Export Enhancement**:
+    - Added category, purchases, visits, notes columns to export
+
+Stage Summary:
+- Customer categories fully implemented with 4 types (عادي, VIP, موظف, تاجر)
+- Category filtering via chip buttons and API parameter
+- Customer notes with tooltip preview and expandable section
+- Purchase history dialog with summary stats and last 10 invoices
+- Auto visit tracking on sale invoice creation (visitCount, lastVisit, totalPurchases)
+- VIP customers get special golden border and Crown icon in table
+- `bun run lint` → 0 errors, `bun run db:push` → schema synced
+- All existing functionality preserved, RTL layout intact
+
+---
+Task ID: 9-A
+Agent: full-stack-developer
+Task: Enhance POS receipt and payment workflow
+
+Work Log:
+- Read worklog.md (2058 lines), pos-screen.tsx (1842 lines), app-store.ts for full context
+- Fixed duplicate import of Tabs and Label in pos-screen.tsx
+- Added DialogDescription to Dialog import (was used but not imported)
+- Updated app-store.ts: holdCurrentOrder now accepts customerName param and limits held orders to max 5 (oldest removed)
+- Updated confirmHoldOrder in pos-screen.tsx to pass selectedCustomer.name to holdCurrentOrder
+- Added receipt number helper functions: getNextReceiptNumber() and peekNextReceiptNumber() with INV-YYYYMMDD-XXXX format stored in localStorage
+- Added split payment state (paymentTab, splitCash, splitCard) and computed values (splitCashNum, splitCardNum, splitTotal, splitRemaining, isSplitValid)
+- Replaced flat payment dialog with tabbed payment dialog using Tabs/TabsList/TabsTrigger/TabsContent components
+- Payment dialog now shows: receipt number preview, summary, items count, two tabs (دفع كامل / دفع مجزأ)
+- Full payment tab: original paid amount input with quick buttons and change calculation
+- Split payment tab: cash input with quick buttons (green), card input with "المتبقي" shortcut (blue), split summary, cash change, validation messages
+- Updated handleConfirmPayment to support both payment modes, generates receipt number on payment
+- Added quick discount buttons (5%, 10%, 15%, 20%) and custom discount button (مخصص) below discount input in cart footer
+- Added custom discount dialog with tabs (percentage / fixed amount), value input, live preview of discount
+- Added handleApplyDiscount, handleOpenCustomDiscount, handleApplyCustomDiscount callbacks
+- Used existing Lucide icons: Banknote, ReceiptText, Percent, CreditCard
+- All text in Arabic (RTL), used existing CSS utility classes (rounded-xl, bg-muted/40, tabular-nums, etc.)
+- bun run lint passes with 0 errors
+
+Stage Summary:
+- Payment dialog enhanced with split payment support (cash + card) using tabs
+- Receipt number auto-generated in INV-YYYYMMDD-XXXX format with daily sequence
+- Quick discount buttons (5%, 10%, 15%, 20%, مخصص) added to cart footer
+- Custom discount dialog with percentage/fixed amount modes and live preview
+- Held orders limited to max 5 with customer name saved
+- Zero lint errors, zero breaking changes
+================================================================================
+                        PHASE 8 - POS ENHANCEMENTS, VARIANTS, CSS, CUSTOMER ADVANCED
+================================================================================
+
+---
+Task ID: 9-A
+Agent: full-stack-developer
+Task: Enhance POS receipt and payment workflow
+
+Work Log:
+- Added Split Payment (دفع مجزأ) support: two tabs in payment dialog, cash + card inputs, auto-calculate remaining, change amount display
+- Enhanced Hold/Recall Orders: accepts customer name, max 5 orders, oldest auto-removed
+- Added Receipt Number: INV-YYYYMMDD-XXXX format, daily sequential counter in localStorage, preview in payment dialog
+- Added Quick Discount Buttons: 5%, 10%, 15%, 20%, مخصص (custom with % or fixed amount modes)
+- bun run lint: 0 errors
+
+Stage Summary:
+- 4 major POS enhancements: split payment, hold/recall, receipt numbers, quick discounts
+- Payment dialog significantly more capable
+
+---
+Task ID: 9-B
+Agent: full-stack-developer
+Task: Add Product Variants support
+
+Work Log:
+- Added ProductVariant model to Prisma schema (id, productId, name, sku, barcode, costPrice, sellPrice, stock, isActive)
+- Created /api/product-variants/route.ts (GET/POST/PUT/DELETE)
+- Enhanced products API to include variant counts
+- Updated CartItem interface with variantId field
+- Enhanced inventory screen: variants dialog with CRUD, stock indicators, SKU/barcode
+- Enhanced POS: variant selector dialog when product has variants, variant name in cart
+- bun run db:push and bun run lint: 0 errors
+
+Stage Summary:
+- Complete product variants system with size/flavor/packaging support
+- Variant-aware cart and POS flow
+
+---
+Task ID: 9-C
+Agent: frontend-styling-expert
+Task: Add advanced CSS styling (Sections 82-87)
+
+Work Log:
+- Added 6 new CSS sections to globals.css (+398 lines, 81→87 sections):
+  - 82. Animated Border Gradient (.animated-border-gradient) with @property --angle spinning
+  - 83. Notification Badge Pulse (.badge-ping) with ping animation
+  - 84. Number Ticker (.number-ticker) with tabular-nums and transitions
+  - 85. Glass Card Frosted (.glass-card-frosted) enhanced glassmorphism
+  - 86. Hover Underline Effect (.hover-underline) RTL-aware
+  - 87. Stat Card Variants (.stat-card-violet/emerald/amber/rose)
+- Applied new classes to 7 files: settings, customers, dashboard, app-layout, pos, daily-close, expense screens
+- All sections include dark mode variants and reduced-motion support
+- bun run lint: 0 errors
+
+Stage Summary:
+- globals.css expanded to 10,202 lines with 87 sections
+- 12 new utility classes applied across 7 screen files
+
+---
+Task ID: 9-D
+Agent: full-stack-developer
+Task: Add Customer Categories, Notes, and Purchase History
+
+Work Log:
+- Added 5 fields to Customer model: category, notes, totalPurchases, visitCount, lastVisit
+- Created customer category system with filter chips (الكل/عادي/VIP/موظف/تاجر)
+- VIP customers get golden border and Crown icon
+- Added purchase history dialog showing last 10 invoices with summary cards
+- Added customer notes (textarea in dialog, tooltip in table, expandable in history)
+- Enhanced invoice POST to auto-track visits (increment visitCount, update lastVisit, totalPurchases)
+- bun run db:push and bun run lint: 0 errors
+
+Stage Summary:
+- Complete customer segmentation with 5 categories
+- Purchase history tracking with visit analytics
+- Customer notes support for extra context
+
+================================================================================
+                   UPDATED HANDOVER DOCUMENT - PHASE 8
+================================================================================
+
+## 1. Project Current Status / Assessment
+
+**Status: STABLE & FEATURE-RICH** ✅
+
+### Architecture:
+- **Framework**: Next.js 16 App Router with TypeScript 5
+- **Database**: SQLite + Prisma ORM with 16 models (User, Category, Product, ProductVariant, Customer, Supplier, Invoice, InvoiceItem, Payment, SupplierPayment, ProductReturn, StockAdjustment, Expense, AuditLog, SalesTarget, LoyaltyTransaction)
+- **State**: Zustand with persist middleware
+- **UI**: Tailwind CSS 4 + shadcn/ui + Recharts + Framer Motion
+- **Design**: Apple-inspired glassmorphism with RTL Arabic interface
+- **CSS**: ~10,200 lines with 87 sections and 70+ utility classes
+
+### Screens (17 total):
+1. Login — Gradient, particles, demo auto-login
+2. POS — Split payment, hold/recall, receipt numbers, quick discounts, product variants, loyalty, multi-currency, barcode
+3. Inventory — CRUD, variants management, stock history popover
+4. Stock Adjustments — Timeline history, filters
+5. Purchases — Suppliers, invoices, payment tracking
+6. Customers — Categories (VIP/عادي/موظف/تاجر), notes, purchase history, loyalty points
+7. Invoices — Sales/purchases tabs, print, returns, multi-currency
+8. Returns — Return management, approve/reject
+9. Dashboard — Charts, stat cards (colored variants), CSV export
+10. Analytics — Advanced analytics
+11. Sales Targets — Target tracking
+12. Users — CRUD, role management
+13. Settings — Currency, loyalty, 20+ options
+14. Daily Close — End-of-day, charts, thermal print
+15. Audit Log — Operation tracking
+16. Expenses — Expense management
+17. Backup — Backup/restore
+
+### Key Features:
+- Role-based access (Admin/Cashier)
+- Multi-Currency (12 currencies, 3 display modes)
+- Customer Loyalty/Rewards
+- Product Variants (size/flavor/packaging)
+- Split Payment + Quick Discounts
+- Hold/Recall Orders
+- Customer Categories (VIP, عادي, موظف, تاجر)
+- Dark/Light mode, Keyboard shortcuts, Barcode scanning
+- CSV export, Thermal printing, Backup/restore
+
+## 2. Completed Modifications (Phase 8)
+
+1. ✅ POS Split Payment — cash + card with change calculation
+2. ✅ POS Hold/Recall Orders — up to 5 orders with customer names
+3. ✅ POS Receipt Numbers — INV-YYYYMMDD-XXXX format
+4. ✅ POS Quick Discounts — 5/10/15/20% + custom
+5. ✅ Product Variants — full CRUD, variant-aware POS
+6. ✅ CSS Sections 82-87 — animated borders, badges, frosted glass, stat cards
+7. ✅ Customer Categories — 5 categories with VIP styling
+8. ✅ Customer Notes + Purchase History
+9. ✅ Auto Visit Tracking on invoice creation
+10. ✅ `bun run lint` → 0 errors
+11. ✅ agent-browser QA → 0 errors on all tested screens
+
+## 3. Recommended Next Phase Priorities
+
+1. **HIGH: Multi-Language (English)** — English toggle alongside Arabic
+2. **MEDIUM: Mobile-Responsive POS** — Tablet-optimized layout
+3. **MEDIUM: Advanced Inventory Reports** — Stock aging, reorder points
+4. **MEDIUM: Supplier Portal** — Supplier self-service order management
+5. **MEDIUM: Customer Portal/App** — Customer-facing order tracking
+6. **LOW: WebSocket Real-time Updates** — Multi-terminal sync
+7. **LOW: Email/SMS Notifications** — Low stock alerts, invoice receipts

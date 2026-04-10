@@ -8,8 +8,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
 import {
   Search,
   Plus,
@@ -43,6 +45,9 @@ import {
   Play,
   Target,
   Star,
+  Banknote,
+  ReceiptText,
+  Percent,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
@@ -62,6 +67,7 @@ interface Product {
   image?: string
   barcode?: string
   isActive: boolean
+  _count?: { variants: number }
 }
 
 interface Category {
@@ -79,6 +85,18 @@ interface Customer {
   loyaltyPoints?: number
 }
 
+interface ProductVariant {
+  id: string
+  productId: string
+  name: string
+  sku?: string
+  barcode?: string
+  costPrice: number
+  sellPrice: number
+  stock: number
+  isActive: boolean
+}
+
 interface LastInvoice {
   id: string
   invoiceNo: string
@@ -93,6 +111,34 @@ interface SalesTargetCompact {
   targetAmount: number
   currentAmount: number
   type: string
+}
+
+// ─── Receipt number helper ─────────────────────────────────────────────
+
+function getNextReceiptNumber(): string {
+  const today = new Date()
+  const dateStr = today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0')
+  const key = `sultan-receipt-counter-${dateStr}`
+  const stored = localStorage.getItem(key)
+  let seq = 1
+  if (stored) {
+    seq = parseInt(stored, 10) + 1
+  }
+  localStorage.setItem(key, seq.toString())
+  return `INV-${dateStr}-${String(seq).padStart(4, '0')}`
+}
+
+function peekNextReceiptNumber(): string {
+  const today = new Date()
+  const dateStr = today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0')
+  const key = `sultan-receipt-counter-${dateStr}`
+  const stored = localStorage.getItem(key)
+  const seq = stored ? parseInt(stored, 10) + 1 : 1
+  return `INV-${dateStr}-${String(seq).padStart(4, '0')}`
 }
 
 // ─── Icon mapping ────────────────────────────────────────────────────────────
@@ -274,8 +320,24 @@ export function POSScreen() {
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null)
   const [quickViewQuantity, setQuickViewQuantity] = useState(1)
 
+  // ── Variant selector ──
+  const [variantSelectorOpen, setVariantSelectorOpen] = useState(false)
+  const [variantSelectorProduct, setVariantSelectorProduct] = useState<Product | null>(null)
+  const [variantSelectorVariants, setVariantSelectorVariants] = useState<ProductVariant[]>([])
+  const [variantSelectorLoading, setVariantSelectorLoading] = useState(false)
+
   // ── Calculator widget ──
   const [calculatorOpen, setCalculatorOpen] = useState(false)
+
+  // ── Split payment state ──
+  const [paymentTab, setPaymentTab] = useState<'full' | 'split'>('full')
+  const [splitCash, setSplitCash] = useState('')
+  const [splitCard, setSplitCard] = useState('')
+
+  // ── Custom discount dialog state ──
+  const [customDiscountDialogOpen, setCustomDiscountDialogOpen] = useState(false)
+  const [customDiscountValue, setCustomDiscountValue] = useState('')
+  const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'amount'>('percent')
 
   // ── Hold order ──
   const [holdDialogOpen, setHoldDialogOpen] = useState(false)
@@ -396,10 +458,20 @@ export function POSScreen() {
   const grandTotal = effectiveTotal
   const change = parseFloat(paidAmount) - grandTotal
 
+  // ── Split payment computed values ──
+  const splitCashNum = parseFloat(splitCash) || 0
+  const splitCardNum = parseFloat(splitCard) || 0
+  const splitTotal = splitCashNum + splitCardNum
+  const splitRemaining = Math.max(0, grandTotal - splitTotal)
+  const isSplitValid = splitTotal >= grandTotal && splitCashNum >= 0 && splitCardNum >= 0
+
   // ── Payment ──
   const handleOpenPayment = useCallback(() => {
     if (cart.length === 0) return
     setPaidAmount(grandTotal.toFixed(2))
+    setPaymentTab('full')
+    setSplitCash('')
+    setSplitCard('')
     setPaymentDialogOpen(true)
   }, [cart.length, grandTotal])
 
@@ -431,15 +503,31 @@ export function POSScreen() {
       toast.error('يرجى تسجيل الدخول أولاً')
       return
     }
-    const paid = parseFloat(paidAmount)
-    if (isNaN(paid) || paid < 0) {
-      toast.error('يرجى إدخال مبلغ صحيح')
-      return
+
+    // Compute the actual paid amount based on payment mode
+    let paid: number
+    let paymentMethod: string = 'cash'
+    if (paymentTab === 'split') {
+      if (!isSplitValid) {
+        toast.error('المبلغ غير كافٍ لتغطية الإجمالي')
+        return
+      }
+      paid = splitCashNum + splitCardNum
+      paymentMethod = 'split'
+    } else {
+      paid = parseFloat(paidAmount)
+      if (isNaN(paid) || paid < 0) {
+        toast.error('يرجى إدخال مبلغ صحيح')
+        return
+      }
+      if (paid < grandTotal) {
+        toast.error('المبلغ المدفوع أقل من الإجمالي')
+        return
+      }
     }
-    if (paid < grandTotal) {
-      toast.error('المبلغ المدفوع أقل من الإجمالي')
-      return
-    }
+
+    // Generate and store receipt number
+    const receiptNumber = getNextReceiptNumber()
 
     setProcessingPayment(true)
     try {
@@ -462,7 +550,7 @@ export function POSScreen() {
       const json = await res.json()
 
       if (json.success) {
-        toast.success(`تم إنشاء الفاتورة ${json.data.invoiceNo} بنجاح`)
+        toast.success(`تم إنشاء الفاتورة ${receiptNumber} بنجاح`)
         // Auto-award loyalty points after successful payment
         awardLoyaltyPoints(json.data.id, json.data.totalAmount || subtotal, cartCustomerId)
         clearCart()
@@ -492,6 +580,10 @@ export function POSScreen() {
     awardLoyaltyPoints,
     subtotal,
     loyaltyDiscount,
+    paymentTab,
+    splitCashNum,
+    splitCardNum,
+    isSplitValid,
   ])
 
   const handleClearCart = useCallback(() => {
@@ -505,6 +597,42 @@ export function POSScreen() {
     toast.success('تم مسح السلة')
   }, [clearCart])
 
+  // ── Quick discount handler ──
+  const handleApplyDiscount = useCallback((percent: number) => {
+    const discountAmount = (subtotal * percent) / 100
+    setCartDiscount(Math.round(discountAmount * 100) / 100)
+  }, [subtotal, setCartDiscount])
+
+  const handleOpenCustomDiscount = useCallback(() => {
+    setCustomDiscountValue('')
+    setCustomDiscountType('percent')
+    setCustomDiscountDialogOpen(true)
+  }, [])
+
+  const handleApplyCustomDiscount = useCallback(() => {
+    const val = parseFloat(customDiscountValue)
+    if (isNaN(val) || val <= 0) {
+      toast.error('يرجى إدخال قيمة صحيحة')
+      return
+    }
+    if (customDiscountType === 'percent') {
+      if (val > 100) {
+        toast.error('نسبة الخصم لا يمكن أن تتجاوز 100%')
+        return
+      }
+      const discountAmount = (subtotal * val) / 100
+      setCartDiscount(Math.round(discountAmount * 100) / 100)
+    } else {
+      if (val > subtotal) {
+        toast.error('مبلغ الخصم لا يمكن أن يتجاوز المجموع الفرعي')
+        return
+      }
+      setCartDiscount(Math.round(val * 100) / 100)
+    }
+    setCustomDiscountDialogOpen(false)
+    toast.success('تم تطبيق الخصم')
+  }, [customDiscountValue, customDiscountType, subtotal, setCartDiscount])
+
   // ── Hold order handler ──
   const handleHoldOrder = useCallback(() => {
     if (cart.length === 0) return
@@ -513,11 +641,12 @@ export function POSScreen() {
   }, [cart.length])
 
   const confirmHoldOrder = useCallback(() => {
-    const id = holdCurrentOrder(holdNote)
+    const customerName = selectedCustomer?.name || null
+    const id = holdCurrentOrder(holdNote, customerName)
     setHoldDialogOpen(false)
     setHoldNote('')
     toast.success(`تم تجميد الطلب (#${id})`)
-  }, [holdCurrentOrder, holdNote])
+  }, [holdCurrentOrder, holdNote, selectedCustomer])
 
   // ── Recall order handler ──
   const handleRecallOrder = useCallback((orderId: string) => {
@@ -573,12 +702,57 @@ export function POSScreen() {
   }, [])
 
   // ── Open product quick view ──
-  const handleProductClick = useCallback((product: Product) => {
+  const handleProductClick = useCallback(async (product: Product) => {
     if (product.quantity <= 0) return
+
+    // If product has variants, show variant selector
+    if (product._count && product._count.variants > 0) {
+      setVariantSelectorProduct(product)
+      setVariantSelectorOpen(true)
+      setVariantSelectorLoading(true)
+      try {
+        const res = await fetch(`/api/product-variants?productId=${product.id}`)
+        const data = await res.json()
+        if (data.success) {
+          setVariantSelectorVariants(data.data.filter((v: ProductVariant) => v.isActive))
+        } else {
+          toast.error('فشل في تحميل المتغيرات')
+          setVariantSelectorOpen(false)
+        }
+      } catch {
+        toast.error('حدث خطأ في تحميل المتغيرات')
+        setVariantSelectorOpen(false)
+      } finally {
+        setVariantSelectorLoading(false)
+      }
+      return
+    }
+
+    // No variants — show quick view as before
     setQuickViewProduct(product)
     const inCart = cart.find((c) => c.productId === product.id)?.quantity || 0
     setQuickViewQuantity(inCart > 0 ? 1 : 1)
   }, [cart])
+
+  const handleVariantSelect = useCallback((product: Product, variant: ProductVariant) => {
+    if (variant.stock <= 0) {
+      toast.error('هذا المتغير غير متوفر في المخزون')
+      return
+    }
+    const displayName = `${product.name} (${variant.name})`
+    addToCart({
+      productId: product.id,
+      variantId: variant.id,
+      name: displayName,
+      price: variant.sellPrice,
+      maxQuantity: variant.stock,
+      image: product.image,
+    })
+    toast.success(`تمت إضافة ${displayName}`)
+    setVariantSelectorOpen(false)
+    setVariantSelectorProduct(null)
+    setVariantSelectorVariants([])
+  }, [addToCart])
 
   const handleQuickViewAdd = useCallback(() => {
     if (!quickViewProduct) return
@@ -627,6 +801,8 @@ export function POSScreen() {
           setDeleteHeldOrderId(null)
         } else if (quickViewProduct) {
           setQuickViewProduct(null)
+        } else if (variantSelectorOpen) {
+          setVariantSelectorOpen(false)
         } else if (document.activeElement === barcodeInputRef.current) {
           setBarcodeInput('')
           barcodeInputRef.current?.blur()
@@ -639,7 +815,7 @@ export function POSScreen() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [cart.length, paymentDialogOpen, clearCartDialogOpen, holdDialogOpen, deleteHeldOrderId, quickViewProduct, handleOpenPayment])
+  }, [cart.length, paymentDialogOpen, clearCartDialogOpen, holdDialogOpen, deleteHeldOrderId, quickViewProduct, variantSelectorOpen, handleOpenPayment])
 
   // ── Relative time in Arabic ──
   const formatRelativeTime = useCallback((isoDate: string) => {
@@ -1253,6 +1429,29 @@ export function POSScreen() {
                   />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{symbol}</span>
                 </div>
+                {/* Quick discount buttons */}
+                <div className="flex gap-1.5 flex-wrap pt-1">
+                  {[5, 10, 15, 20].map((pct) => (
+                    <button
+                      key={pct}
+                      onClick={() => handleApplyDiscount(pct)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all duration-150 ${
+                        cartDiscount > 0 && Math.round((cartDiscount / subtotal) * 100) === pct
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                  <button
+                    onClick={handleOpenCustomDiscount}
+                    className="px-2 py-1 rounded-md text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-150 flex items-center gap-0.5"
+                  >
+                    <Percent className="w-2.5 h-2.5" />
+                    مخصص
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1336,7 +1535,7 @@ export function POSScreen() {
 
       {/* ── Payment Dialog ── */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogContent className="sm:max-w-lg animated-border-gradient" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-right">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -1347,6 +1546,13 @@ export function POSScreen() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* Receipt number */}
+            <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-4 py-2.5">
+              <ReceiptText className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">رقم الفاتورة:</span>
+              <span className="text-sm font-bold font-mono text-primary">{peekNextReceiptNumber()}</span>
+            </div>
+
             {/* Summary */}
             <div className="rounded-xl bg-muted/40 p-4 space-y-2.5">
               <div className="flex justify-between text-sm">
@@ -1383,58 +1589,187 @@ export function POSScreen() {
               </span>
             </div>
 
-            {/* Paid amount */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">المبلغ المدفوع</label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
-                  autoFocus
-                />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
-              </div>
-            </div>
+            {/* Payment method tabs */}
+            <Tabs value={paymentTab} onValueChange={(v) => setPaymentTab(v as 'full' | 'split')} className="w-full">
+              <TabsList className="w-full h-10">
+                <TabsTrigger value="full" className="flex-1 gap-1.5 text-xs">
+                  <Banknote className="w-3.5 h-3.5" />
+                  دفع كامل
+                </TabsTrigger>
+                <TabsTrigger value="split" className="flex-1 gap-1.5 text-xs">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  دفع مجزأ
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Quick amount buttons */}
-            <div className="flex gap-2 flex-wrap">
-              {[10, 20, 50, 100, 200, 500].map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setPaidAmount(amt.toString())}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                    parseFloat(paidAmount) === amt
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {amt}
-                </button>
-              ))}
-            </div>
+              {/* Full payment tab */}
+              <TabsContent value="full" className="space-y-4 mt-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">المبلغ المدفوع</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={paidAmount}
+                      onChange={(e) => setPaidAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
+                      autoFocus
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
+                  </div>
+                </div>
 
-            {/* Change calculation */}
-            {paidAmount && parseFloat(paidAmount) >= grandTotal && (
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-emerald-700">الباقي</span>
-                <span className="text-lg font-bold text-emerald-600 tabular-nums">
-                  {change.toFixed(2)} {symbol}
-                </span>
-              </div>
-            )}
-            {paidAmount && parseFloat(paidAmount) < grandTotal && parseFloat(paidAmount) > 0 && (
-              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-destructive">المبلغ غير كافٍ</span>
-                <span className="text-lg font-bold text-destructive tabular-nums">
-                  {(grandTotal - parseFloat(paidAmount)).toFixed(2)} {symbol} متبقي
-                </span>
-              </div>
-            )}
+                {/* Quick amount buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  {[10, 20, 50, 100, 200, 500].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setPaidAmount(amt.toString())}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                        parseFloat(paidAmount) === amt
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {amt}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Change / insufficient */}
+                {paidAmount && parseFloat(paidAmount) >= grandTotal && (
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-emerald-700">الباقي</span>
+                    <span className="text-lg font-bold text-emerald-600 tabular-nums">
+                      {change.toFixed(2)} {symbol}
+                    </span>
+                  </div>
+                )}
+                {paidAmount && parseFloat(paidAmount) < grandTotal && parseFloat(paidAmount) > 0 && (
+                  <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-destructive">المبلغ غير كافٍ</span>
+                    <span className="text-lg font-bold text-destructive tabular-nums">
+                      {(grandTotal - parseFloat(paidAmount)).toFixed(2)} {symbol} متبقي
+                    </span>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Split payment tab */}
+              <TabsContent value="split" className="space-y-4 mt-4">
+                {/* Cash input */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                    المبلغ النقدي
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={splitCash}
+                      onChange={(e) => setSplitCash(e.target.value)}
+                      placeholder="0.00"
+                      className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
+                      autoFocus
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[10, 20, 50, 100, 200, 500].filter(a => a <= grandTotal).map((amt) => (
+                      <button
+                        key={`cash-${amt}`}
+                        onClick={() => setSplitCash(amt.toString())}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all duration-150 ${
+                          splitCashNum === amt
+                            ? 'bg-emerald-500 text-white shadow-sm'
+                            : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                        }`}
+                      >
+                        {amt}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setSplitCash(grandTotal.toString())}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-150"
+                    >
+                      الكامل
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card input */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                    المبلغ بالبطاقة
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={splitCard}
+                      onChange={(e) => setSplitCard(e.target.value)}
+                      placeholder="0.00"
+                      className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
+                  </div>
+                  <button
+                    onClick={() => setSplitCard(splitRemaining.toFixed(2))}
+                    className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-all duration-150"
+                  >
+                    المتبقي ({splitRemaining.toFixed(2)})
+                  </button>
+                </div>
+
+                {/* Split summary */}
+                <div className="rounded-xl bg-muted/40 p-3 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">نقدي + بطاقة</span>
+                    <span className="font-medium tabular-nums">
+                      {splitCashNum.toFixed(2)} + {splitCardNum.toFixed(2)} = {splitTotal.toFixed(2)} {symbol}
+                    </span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">المتبقي</span>
+                    <span className={`font-bold tabular-nums ${splitRemaining > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                      {splitRemaining.toFixed(2)} {symbol}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Cash change */}
+                {splitCashNum > 0 && grandTotal > splitCardNum && (
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-emerald-700">الباقي (نقدي)</span>
+                    <span className="text-lg font-bold text-emerald-600 tabular-nums">
+                      {Math.max(0, splitCashNum - (grandTotal - splitCardNum)).toFixed(2)} {symbol}
+                    </span>
+                  </div>
+                )}
+
+                {/* Validation messages */}
+                {splitTotal > 0 && splitTotal < grandTotal && (
+                  <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-destructive">المبلغ غير كافٍ</span>
+                    <span className="text-base font-bold text-destructive tabular-nums">
+                      {splitRemaining.toFixed(2)} {symbol} متبقي
+                    </span>
+                  </div>
+                )}
+                {isSplitValid && (
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
+                    <span className="text-sm font-medium text-emerald-700">المبلغ مكتمل ✓</span>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-2">
@@ -1448,7 +1783,10 @@ export function POSScreen() {
             </Button>
             <Button
               onClick={handleConfirmPayment}
-              disabled={processingPayment || !paidAmount || parseFloat(paidAmount) < grandTotal}
+              disabled={
+                processingPayment ||
+                (paymentTab === 'full' ? (!paidAmount || parseFloat(paidAmount) < grandTotal) : !isSplitValid)
+              }
               className="flex-1 h-11 rounded-xl gap-2 shadow-lg shadow-primary/25"
             >
               {processingPayment ? (
@@ -1729,6 +2067,76 @@ export function POSScreen() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Variant Selector Dialog ── */}
+      <Dialog open={variantSelectorOpen} onOpenChange={(open) => { setVariantSelectorOpen(open); if (!open) { setVariantSelectorProduct(null); setVariantSelectorVariants([]) } }}>
+        <DialogContent className="sm:max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-right text-base flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                <CupSoda className="w-4 h-4 text-violet-700 dark:text-violet-400" />
+              </div>
+              اختر المتغير
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              {variantSelectorProduct?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          {variantSelectorLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : variantSelectorVariants.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">لا توجد متغيرات متاحة</p>
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[50vh]">
+              <div className="space-y-2">
+                {variantSelectorVariants.map((variant) => (
+                  <button
+                    key={variant.id}
+                    onClick={() => variantSelectorProduct && handleVariantSelect(variantSelectorProduct, variant)}
+                    disabled={variant.stock <= 0}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-right ${
+                      variant.stock <= 0
+                        ? 'opacity-50 cursor-not-allowed bg-muted/30'
+                        : 'bg-card hover:bg-muted/50 hover:border-primary/30 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{variant.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {variant.sku && <span className="font-mono mr-2">{variant.sku}</span>}
+                        المخزون: {variant.stock}
+                      </p>
+                    </div>
+                    <div className="text-left flex-shrink-0">
+                      <p className="text-sm font-bold text-primary tabular-nums">
+                        {formatDual(variant.sellPrice).display}
+                      </p>
+                      {variant.stock <= 0 && (
+                        <p className="text-[10px] text-destructive font-medium">غير متوفر</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setVariantSelectorOpen(false)}
+              className="flex-1 h-10 rounded-xl"
+            >
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Hold Order Dialog ── */}
       <Dialog open={holdDialogOpen} onOpenChange={setHoldDialogOpen}>
         <DialogContent className="sm:max-w-sm" dir="rtl">
@@ -1833,6 +2241,102 @@ export function POSScreen() {
             >
               <Trash2 className="w-4 h-4" />
               حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Custom Discount Dialog ── */}
+      <Dialog open={customDiscountDialogOpen} onOpenChange={setCustomDiscountDialogOpen}>
+        <DialogContent className="sm:max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Percent className="w-5 h-5 text-primary" />
+              </div>
+              خصم مخصص
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Discount type tabs */}
+            <Tabs value={customDiscountType} onValueChange={(v) => setCustomDiscountType(v as 'percent' | 'amount')} className="w-full">
+              <TabsList className="w-full h-9">
+                <TabsTrigger value="percent" className="flex-1 text-xs">
+                  نسبة مئوية %
+                </TabsTrigger>
+                <TabsTrigger value="amount" className="flex-1 text-xs">
+                  مبلغ ثابت
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Value input */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                {customDiscountType === 'percent' ? 'نسبة الخصم' : 'مبلغ الخصم'}
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  max={customDiscountType === 'percent' ? 100 : subtotal}
+                  step={0.5}
+                  value={customDiscountValue}
+                  onChange={(e) => setCustomDiscountValue(e.target.value)}
+                  placeholder={customDiscountType === 'percent' ? '0' : '0.00'}
+                  className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
+                  autoFocus
+                />
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
+                  {customDiscountType === 'percent' ? '%' : symbol}
+                </span>
+              </div>
+            </div>
+
+            {/* Discount preview */}
+            {customDiscountValue && parseFloat(customDiscountValue) > 0 && (
+              <div className="rounded-xl bg-muted/40 p-3 space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>المجموع الفرعي</span>
+                  <span className="font-medium tabular-nums">{formatDual(subtotal).display}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-destructive">الخصم</span>
+                  <span className="font-bold text-destructive tabular-nums">
+                    -{customDiscountType === 'percent'
+                      ? formatDual((subtotal * parseFloat(customDiscountValue)) / 100).display
+                      : formatDual(parseFloat(customDiscountValue)).display
+                    }
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-sm font-bold">
+                  <span>الإجمالي بعد الخصم</span>
+                  <span className="text-primary tabular-nums">
+                    {customDiscountType === 'percent'
+                      ? formatDual(subtotal - (subtotal * parseFloat(customDiscountValue)) / 100).display
+                      : formatDual(subtotal - parseFloat(customDiscountValue)).display
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCustomDiscountDialogOpen(false)}
+              className="flex-1 h-10 rounded-xl"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleApplyCustomDiscount}
+              disabled={!customDiscountValue || parseFloat(customDiscountValue) <= 0}
+              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-primary/25"
+            >
+              <Percent className="w-4 h-4" />
+              تطبيق الخصم
             </Button>
           </DialogFooter>
         </DialogContent>
