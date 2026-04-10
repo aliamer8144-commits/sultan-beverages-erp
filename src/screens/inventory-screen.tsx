@@ -846,25 +846,20 @@ export function InventoryScreen() {
     setBatchSubmitting(true)
     try {
       const ids = Array.from(selectedIds)
-      const results = await Promise.all(
-        ids.map((id) =>
-          fetch('/api/products', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id }),
-          }).then((r) => r.json())
-        )
-      )
+      const res = await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      const data = await res.json()
 
-      const successCount = results.filter((r) => r.success).length
-      if (successCount > 0) {
-        toast.success(`تم حذف ${successCount} منتج بنجاح`)
+      if (data.success) {
+        toast.success(`تم حذف ${data.data.count} منتج بنجاح`)
         setBatchDeleteOpen(false)
         clearSelection()
         fetchProducts()
-      }
-      if (successCount < ids.length) {
-        toast.error(`فشل في حذف ${ids.length - successCount} منتج`)
+      } else {
+        toast.error(data.error || 'فشل في حذف المنتجات')
       }
     } catch {
       toast.error('حدث خطأ في الاتصال')
@@ -1062,11 +1057,14 @@ export function InventoryScreen() {
       {/* Data Table */}
       <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden card-hover data-table-enhanced">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <span className="text-sm text-muted-foreground">جاري تحميل المنتجات...</span>
+          <div className="flex-1 flex items-center justify-center loading-overlay" style={{ position: 'absolute', inset: 0 }}>
+            <div className="loading-spinner" />
+            <div className="loading-dots">
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
+            <p className="loading-text">جاري تحميل المنتجات...</p>
           </div>
         ) : products.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">

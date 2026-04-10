@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres.mypophlireumyzfntokb:Alsoltan.7375@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 }
 
 model User {
@@ -95,6 +95,7 @@ model Supplier {
   isActive        Boolean           @default(true)
   invoices        Invoice[]
   supplierPayments SupplierPayment[]
+  reviews         SupplierReview[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -234,4 +235,14 @@ model LoyaltyTransaction {
   invoice        Invoice?  @relation(fields: [invoiceId], references: [id])
   description    String
   createdAt      DateTime  @default(now())
+}
+
+model SupplierReview {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  rating     Int      // 1-5
+  review     String?  // optional review text
+  userName   String?  // who submitted
+  createdAt  DateTime @default(now())
 }

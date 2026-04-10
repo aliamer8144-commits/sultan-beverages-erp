@@ -219,23 +219,44 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id } = body;
+    const { id, ids } = body as { id?: string; ids?: string[] };
 
-    await db.product.delete({
-      where: { id },
-    });
+    // Bulk delete: array of IDs
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      // Delete related records first (variants, stock adjustments via cascade)
+      // Then delete products
+      const result = await db.product.deleteMany({
+        where: { id: { in: ids } },
+      });
 
-    // Log product deletion
-    logAction({
-      action: 'delete',
-      entity: 'Product',
-      entityId: id,
-      details: { reason: 'تم حذف المنتج' },
-    });
+      logAction({
+        action: 'bulk_delete',
+        entity: 'Product',
+        details: { reason: `حذف ${result.count} منتج دفعة واحدة`, ids },
+      });
 
-    return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, data: { count: result.count } });
+    }
+
+    // Single delete: one ID
+    if (id) {
+      await db.product.delete({
+        where: { id },
+      });
+
+      logAction({
+        action: 'delete',
+        entity: 'Product',
+        entityId: id,
+        details: { reason: 'تم حذف المنتج' },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ success: false, error: "يرجى تحديد منتج واحد على الأقل" }, { status: 400 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete product";
+    const message = error instanceof Error ? error.message : "Failed to delete product(s)";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

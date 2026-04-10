@@ -544,7 +544,8 @@ export function DashboardScreen() {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
             {/* Monthly Sales Bar Chart */}
-            <Card className="rounded-2xl border-0 shadow-sm">
+            <div className="chart-container">
+            <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-foreground">المبيعات الشهرية</CardTitle>
                 <p className="text-xs text-muted-foreground">إجمالي المبيعات خلال آخر 6 أشهر</p>
@@ -580,9 +581,11 @@ export function DashboardScreen() {
                 </div>
               </CardContent>
             </Card>
+            </div>
 
             {/* Top 5 Selling Products */}
-            <Card className="rounded-2xl border-0 shadow-sm">
+            <div className="chart-container">
+            <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-foreground">أفضل المنتجات مبيعاً</CardTitle>
                 <p className="text-xs text-muted-foreground">أكثر 5 منتجات مبيعاً حسب الكمية</p>
@@ -641,6 +644,7 @@ export function DashboardScreen() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </div>
 
           <div className="section-divider my-2" />

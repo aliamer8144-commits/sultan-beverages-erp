@@ -558,7 +558,8 @@ export function DailyCloseScreen() {
       ) : data ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
           {/* Hourly Sales Bar Chart */}
-          <Card className="rounded-2xl border-0 shadow-sm">
+          <div className="chart-container">
+          <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
@@ -617,9 +618,11 @@ export function DailyCloseScreen() {
               </div>
             </CardContent>
           </Card>
+          </div>
 
           {/* Sales vs Purchases */}
-          <Card className="rounded-2xl border-0 shadow-sm">
+          <div className="chart-container">
+          <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
@@ -660,6 +663,7 @@ export function DailyCloseScreen() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       ) : null}
 

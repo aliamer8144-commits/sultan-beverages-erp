@@ -10,10 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/toast'
 import { toast } from 'sonner'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 
@@ -196,23 +195,54 @@ export function PurchasesScreen() {
     return () => clearTimeout(timer)
   }, [supplierSearch, supplierSort, fetchSuppliers])
 
+  // ==================== Supplier Rating Dialog State ====================
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false)
+  const [ratingSupplier, setRatingSupplier] = useState<Supplier | null>(null)
+  const [ratingValue, setRatingValue] = useState(0)
+  const [ratingReview, setRatingReview] = useState('')
+  const [ratingSubmitting, setRatingSubmitting] = useState(false)
+  const [ratingHover, setRatingHover] = useState(0)
+
   // ==================== Supplier Rating Handler ====================
-  const handleRateSupplier = async (supplierId: string, rating: number) => {
+  const openRatingDialog = (supplier: Supplier) => {
+    setRatingSupplier(supplier)
+    setRatingValue(0)
+    setRatingReview('')
+    setRatingHover(0)
+    setRatingDialogOpen(true)
+  }
+
+  const handleSubmitRating = async () => {
+    if (!ratingSupplier || ratingValue === 0) {
+      toast.error('يرجى اختيار تقييم')
+      return
+    }
+
+    setRatingSubmitting(true)
     try {
       const res = await fetch('/api/supplier-rating', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supplierId, rating }),
+        body: JSON.stringify({
+          supplierId: ratingSupplier.id,
+          rating: ratingValue,
+          review: ratingReview.trim() || undefined,
+          userName: user?.name || undefined,
+        }),
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(`تم تقييم المورد ${rating} نجوم`)
+        toast.success(`تم تقييم المورد ${ratingValue} نجوم`)
+        setRatingDialogOpen(false)
+        setRatingSupplier(null)
         fetchSuppliers(supplierSearch, supplierSort)
       } else {
         toast.error(data.error || 'فشل في تسجيل التقييم')
       }
     } catch {
       toast.error('حدث خطأ أثناء تسجيل التقييم')
+    } finally {
+      setRatingSubmitting(false)
     }
   }
 
@@ -650,38 +680,23 @@ export function PurchasesScreen() {
                               <div>
                                 <p className="font-medium text-sm">{supplier.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <div className="flex items-center gap-0.5 cursor-pointer hover:scale-105 transition-transform" title="انقر للتقييم">
-                                        <StarRating
-                                          rating={supplier.rating}
-                                          size="sm"
-                                        />
-                                        <ChevronDown className="w-3 h-3 text-muted-foreground/50" />
-                                      </div>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-3" dir="rtl" side="bottom" align="start">
-                                      <div className="space-y-2">
-                                        <p className="text-xs font-semibold text-foreground">تقييم المورد</p>
-                                        <StarRating
-                                          rating={supplier.rating}
-                                          size="md"
-                                          interactive
-                                          onRate={(val) => handleRateSupplier(supplier.id, val)}
-                                        />
-                                        {supplier.ratingCount > 0 && (
-                                          <p className="text-[10px] text-muted-foreground text-center">
-                                            ({supplier.ratingCount} تقييم) — المتوسط: {supplier.rating.toFixed(1)}
-                                          </p>
-                                        )}
-                                        {supplier.ratingCount === 0 && (
-                                          <p className="text-[10px] text-muted-foreground text-center">
-                                            لا توجد تقييمات بعد
-                                          </p>
-                                        )}
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRatingDialog(supplier)}
+                                    className="flex items-center gap-0.5 cursor-pointer hover:scale-105 transition-transform"
+                                    title="انقر للتقييم"
+                                  >
+                                    <StarRating
+                                      rating={supplier.rating}
+                                      size="sm"
+                                    />
+                                    <ChevronDown className="w-3 h-3 text-muted-foreground/50" />
+                                  </button>
+                                  {supplier.ratingCount > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      ({supplier.ratingCount})
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1376,6 +1391,106 @@ export function PurchasesScreen() {
               </ScrollArea>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================== Supplier Rating Dialog ==================== */}
+      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                <Star className="h-5 w-5 text-amber-500" />
+              </div>
+              تقييم المورد
+            </DialogTitle>
+          </DialogHeader>
+          {ratingSupplier && (
+            <div className="space-y-4 py-2">
+              {/* Supplier Info */}
+              <div className="glass-card rounded-xl p-3">
+                <p className="text-sm font-bold">{ratingSupplier.name}</p>
+                {ratingSupplier.ratingCount > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    المتوسط الحالي: {ratingSupplier.rating.toFixed(1)} ({ratingSupplier.ratingCount} تقييم)
+                  </p>
+                )}
+              </div>
+
+              {/* Star Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">اختر التقييم</Label>
+                <div className="flex items-center gap-1 justify-center py-2">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const filled = star <= (ratingHover || ratingValue)
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        className="cursor-pointer hover:scale-125 transition-transform p-1"
+                        onMouseEnter={() => setRatingHover(star)}
+                        onMouseLeave={() => setRatingHover(0)}
+                        onClick={() => setRatingValue(star)}
+                      >
+                        <Star
+                          className={`w-8 h-8 ${
+                            filled
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'fill-transparent text-muted-foreground/30'
+                          }`}
+                        />
+                      </button>
+                    )
+                  })}
+                </div>
+                {ratingValue > 0 && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    {ratingValue === 1 && 'سيئ'}
+                    {ratingValue === 2 && 'مقبول'}
+                    {ratingValue === 3 && 'جيد'}
+                    {ratingValue === 4 && 'جيد جداً'}
+                    {ratingValue === 5 && 'ممتاز'}
+                  </p>
+                )}
+              </div>
+
+              {/* Review Text */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  ملاحظات <span className="text-muted-foreground text-xs">(اختياري)</span>
+                </Label>
+                <Textarea
+                  placeholder="أضف تعليقاً على تقييمك..."
+                  value={ratingReview}
+                  onChange={(e) => setRatingReview(e.target.value)}
+                  className="rounded-xl min-h-[80px] resize-none"
+                  maxLength={200}
+                />
+                <p className="text-[10px] text-muted-foreground text-left" dir="ltr">
+                  {ratingReview.length}/200
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setRatingDialogOpen(false)}
+              disabled={ratingSubmitting}
+              className="rounded-lg"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleSubmitRating}
+              disabled={ratingSubmitting || ratingValue === 0}
+              className="gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {ratingSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              <Star className="w-4 h-4" />
+              إرسال التقييم
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

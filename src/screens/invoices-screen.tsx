@@ -977,10 +977,10 @@ export function InvoicesScreen() {
                     <p className="text-xs font-semibold text-muted-foreground mb-2">
                       عناصر الفاتورة
                     </p>
-                    <div className="rounded-lg overflow-hidden border border-border/50">
+                    <div className="rounded-lg overflow-hidden border border-border/50 receipt-preview">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-muted/70 hover:bg-muted/70">
+                          <TableRow className="hover:bg-transparent">
                             <TableHead className="text-xs font-semibold text-right py-2 px-3">
                               المنتج
                             </TableHead>

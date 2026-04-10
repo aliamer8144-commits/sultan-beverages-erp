@@ -30,6 +30,7 @@ import { SalesTargetsScreen } from '@/screens/sales-targets-screen'
 import { CustomerStatementScreen } from '@/screens/customer-statement-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { StockAlertsWidget } from '@/components/stock-alerts-widget'
+import { GlobalSearchDialog } from '@/components/global-search-dialog'
 import { toast } from 'sonner'
 import {
   ShoppingCart,
@@ -57,6 +58,7 @@ import {
   RotateCcw,
   Receipt,
   SlidersHorizontal,
+  Search,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -378,6 +380,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
 export function AppLayout() {
   const { currentScreen, sidebarOpen, setSidebarOpen, toggleSidebar } = useAppStore()
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const prevScreenRef = useRef<Screen>(currentScreen)
 
   // ── Screen navigation toast ───────────────────────────────────────
@@ -405,6 +408,16 @@ export function AppLayout() {
   // ── Keyboard shortcuts listener ───────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K or / → Global search dialog
+      if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && !e.ctrlKey && !e.metaKey)) {
+        const target = e.target as HTMLElement
+        // Don't trigger if user is typing in an input/textarea
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+        e.preventDefault()
+        e.stopPropagation()
+        setSearchOpen(true)
+      }
+
       // F1 → Shortcuts dialog
       if (e.key === 'F1') {
         e.preventDefault()
@@ -477,13 +490,24 @@ export function AppLayout() {
             </h1>
           </div>
 
-          {/* Right side items in RTL: clock → bell → theme → shortcut hint */}
+          {/* Right side items in RTL: clock → bell → theme → search hint → shortcut hint */}
           <div className="flex items-center gap-1.5">
             {/* Live Clock */}
             <LiveClock />
 
             {/* Stock Alert Notifications Widget */}
             <StockAlertsWidget />
+
+            {/* Global Search Button */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-1.5 p-2 rounded-xl hover:bg-muted transition-colors"
+              aria-label="البحث في المنتجات"
+            >
+              <kbd className="kbd hidden md:inline-flex">Ctrl+K</kbd>
+              <Search className="w-4 h-4 text-muted-foreground md:hidden" />
+              <span className="text-[10px] text-muted-foreground hidden md:inline">بحث</span>
+            </button>
 
             {/* Dark Mode Toggle */}
             <ThemeToggle />
@@ -509,6 +533,9 @@ export function AppLayout() {
 
       {/* Keyboard Shortcuts Dialog */}
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
+      {/* Global Search Dialog */}
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
 
       {/* Floating Quick Stats Panel */}
       <QuickStatsPanel />

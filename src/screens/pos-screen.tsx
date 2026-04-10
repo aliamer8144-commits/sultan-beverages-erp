@@ -907,10 +907,11 @@ export function POSScreen() {
         {/* ── Feature 1: Quick Actions Panel ── */}
         <div className="px-4 pb-2 flex-shrink-0">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <div className="action-btn-group flex-shrink-0">
             <Button
               variant="outline"
               size="sm"
-              className="flex-shrink-0 h-8 gap-1.5 text-xs font-medium rounded-lg bg-card border-border/60 hover:bg-primary/5 hover:border-primary/30 btn-ripple"
+              className="h-8 gap-1.5 text-xs font-medium rounded-none bg-card border-border/60 hover:bg-primary/5 hover:border-primary/30 btn-ripple"
               onClick={() => searchInputRef.current?.focus()}
             >
               <Search className="w-3.5 h-3.5" />
@@ -919,7 +920,7 @@ export function POSScreen() {
             <Button
               variant="outline"
               size="sm"
-              className="flex-shrink-0 h-8 gap-1.5 text-xs font-medium rounded-lg bg-card border-border/60 hover:bg-primary/5 hover:border-primary/30 btn-ripple"
+              className="h-8 gap-1.5 text-xs font-medium rounded-none bg-card border-border/60 hover:bg-primary/5 hover:border-primary/30 btn-ripple"
               onClick={() => barcodeInputRef.current?.focus()}
             >
               <ScanBarcode className="w-3.5 h-3.5" />
@@ -929,13 +930,14 @@ export function POSScreen() {
             <Button
               variant="outline"
               size="sm"
-              className="flex-shrink-0 h-8 gap-1.5 text-xs font-medium rounded-lg bg-card border-border/60 hover:bg-destructive/5 hover:border-destructive/30 hover:text-destructive btn-ripple"
+              className="h-8 gap-1.5 text-xs font-medium rounded-none bg-card border-border/60 hover:bg-destructive/5 hover:border-destructive/30 hover:text-destructive btn-ripple"
               onClick={handleClearCart}
               disabled={cart.length === 0}
             >
               <RotateCcw className="w-3.5 h-3.5" />
               إلغاء العملية
             </Button>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -1103,7 +1105,7 @@ export function POSScreen() {
                     <div
                       key={product.id}
                       onClick={() => !isOutOfStock && handleProductClick(product)}
-                      className={`product-card card-hover bg-card rounded-2xl border border-border/50 p-4 transition-all group relative select-none ${
+                      className={`product-card-premium product-card card-hover bg-card rounded-2xl border border-border/50 p-4 transition-all group relative select-none ${
                         isOutOfStock
                           ? 'opacity-50 cursor-not-allowed'
                           : 'cursor-pointer hover:border-primary/30'
@@ -1315,7 +1317,7 @@ export function POSScreen() {
                 {cart.map((item) => (
                   <div
                     key={item.productId}
-                    className="cart-item-enter pricing-row-hover flex items-center gap-3 p-3 rounded-xl bg-muted/30 transition-colors"
+                    className="cart-item-slide-in cart-item-enter pricing-row-hover flex items-center gap-3 p-3 rounded-xl bg-muted/30 transition-colors"
                   >
                     {/* Item thumbnail */}
                     {item.image ? (
