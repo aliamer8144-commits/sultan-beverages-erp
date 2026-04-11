@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,7 +43,14 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
-import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
+import {
+  dualFormat,
+  formatCurrency,
+  ComparisonTooltip,
+  SummaryCardSkeleton,
+  ChartSkeleton,
+  StatCard,
+} from '@/components/chart-utils'
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface TopProduct {
@@ -76,53 +83,6 @@ interface DailyCloseData {
   hourlyBreakdown: HourlyData[]
 }
 
-// ─── Animated number counter hook ──────────────────────────────────
-function useAnimatedNumber(target: number, duration = 1200) {
-  const [display, setDisplay] = useState(0)
-  const rafRef = useRef<number | null>(null)
-  const startTimeRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (target === 0) {
-      const id = requestAnimationFrame(() => setDisplay(0))
-      return () => cancelAnimationFrame(id)
-    }
-
-    startTimeRef.current = null
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp
-      const elapsed = timestamp - startTimeRef.current
-      const progress = Math.min(elapsed / duration, 1)
-
-      // easeOutExpo
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setDisplay(eased * target)
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(animate)
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [target, duration])
-
-  return display
-}
-
-// Format currency (delegates to centralized utility)
-const formatCurrency = formatWithSettings
-
-// Dual currency format helper (uses settings from store)
-function dualFormat(amount: number): { primary: string; secondary: string | null; display: string } {
-  const settings = useAppStore.getState().settings
-  return formatDualCurrency(amount, settings)
-}
-
 function getTodayArabic(): string {
   const now = new Date()
   try {
@@ -147,93 +107,6 @@ function HourlyTooltip({ active, payload, label }: { active?: boolean; payload?:
         {dualFormat(payload[0].value).display}
       </p>
     </div>
-  )
-}
-
-function ComparisonTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      {payload.map((item) => (
-        <p key={item.dataKey} className="text-sm font-bold text-foreground">
-          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {dualFormat(item.value).display}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-// ─── Stat Card with animated number ────────────────────────────────
-function StatCard({
-  label,
-  value,
-  suffix,
-  icon: Icon,
-  iconBg,
-  statClass,
-  isInteger = false,
-}: {
-  label: string
-  value: number
-  suffix: string
-  icon: typeof DollarSign
-  iconBg: string
-  statClass: string
-  isInteger?: boolean
-}) {
-  const animatedValue = useAnimatedNumber(value)
-  const dual = dualFormat(value)
-
-  return (
-    <Card className={`rounded-2xl border-0 shadow-sm card-hover data-card-micro ${statClass}`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-3xl font-bold text-foreground mt-1 tabular-nums number-lg tabular-nums-enhanced">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : dual.display}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
-          </div>
-          <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center`}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// ─── Skeletons ─────────────────────────────────────────────────────
-function SummaryCardSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-          <Skeleton className="w-12 h-12 rounded-2xl" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ChartSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <Skeleton className="h-5 w-36" />
-        <Skeleton className="h-3 w-48 mt-1" />
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <Skeleton className="h-[280px] w-full rounded-xl" />
-      </CardContent>
-    </Card>
   )
 }
 

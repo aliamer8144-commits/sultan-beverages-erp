@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { getRelativeTime } from '@/lib/date-utils'
 import { exportToCSV } from '@/lib/export-csv'
 import {
   ClipboardList,
@@ -115,25 +116,6 @@ function getActionIcon(action: string) {
     case 'restore': return RotateCcw
     default: return Info
   }
-}
-
-function getRelativeTime(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHour = Math.floor(diffMs / 3600000)
-  const diffDay = Math.floor(diffMs / 86400000)
-
-  if (diffMin < 1) return 'الآن'
-  if (diffMin < 60) return `منذ ${diffMin} دقيقة`
-  if (diffHour < 24) return `منذ ${diffHour} ساعة`
-  if (diffDay < 7) return `منذ ${diffDay} يوم`
-  return date.toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 // ── Component ──────────────────────────────────────────────────────

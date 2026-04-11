@@ -40,7 +40,16 @@ import {
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
 import { exportToCSV } from '@/lib/export-csv'
-import { formatWithSettings } from '@/lib/currency'
+import {
+  formatCurrency,
+  ChartTooltip,
+  PieTooltip,
+  CustomLegend,
+  SummaryCardSkeleton,
+  ChartSkeleton,
+  TableSkeleton,
+} from '@/components/chart-utils'
+import { formatDate } from '@/lib/date-utils'
 import {
   Receipt,
   Plus,
@@ -212,18 +221,6 @@ interface ExpenseSummary {
   averageDailyExpense: number
 }
 
-// Format currency (delegates to centralized utility)
-const formatCurrency = formatWithSettings
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
 function getCategoryDef(categoryValue: string): CategoryDef {
   return EXPENSE_CATEGORIES.find((c) => c.value === categoryValue) || EXPENSE_CATEGORIES[5]
 }
@@ -262,42 +259,7 @@ function getDateRange(range: string): { from: string; to: string } {
   return { from, to }
 }
 
-// ── Custom Chart Tooltips ──────────────────────────────────────────
-
-function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)}</p>
-    </div>
-  )
-}
-
-function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { name: string; value: number } }> }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
-    </div>
-  )
-}
-
-function CustomLegend({ payload }: { payload?: Array<{ value: string; color: string }> }) {
-  if (!payload) return null
-  return (
-    <div className="flex flex-wrap gap-3 justify-center mt-2">
-      {payload.map((entry, index) => (
-        <div key={index} className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
+// ── Chart tooltips & legends imported from @/components/chart-utils ──
 
 // ── Category Icon Component ────────────────────────────────────────
 
@@ -312,55 +274,7 @@ function CategoryIcon({ category, size = 'sm' }: { category: string; size?: 'sm'
   return <Icon className={`${sizeClasses[size]} ${cat.color}`} />
 }
 
-// ── Loading Skeletons ──────────────────────────────────────────────
-
-function SummaryCardSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="skeleton-shimmer h-4 w-24 rounded" />
-            <div className="skeleton-shimmer h-8 w-28 rounded" />
-            <div className="skeleton-shimmer h-3 w-16 rounded" />
-          </div>
-          <div className="skeleton-shimmer w-11 h-11 rounded-2xl" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ChartSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="skeleton-shimmer h-5 w-36 rounded" />
-        <div className="skeleton-shimmer h-3 w-48 rounded mt-1" />
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <div className="skeleton-shimmer h-[280px] w-full rounded-xl" />
-      </CardContent>
-    </Card>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="skeleton-shimmer h-5 w-36 rounded" />
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="skeleton-shimmer h-12 w-full rounded-lg" />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+// ── Skeleton components imported from @/components/chart-utils ──────
 
 function CategoryCardSkeleton() {
   return (
@@ -879,7 +793,7 @@ export function ExpenseScreen() {
                         tickLine={false}
                         tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val)}
                       />
-                      <Tooltip content={<AreaTooltip />} />
+                      <Tooltip content={<ChartTooltip />} />
                       <Area
                         type="monotone"
                         dataKey="total"

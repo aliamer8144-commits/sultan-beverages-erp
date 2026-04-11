@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner'
 import { Search, FileText, Printer, ChevronDown, ChevronUp, Calendar, Eye, Loader2, Filter, X, Download, RotateCcw } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
+import { formatDate, formatShortDate, formatTime } from '@/lib/date-utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,29 +58,6 @@ interface Invoice {
 // formatCurrency is provided by useCurrency hook (client component)
 // formatWithSettings is used in print templates (non-react context)
 const printFormatCurrency = formatWithSettings
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('ar-SA', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // ── Component ──────────────────────────────────────────────────────────────
 

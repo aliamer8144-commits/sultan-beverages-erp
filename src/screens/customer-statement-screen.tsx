@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useCurrency } from '@/hooks/use-currency'
 import { exportToCSV } from '@/lib/export-csv'
+import { formatDateShortMonth, formatDateTime } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -71,33 +72,6 @@ interface StatementData {
     totalPurchasesAllTime: number
   }
   transactions: Transaction[]
-}
-
-// ─── Format date to Arabic ────────────────────────────────────────────
-function formatDateArabic(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  } catch {
-    return iso
-  }
-}
-
-function formatDateTimeArabic(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso
-  }
 }
 
 // ─── Type badge component ────────────────────────────────────────────
@@ -255,7 +229,7 @@ export function CustomerStatementScreen() {
     }
 
     const rows = statement.transactions.map((t) => ({
-      'التاريخ': formatDateTimeArabic(t.date),
+      'التاريخ': formatDateTime(t.date),
       'النوع': t.type === 'invoice' ? 'فاتورة' : t.type === 'payment' ? 'دفعة' : 'مرتجع',
       'المرجع': t.reference,
       'مدين': t.debit.toLocaleString(),
@@ -537,7 +511,7 @@ export function CustomerStatementScreen() {
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/60 text-xs text-muted-foreground">
               <CalendarDays className="w-3.5 h-3.5" />
-              <span>الفترة: {formatDateArabic(statement.period.startDate)} — {formatDateArabic(statement.period.endDate)}</span>
+              <span>الفترة: {formatDateShortMonth(statement.period.startDate)} — {formatDateShortMonth(statement.period.endDate)}</span>
             </div>
           </div>
 
@@ -555,7 +529,7 @@ export function CustomerStatementScreen() {
                 {statement.customer.phone && (
                   <span><strong>الهاتف:</strong> {statement.customer.phone}</span>
                 )}
-                <span><strong>الفترة:</strong> {formatDateArabic(statement.period.startDate)} — {formatDateArabic(statement.period.endDate)}</span>
+                <span><strong>الفترة:</strong> {formatDateShortMonth(statement.period.startDate)} — {formatDateShortMonth(statement.period.endDate)}</span>
               </div>
 
               <div className="summary-grid">
@@ -592,7 +566,7 @@ export function CustomerStatementScreen() {
                 <tbody>
                   {statement.transactions.map((t, idx) => (
                     <tr key={idx}>
-                      <td className="text-right">{formatDateTimeArabic(t.date)}</td>
+                      <td className="text-right">{formatDateTime(t.date)}</td>
                       <td className="text-right">{t.type === 'invoice' ? 'فاتورة' : t.type === 'payment' ? 'دفعة' : 'مرتجع'}</td>
                       <td className="text-right">{t.reference}</td>
                       <td className="text-right">{t.details}</td>
@@ -647,7 +621,7 @@ export function CustomerStatementScreen() {
                     {statement.transactions.map((t, idx) => (
                       <tr key={idx} className="group">
                         <td className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDateTimeArabic(t.date)}
+                          {formatDateTime(t.date)}
                         </td>
                         <td className="py-2.5 px-4">
                           <TypeBadge type={t.type} />

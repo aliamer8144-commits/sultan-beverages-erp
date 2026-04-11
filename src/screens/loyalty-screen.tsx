@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { formatDate, formatTime } from '@/lib/date-utils'
 import { useTranslation } from '@/lib/translations'
 import {
   Gift,
@@ -111,21 +112,6 @@ function getTransactionColor(type: string) {
     case 'adjusted': return { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/20' }
     default: return { bg: 'bg-muted/30', text: 'text-muted-foreground', border: 'border-border' }
   }
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('ar-SA', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 // ── Loading Skeleton ──────────────────────────────────────────────

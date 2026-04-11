@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -10,11 +10,24 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { DollarSign, TrendingUp, FileText, AlertTriangle, RefreshCw, Download, Target, Clock, Flame } from 'lucide-react'
 import { ExchangeRateWidget } from '@/components/exchange-rate-widget'
 import { exportToCSV } from '@/lib/export-csv'
-import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
-import { useAppStore } from '@/store/app-store'
-
-// Chart color palette matching the theme
-const CHART_COLORS = ['#3b5bdb', '#364fc7', '#5c7cfa', '#e03131', '#c92a2a', '#0ca678', '#f08c00', '#9c36b5', '#1c7ed6', '#e8590c']
+import {
+  formatCurrency,
+  ChartTooltip,
+  PieTooltip,
+  CustomLegend,
+  SummaryCardSkeleton,
+  ChartSkeleton,
+  StatCard,
+  CHART_COLORS,
+} from '@/components/chart-utils'
+import { formatDate } from '@/lib/date-utils'
+import {
+  getMotivationalMessage,
+  getProgressColor,
+  getProgressRingColor,
+  getProgressBgColor,
+  getTargetTypeLabel,
+} from '@/lib/progress-utils'
 
 // Type for dashboard data
 interface TopProduct {
@@ -65,79 +78,6 @@ interface DashboardData {
   salesByCategory: CategorySale[]
 }
 
-// Animated number counter hook
-function useAnimatedNumber(target: number, duration = 1200) {
-  const [display, setDisplay] = useState(0)
-  const rafRef = useRef<number | null>(null)
-  const startTimeRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (target === 0) {
-      const id = requestAnimationFrame(() => setDisplay(0))
-      return () => cancelAnimationFrame(id)
-    }
-
-    startTimeRef.current = null
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp
-      const elapsed = timestamp - startTimeRef.current
-      const progress = Math.min(elapsed / duration, 1)
-
-      // easeOutExpo
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-      setDisplay(eased * target)
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(animate)
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [target, duration])
-
-  return display
-}
-
-// Format date to Arabic locale
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-// Format currency (delegates to centralized utility)
-const formatCurrency = formatWithSettings
-
-// Dual currency format helper (uses settings from store)
-function dualFormat(amount: number): { primary: string; secondary: string | null; display: string } {
-  const settings = useAppStore.getState().settings
-  return formatDualCurrency(amount, settings)
-}
-
-// Custom tooltip for bar charts
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload?: { name?: string } }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  const dual = dualFormat(payload[0].value)
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">
-        {dual.display}
-      </p>
-    </div>
-  )
-}
-
 function TopProductTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload?: { name?: string } }> }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
@@ -149,138 +89,6 @@ function TopProductTooltip({ active, payload }: { active?: boolean; payload?: Ar
       </p>
     </div>
   )
-}
-
-// Pie chart tooltip
-function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { name: string; value: number } }> }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  const dual = dualFormat(item.value)
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
-      <p className="text-sm font-bold text-foreground">
-        {dual.display}
-      </p>
-    </div>
-  )
-}
-
-// Custom legend renderer
-function CustomLegend({ payload }: { payload?: Array<{ value: string; color: string }> }) {
-  if (!payload) return null
-  return (
-    <div className="flex flex-wrap gap-3 justify-center mt-2">
-      {payload.map((entry, index) => (
-        <div key={index} className="flex items-center gap-1.5">
-          <span
-            className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Loading skeleton for summary cards
-function SummaryCardSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm skeleton-card">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="skeleton-shimmer h-4 w-24 rounded" />
-            <div className="skeleton-shimmer h-9 w-28 rounded" />
-            <div className="skeleton-shimmer h-3 w-16 rounded" />
-          </div>
-          <div className="skeleton-shimmer w-12 h-12 rounded-2xl" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Loading skeleton for chart
-function ChartSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm skeleton-card">
-      <CardHeader className="pb-2">
-        <div className="skeleton-shimmer h-5 w-36 rounded" />
-        <div className="skeleton-shimmer h-3 w-48 rounded mt-1" />
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <div className="skeleton-shimmer h-[280px] w-full rounded-xl" />
-      </CardContent>
-    </Card>
-  )
-}
-
-// Stat card with animated number
-function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteger = false }: {
-  label: string
-  value: number
-  suffix: string
-  icon: typeof DollarSign
-  iconBg: string
-  statClass: string
-  isInteger?: boolean
-}) {
-  const animatedValue = useAnimatedNumber(value)
-  const dual = dualFormat(value)
-
-  return (
-    <Card className={`rounded-2xl border-0 shadow-sm card-elevated stat-card-gradient data-card-micro stat-card-v2 ${statClass}`}>
-      <CardContent className="p-6 relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-              {isInteger ? Math.round(animatedValue).toLocaleString('ar-SA') : dual.display}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{suffix}</p>
-          </div>
-          <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center`}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// ─── Motivational Arabic message based on progress ─────────────────
-function getMotivationalMessage(percent: number): string {
-  if (percent >= 100) return '🎉 أحسنت! لقد حققت الهدف! استمر في العطاء'
-  if (percent >= 80) return '🔥 قريب جداً! استمر بنفس الحماس'
-  if (percent >= 60) return '💪 أداء رائع! أنت على الطريق الصحيح'
-  if (percent >= 40) return '📈 تقدم جيد! كل فاتورة تقربك من الهدف'
-  if (percent >= 20) return '🚀 البداية كانت ممتازة! واصل البيع'
-  return '🎯 بداية جديدة! كل مبيعاتك تُحسب'
-}
-
-function getProgressColor(percent: number): string {
-  if (percent >= 80) return 'bg-emerald-500'
-  if (percent >= 50) return 'bg-amber-500'
-  return 'bg-red-500'
-}
-
-function getProgressRingColor(percent: number): string {
-  if (percent >= 80) return 'stroke-emerald-500'
-  if (percent >= 50) return 'stroke-amber-500'
-  return 'stroke-red-500'
-}
-
-function getProgressBgColor(percent: number): string {
-  if (percent >= 80) return 'bg-emerald-500/10 text-emerald-700'
-  if (percent >= 50) return 'bg-amber-500/10 text-amber-700'
-  return 'bg-red-500/10 text-red-700'
-}
-
-function getTypeLabel(type: string): string {
-  const labels: Record<string, string> = { daily: 'اليومي', weekly: 'الأسبوعي', monthly: 'الشهري' }
-  return labels[type] || type
 }
 
 // ─── Sales Target Widget ─────────────────────────────────────────
@@ -354,7 +162,7 @@ function SalesTargetWidget() {
             <div className="flex items-center justify-center sm:justify-start gap-2">
               <Target className="w-5 h-5 text-primary" />
               <h3 className="text-base font-bold text-foreground">
-                هدف المبيعات {getTypeLabel(target.type)}
+                هدف المبيعات {getTargetTypeLabel(target.type)}
               </h3>
               {isComplete && (
                 <span className="status-badge-modern badge-success size-sm">
@@ -367,17 +175,17 @@ function SalesTargetWidget() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">الهدف</p>
-                <p className="text-sm font-bold text-foreground tabular-nums">{formatWithSettings(target.targetAmount)}</p>
+                <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(target.targetAmount)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">الحالي</p>
-                <p className={`text-sm font-bold tabular-nums ${isComplete ? 'text-emerald-600' : getProgressBgColor(percent).split(' ')[1]}`}>                  {formatWithSettings(target.currentAmount)}
+                <p className={`text-sm font-bold tabular-nums ${isComplete ? 'text-emerald-600' : getProgressBgColor(percent).split(' ')[1]}`}>                  {formatCurrency(target.currentAmount)}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">المتبقي</p>
                 <p className="text-sm font-bold text-foreground tabular-nums">
-                  {isComplete ? '0.00' : formatWithSettings(target.remainingAmount)}
+                  {isComplete ? '0.00' : formatCurrency(target.remainingAmount)}
                 </p>
               </div>
               <div className="text-center">
@@ -790,7 +598,7 @@ export function DashboardScreen() {
                             </TableCell>
                             <TableCell className="py-3 px-4 text-left">
                               <span className="text-sm font-bold text-foreground">
-                                {formatWithSettings(sale.total)}
+                                {formatCurrency(sale.total)}
                               </span>
                             </TableCell>
                             <TableCell className="py-3 px-4">

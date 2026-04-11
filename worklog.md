@@ -379,3 +379,105 @@ Stage Summary:
 - ConfirmDialog replaces window.confirm() with accessible AlertDialog
 - EmptyState/LoadingState/Pagination provide consistent UI across screens
 - All hooks are 'use client' and use existing dependencies (zustand, sonner, lucide, shadcn)
+
+## Task 6d-expense — Refactor expense-screen to use shared utilities
+
+**Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+**Summary**: Replaced 6 duplicated local components and 2 helper functions in `src/screens/expense-screen.tsx` with shared imports from `@/components/chart-utils` and `@/lib/date-utils`.
+
+**Changes**:
+- **Removed imports**: `import { formatWithSettings } from '@/lib/currency'`
+- **Added imports**: `formatCurrency`, `ChartTooltip`, `PieTooltip`, `CustomLegend`, `SummaryCardSkeleton`, `ChartSkeleton`, `TableSkeleton` from `@/components/chart-utils`; `formatDate` from `@/lib/date-utils`
+- **Removed local components**: `AreaTooltip`, `PieTooltip`, `CustomLegend`, `SummaryCardSkeleton`, `ChartSkeleton`, `TableSkeleton`
+- **Removed local helpers**: `const formatCurrency = formatWithSettings`, `formatDate()` function
+- **Updated JSX**: `<AreaTooltip />` → `<ChartTooltip />` in AreaChart Tooltip
+- **Kept local**: `CategoryDef`, `EXPENSE_CATEGORIES`, `DATE_RANGE_OPTIONS`, `RECURRING_PERIODS`, `CategoryIcon`, `CategoryProgressBar`, `CategoryCardSkeleton`, all types, all helper functions (`getCategoryDef`, `getPeriodLabel`, `getDateRange`), and the main `ExpenseScreen` component
+
+**TypeScript check**: ✅ Passed (`npx tsc --noEmit` — no errors)
+## Task 6d-daily: Refactor daily-close-screen.tsx to use shared chart-utils
+
+**File**: `src/screens/daily-close-screen.tsx`
+
+**Changes**:
+- Added import block from `@/components/chart-utils` for: `dualFormat`, `formatCurrency`, `ComparisonTooltip`, `SummaryCardSkeleton`, `ChartSkeleton`, `StatCard`
+- Removed old import: `import { formatWithSettings, formatDualCurrency } from @/lib/currency`
+- Removed unused `useRef` from React imports
+- Removed local `useAnimatedNumber` hook (now from chart-utils)
+- Removed local `formatCurrency = formatWithSettings` alias (now from chart-utils)
+- Removed local `dualFormat` function (now from chart-utils)
+- Removed local `ComparisonTooltip` component (now from chart-utils)
+- Removed local `StatCard` component (now from chart-utils)
+- Removed local `SummaryCardSkeleton` component (now from chart-utils)
+- Removed local `ChartSkeleton` component (now from chart-utils)
+- Kept local: `getTodayArabic()`, `HourlyTooltip`, `generatePrintContent()`, `handlePrint()`
+- Kept `useAppStore` import (still used by `generatePrintContent`)
+- **TypeScript check**: passed with zero errors
+- **Net reduction**: ~130 lines of duplicated code removed
+
+---
+Task ID: 6e
+Agent: Main Agent
+Task: Refactor 5 screen files to use shared utility imports (date-utils, chart-utils)
+
+Work Log:
+- Edited src/screens/returns-screen.tsx — removed local formatCurrency, formatDate, formatShortDate; added imports from @/components/chart-utils and @/lib/date-utils; kept getStatusBadge, all types, all component logic
+- Edited src/screens/invoices-screen.tsx — removed local formatDate, formatShortDate, formatTime; added import from @/lib/date-utils; kept InvoiceItem/Invoice types, printFormatCurrency alias, all print/component logic
+- Edited src/screens/loyalty-screen.tsx — removed local formatDate, formatTime; added import from @/lib/date-utils; kept all types, getRankBadge, getTransactionColor, all skeleton components, all component logic
+- Edited src/screens/audit-log-screen.tsx — removed local getRelativeTime; added import from @/lib/date-utils; kept all types, constants, getActionIcon, all component logic
+- Edited src/screens/customer-statement-screen.tsx — removed local formatDateArabic, formatDateTimeArabic; added formatDateShortMonth, formatDateTime imports from @/lib/date-utils; updated all JSX references (formatDateArabic→formatDateShortMonth, formatDateTimeArabic→formatDateTime); kept all types, TypeBadge, all component logic
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+
+Stage Summary:
+- 5 screen files refactored to use shared date/currency formatting utilities
+- No breaking changes — all local types, components, and logic preserved
+- Reduced code duplication across the project
+
+
+---
+
+## Task 6d-dash: Refactor dashboard-screen.tsx to use shared utilities
+
+**File**: `src/screens/dashboard-screen.tsx`
+
+### Changes Summary
+
+**Removed local definitions (~217 lines)**, replacing with shared imports:
+- `useAnimatedNumber` hook → `@/components/chart-utils`
+- `formatDate` function → `@/lib/date-utils`
+- `formatCurrency` alias (`formatWithSettings`) → `@/components/chart-utils`
+- `dualFormat` function → `@/components/chart-utils`
+- `ChartTooltip` component → `@/components/chart-utils`
+- `PieTooltip` component → `@/components/chart-utils`
+- `CustomLegend` component → `@/components/chart-utils`
+- `SummaryCardSkeleton` component → `@/components/chart-utils`
+- `ChartSkeleton` component → `@/components/chart-utils`
+- `StatCard` component → `@/components/chart-utils`
+- `CHART_COLORS` constant → `@/components/chart-utils`
+- `getMotivationalMessage` → `@/lib/progress-utils`
+- `getProgressColor` → `@/lib/progress-utils`
+- `getProgressRingColor` → `@/lib/progress-utils`
+- `getProgressBgColor` → `@/lib/progress-utils`
+- `getTypeLabel` → `@/lib/progress-utils` (as `getTargetTypeLabel`)
+
+**Kept locally**:
+- `TopProductTooltip` (dashboard-specific, uses "وحدة")
+
+**Removed old imports**:
+- `import { formatWithSettings, formatDualCurrency } from '@/lib/currency'`
+- `import { useAppStore } from '@/store/app-store'`
+- `useRef` from React (no longer needed)
+
+**Added new imports**:
+- `formatCurrency, ChartTooltip, PieTooltip, CustomLegend, SummaryCardSkeleton, ChartSkeleton, StatCard, CHART_COLORS` from `@/components/chart-utils`
+- `formatDate` from `@/lib/date-utils`
+- `getMotivationalMessage, getProgressColor, getProgressRingColor, getProgressBgColor, getTargetTypeLabel` from `@/lib/progress-utils`
+
+**Reference updates**:
+- `getTypeLabel(target.type)` → `getTargetTypeLabel(target.type)` (line 167)
+- `formatWithSettings(...)` → `formatCurrency(...)` (4 occurrences)
+
+**Result**: File reduced from 821 lines to ~629 lines (~192 lines removed). TypeScript check passes with 0 errors.
+
