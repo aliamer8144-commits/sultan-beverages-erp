@@ -1799,7 +1799,7 @@ export function InventoryScreen() {
                     <span className="font-semibold tabular-nums">{adjustProduct.quantity}</span>
                     <ArrowLeft className="w-3 h-3 text-muted-foreground" />
                     <span className="font-bold tabular-nums text-primary">
-                      {adjustForm.type === 'addition' || adjustForm.type === 'return'
+                      {adjustForm.type === 'addition'
                         ? adjustProduct.quantity + Number(adjustForm.quantity)
                         : adjustForm.type === 'subtraction'
                           ? Math.max(0, adjustProduct.quantity - Number(adjustForm.quantity))
@@ -2840,7 +2840,7 @@ export function InventoryScreen() {
             <AlertDialogCancel className="rounded-lg">إلغاء</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCatDelete}
-              disabled={deletingCat && (deletingCat._count?.products ?? 0) > 0}
+              disabled={!!deletingCat && (deletingCat._count?.products ?? 0) > 0}
               className="bg-destructive text-white hover:bg-destructive/90 rounded-lg gap-2"
             >
               <Trash2 className="w-4 h-4" />

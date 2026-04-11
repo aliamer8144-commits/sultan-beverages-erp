@@ -37,6 +37,7 @@ interface Product {
   price: number
   costPrice: number
   quantity: number
+  minQuantity: number
   category: { id: string; name: string }
   barcode?: string
   _count?: { variants: number }

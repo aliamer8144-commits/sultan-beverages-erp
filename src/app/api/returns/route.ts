@@ -27,11 +27,11 @@ export async function GET(request: NextRequest) {
     if (dateFrom || dateTo) {
       where.createdAt = {}
       if (dateFrom) {
-        (where.createdAt as Record<string, unknown>).gte = new Date(dateFrom)
+        ;(where.createdAt as Record<string, unknown>).gte = new Date(dateFrom)
       }
       if (dateTo) {
-        const endDate = new Date(dateTo + 'T23:59:59.999Z')
-        (where.createdAt as Record<string, unknown>).lte = endDate
+        const endDt = new Date(dateTo + 'T23:59:59.999Z')
+        ;(where.createdAt as Record<string, unknown>).lte = endDt
       }
     }
 

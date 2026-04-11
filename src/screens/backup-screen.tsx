@@ -311,8 +311,7 @@ export function BackupScreen() {
             </CardContent>
           </Card>
 
-          {/* Last Backup Info */}
-          {lastBackupInfo != null && (
+          {lastBackupInfo !== null ? (
             <Card className="rounded-2xl border-0 shadow-sm card-hover glass-card">
               <CardHeader className="pb-4">
                 <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
@@ -350,10 +349,10 @@ export function BackupScreen() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           {/* Current Backup Summary (if just created) */}
-          {backupData && backupData.summary && (
+          {backupData && (backupData.summary as BackupSummary) ? (
             <Card className="rounded-2xl border-0 shadow-sm card-hover glass-card">
               <CardHeader className="pb-4">
                 <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
@@ -375,7 +374,7 @@ export function BackupScreen() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </TabsContent>
 
         {/* ── Restore Tab ── */}

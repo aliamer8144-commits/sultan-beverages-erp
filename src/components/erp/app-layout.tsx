@@ -222,7 +222,8 @@ function LanguageToggle() {
 // ─── Live Clock Component ──────────────────────────────────────────
 function LiveClock() {
   const [dateTime, setDateTime] = useState('')
-  const { locale } = useTranslation()
+  const { lang } = useTranslation()
+  const locale = lang === 'ar' ? 'ar-SA' : 'en-US'
 
   useEffect(() => {
     const updateClock = () => {
@@ -294,7 +295,7 @@ function ShortcutsDialog({
               className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
             >
               <span className="text-sm font-medium text-foreground">
-                {t(`shortcuts.${shortcut.descriptionKey}` as keyof ReturnType<typeof t>)}
+                {t(`shortcuts.${shortcut.descriptionKey}`)}
               </span>
               <div className="flex items-center gap-1.5">
                 {shortcut.keys.map((key) => (
@@ -395,7 +396,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 } ${collapsed ? 'justify-center' : ''}`}
               >
                 <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-white' : 'text-foreground/50 group-hover:text-primary'}`} />
-                {!collapsed && <span>{t(navKeyMap[item.id] as keyof ReturnType<typeof t>)}</span>}
+                {!collapsed && <span>{t(navKeyMap[item.id])}</span>}
                 {isActive && !collapsed && (
                   (isRTL ? <ChevronLeft className="w-3.5 h-3.5 mr-auto text-white/70" /> : <ChevronRight className="w-3.5 h-3.5 ml-auto text-white/70" />)
                 )}
@@ -407,7 +408,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>{button}</TooltipTrigger>
                   <TooltipContent side={isRTL ? 'right' : 'left'} className="font-medium">
-                    {t(navKeyMap[item.id] as keyof ReturnType<typeof t>)}
+                    {t(navKeyMap[item.id])}
                   </TooltipContent>
                 </Tooltip>
               )
@@ -493,7 +494,7 @@ export function AppLayout() {
   // ── Screen navigation toast ───────────────────────────────────────
   useEffect(() => {
     if (prevScreenRef.current !== currentScreen) {
-      const label = t(navKeyMap[currentScreen] as keyof ReturnType<typeof t>)
+      const label = t(navKeyMap[currentScreen])
       if (label) {
         toast(label, {
           description: `${t('toast.navigatedTo')} ${label}`,
@@ -597,7 +598,7 @@ export function AppLayout() {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold text-foreground truncate">
-              {t(navKeyMap[currentScreen] as keyof ReturnType<typeof t>)}
+              {t(navKeyMap[currentScreen])}
             </h1>
           </div>
 

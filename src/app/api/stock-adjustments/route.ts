@@ -92,14 +92,12 @@ export async function GET(request: NextRequest) {
     ])
 
     // More accurate: count where newQty > previousQty (increase) and where newQty < previousQty (decrease)
-    const [increaseAgg, decreaseAgg] = await Promise.all([
-      db.stockAdjustment.groupBy({
-        by: ['type'],
-        where: { ...todayWhere },
-        _count: true,
-        _sum: { quantity: true },
-      }),
-    ])
+    const increaseAgg = await db.stockAdjustment.groupBy({
+      by: ['type'],
+      where: { ...todayWhere },
+      _count: true,
+      _sum: { quantity: true },
+    })
 
     let totalIncrease = 0
     let totalDecrease = 0

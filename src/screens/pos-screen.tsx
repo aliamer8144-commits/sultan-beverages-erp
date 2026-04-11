@@ -1871,7 +1871,7 @@ export function POSScreen() {
                 const minPts = loyaltySettings.loyaltyMinPointsToRedeem || 100
                 const quarterPts = Math.floor(customerPoints / 4)
                 const halfPts = Math.floor(customerPoints / 2)
-                const buttons = []
+                const buttons: Array<{ label: string; value: number }> = []
                 if (quarterPts >= minPts) buttons.push({ label: `١/٤ (${quarterPts})`, value: quarterPts })
                 if (halfPts >= minPts) buttons.push({ label: `نصف (${halfPts})`, value: halfPts })
                 buttons.push({ label: `الكل (${customerPoints})`, value: customerPoints })

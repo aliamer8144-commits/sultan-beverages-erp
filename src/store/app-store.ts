@@ -190,7 +190,7 @@ interface AppState {
 
   // Held Orders
   heldOrders: HeldOrder[]
-  holdCurrentOrder: (note?: string) => string
+  holdCurrentOrder: (note?: string, customerName?: string | null) => string
   recallOrder: (orderId: string) => void
   deleteHeldOrder: (orderId: string) => void
 

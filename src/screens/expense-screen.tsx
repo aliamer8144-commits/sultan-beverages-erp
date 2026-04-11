@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, type LucideIcon } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'

@@ -3607,3 +3607,40 @@ auth, products, categories, customers, suppliers, invoices, users, dashboard, da
 - State management could benefit from TanStack Query for server state caching
 - Some API calls lack error boundary protection
 - Toast notifications for screen navigation could be debounced
+
+---
+Task ID: TS-FIX
+Agent: Main Agent
+Task: Fix all TypeScript errors - remove ignoreBuildErrors, fix 25 errors across 11 files
+
+Work Log:
+- Removed `ignoreBuildErrors: true` from next.config.ts (user explicitly requested not to use it)
+- Ran `npx tsc --noEmit` and found 25 TypeScript errors across 11 files
+- Fixed all errors systematically:
+
+1. **next.config.ts** — Removed `ignoreBuildErrors: true`
+2. **src/screens/purchases-screen.tsx** — Changed wrong import: `Tooltip*` from `@/components/ui/toast` → `@/components/ui/tooltip`
+3. **src/screens/expense-screen.tsx** — Changed `LucideIcon` import from `'react'` → `'lucide-react'`
+4. **src/app/api/stock-adjustments/route.ts:95** — Fixed tuple destructuring: `const [increaseAgg, decreaseAgg] = await Promise.all([...])` → `const increaseAgg = await db.stockAdjustment.groupBy(...)`
+5. **src/components/erp/app-layout.tsx** — Fixed 6 errors:
+   - Line 225: `locale` doesn't exist on `useTranslation()` return → added `const locale = lang === 'ar' ? 'ar-SA' : 'en-US'`
+   - Lines 297,398,410,496,600: Removed incorrect `as keyof ReturnType<typeof t>` type casts from `t()` calls
+6. **src/screens/inventory-screen.tsx** — Fixed 2 errors:
+   - Line 1802: Removed `'return'` from type comparison (not in `'addition' | 'subtraction' | 'correction'` union)
+   - Line 2843: `disabled={deletingCat && ...}` → `disabled={!!deletingCat && ...}` (boolean | null → boolean)
+7. **src/screens/pos-screen.tsx** — Fixed 2 errors:
+   - Line 645: `holdCurrentOrder(note, customerName)` passed 2 args but interface only allowed 1 → updated interface in store
+   - Line 1875: `const buttons = []` typed as `never[]` → added explicit type `Array<{ label: string; value: number }>`
+8. **src/screens/product-variants-screen.tsx:521** — `minQuantity` not in local Product interface → added `minQuantity: number` field
+9. **src/screens/backup-screen.tsx:314** — `unknown` not assignable to ReactNode:
+   - `backupData.summary` was `unknown` (from `Record<string, unknown>`) → cast to `BackupSummary`
+   - Changed `&&` to ternary `? ( ... ) : null` for proper type narrowing
+10. **src/app/api/returns/route.ts:33** — `Date` constructor shadowing → renamed variable `endDate` to `endDt`
+
+Stage Summary:
+- **TypeScript: 0 errors** ✅
+- **ESLint: 0 errors** ✅
+- **Production Build: SUCCESS** (`next build` compiled successfully in 6.9s) ✅
+- **34 routes built**: 1 static (/), 1 not-found, 32 dynamic API routes
+- All fixes are minimal and surgical — no feature changes, no style modifications
+- Project is ready for Vercel deployment
