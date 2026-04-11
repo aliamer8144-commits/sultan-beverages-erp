@@ -430,6 +430,26 @@ export function DashboardScreen() {
     }
   }
 
+  // Scroll reveal observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('--visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.1 }
+    )
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el))
+    }, 100)
+    return () => { clearTimeout(timer); observer.disconnect() }
+  }, [])
+
   useEffect(() => {
     fetchDashboard()
   }, [])
@@ -650,8 +670,8 @@ export function DashboardScreen() {
           <div className="section-divider my-2" />
 
           {/* Pie Chart - Sales by Category */}
-          <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-            <Card className="rounded-2xl border-0 shadow-sm">
+          <div className="scroll-reveal animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+            <Card className="rounded-2xl border-0 shadow-sm content-card">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div>
@@ -721,8 +741,8 @@ export function DashboardScreen() {
           </CardContent>
         </Card>
       ) : data ? (
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-          <Card className="rounded-2xl border-0 shadow-sm">
+        <div className="scroll-reveal animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+          <Card className="rounded-2xl border-0 shadow-sm content-card">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>

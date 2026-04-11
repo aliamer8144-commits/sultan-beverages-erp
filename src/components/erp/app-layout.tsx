@@ -28,6 +28,7 @@ import { ExpenseScreen } from '@/screens/expense-screen'
 import { StockAdjustmentsScreen } from '@/screens/stock-adjustments-screen'
 import { SalesTargetsScreen } from '@/screens/sales-targets-screen'
 import { CustomerStatementScreen } from '@/screens/customer-statement-screen'
+import { LoyaltyScreen } from '@/screens/loyalty-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { StockAlertsWidget } from '@/components/stock-alerts-widget'
 import { GlobalSearchDialog } from '@/components/global-search-dialog'
@@ -60,6 +61,7 @@ import {
   SlidersHorizontal,
   Search,
   Languages,
+  Gift,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/translations'
 import { useTheme } from 'next-themes'
@@ -90,6 +92,7 @@ const screenLabels: Record<Screen, string> = {
   expenses: 'المصروفات',
   'sales-targets': 'أهداف المبيعات',
   'customer-statement': 'كشف حساب عميل',
+  loyalty: 'برنامج النقاط',
 }
 
 // ─── Keyboard Shortcuts Definition (uses translation keys) ──────
@@ -108,6 +111,7 @@ const navItems: { id: Screen; label: string; icon: React.ElementType; adminOnly?
   { id: 'stock-adjustments', label: 'تعديلات المخزون', icon: SlidersHorizontal, adminOnly: true },
   { id: 'purchases', label: 'المشتريات', icon: Truck, adminOnly: true },
   { id: 'customers', label: 'العملاء', icon: Users },
+  { id: 'loyalty', label: 'برنامج النقاط', icon: Gift },
   { id: 'invoices', label: 'الفواتير', icon: FileText },
   { id: 'returns', label: 'المرتجعات', icon: RotateCcw, adminOnly: true },
   { id: 'dashboard', label: 'التقارير', icon: BarChart3, adminOnly: true },
@@ -328,6 +332,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
     expenses: 'nav.expenses',
     'sales-targets': 'nav.sales-targets',
     'customer-statement': 'nav.customer-statement',
+    loyalty: 'nav.loyalty',
   }
 
   const handleNav = (screen: Screen) => {
@@ -380,7 +385,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 onClick={() => handleNav(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
                   isActive
-                    ? 'bg-primary text-white shadow-md shadow-primary/25'
+                    ? 'bg-primary text-white shadow-md shadow-primary/25 sidebar-item-indicator'
                     : 'text-foreground/70 hover:bg-muted hover:text-foreground'
                 } ${collapsed ? 'justify-center' : ''}`}
               >
@@ -476,6 +481,7 @@ export function AppLayout() {
     expenses: 'nav.expenses',
     'sales-targets': 'nav.sales-targets',
     'customer-statement': 'nav.customer-statement',
+    loyalty: 'nav.loyalty',
   }
 
   // ── Screen navigation toast ───────────────────────────────────────
@@ -544,6 +550,7 @@ export function AppLayout() {
       case 'expenses': return <ExpenseScreen />
       case 'sales-targets': return <SalesTargetsScreen />
       case 'customer-statement': return <CustomerStatementScreen />
+      case 'loyalty': return <LoyaltyScreen />
       default: return <POSScreen />
     }
   }
@@ -627,7 +634,7 @@ export function AppLayout() {
         </header>
 
         {/* Screen Content */}
-        <div className="flex-1 overflow-hidden">
+        <div key={currentScreen} className="flex-1 overflow-hidden animate-fade-in-up">
           {renderScreen()}
         </div>
       </main>

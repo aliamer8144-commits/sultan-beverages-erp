@@ -380,7 +380,7 @@ export function QuickStatsPanel() {
         }`}
         dir="rtl"
       >
-        <div className="glass-card rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden border border-border/50 flex flex-col max-h-[85vh]">
+        <div className="glass-card-v2 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden border border-border/50 flex flex-col max-h-[85vh]">
           {/* Panel Header */}
           <div className="flex items-center justify-between p-4 pb-2 flex-shrink-0">
             <div className="flex items-center gap-2.5">
@@ -746,9 +746,9 @@ export function QuickStatsPanel() {
       <button
         data-fab-button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 left-4 sm:left-6 z-[101] w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 transition-all duration-300 ease-out group hover:shadow-xl hover:shadow-primary/30 hover:scale-105 active:scale-95 ${
+        className={`fixed bottom-6 left-4 sm:left-6 z-[101] fab fab-primary w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ease-out group ${
           isOpen
-            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110'
             : 'glass-card bg-primary/90 text-primary-foreground animate-pulse-glow'
         }`}
         aria-label={isOpen ? 'إغلاق الإحصائيات' : 'عرض الإحصائيات السريعة'}

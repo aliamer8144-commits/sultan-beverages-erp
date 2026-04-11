@@ -15130,3 +15130,1151 @@ button:active:not(:disabled) {
     transition: none;
   }
 }
+
+/* ========== SECTION 134: ANIMATED GRADIENT BORDER ========== */
+/* Slowly rotating gradient border using conic-gradient with CSS animation.
+   Usage: Add .gradient-border-animated to any card or container. */
+
+.gradient-border-animated {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.gradient-border-animated::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--gradient-angle, 0deg),
+    oklch(0.55 0.18 160),
+    oklch(0.60 0.20 30),
+    oklch(0.55 0.20 350),
+    oklch(0.60 0.18 280),
+    oklch(0.55 0.18 160)
+  );
+  animation: gradient-rotate 6s linear infinite;
+  z-index: -2;
+}
+
+.gradient-border-animated::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: oklch(0.985 0.005 260 / 95%);
+  z-index: -1;
+}
+
+.dark .gradient-border-animated::after {
+  background: oklch(0.16 0.01 260 / 95%);
+}
+
+@keyframes gradient-rotate {
+  from {
+    --gradient-angle: 0deg;
+  }
+  to {
+    --gradient-angle: 360deg;
+  }
+}
+
+/* Fallback for browsers without @property support — use background-size animation */
+@supports not (background: conic-gradient(from 0deg, red, blue)) {
+  .gradient-border-animated::before {
+    background: linear-gradient(
+      135deg,
+      oklch(0.55 0.18 160),
+      oklch(0.60 0.20 30),
+      oklch(0.55 0.20 350),
+      oklch(0.60 0.18 280),
+      oklch(0.55 0.18 160)
+    );
+    background-size: 300% 300%;
+    animation: gradient-shift 6s ease infinite;
+  }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ========== SECTION 135: GLASSMORPHISM CARD V2 ========== */
+/* Enhanced glassmorphism with stronger blur, gradient border, and inner shadow.
+   Usage: Add .glass-card-v2 to any card container. */
+
+.glass-card-v2 {
+  position: relative;
+  background: oklch(0.97 0.01 260 / 60%);
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid oklch(0.90 0.015 260 / 40%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 20%),
+    0 8px 32px oklch(0.15 0.01 260 / 8%);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-v2::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    oklch(0.75 0.15 160 / 25%),
+    transparent 50%,
+    oklch(0.70 0.15 30 / 20%)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-card-v2:hover {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 25%),
+    0 16px 48px oklch(0.15 0.01 260 / 12%);
+  transform: translateY(-2px);
+}
+
+.dark .glass-card-v2 {
+  background: oklch(0.18 0.015 260 / 60%);
+  border-color: oklch(0.35 0.02 260 / 30%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 5%),
+    0 8px 32px oklch(0 0 0 / 20%);
+}
+
+.dark .glass-card-v2::before {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.15 160 / 15%),
+    transparent 50%,
+    oklch(0.55 0.12 30 / 12%)
+  );
+}
+
+.dark .glass-card-v2:hover {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 8%),
+    0 16px 48px oklch(0 0 0 / 30%);
+}
+
+/* ========== SECTION 136: FLOATING ACTION BUTTON (FAB) ========== */
+/* Fixed-position floating action button with shadow, pulse on hover, and scale.
+   Usage: .fab .fab-primary / .fab-danger / .fab-success */
+
+.fab {
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: white;
+  background: oklch(0.45 0.18 160);
+  box-shadow:
+    0 4px 14px oklch(0.45 0.18 160 / 35%),
+    0 2px 6px oklch(0 0 0 / 10%);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[dir="rtl"] .fab {
+  left: auto;
+  right: 2rem;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow:
+    0 6px 24px oklch(0.45 0.18 160 / 45%),
+    0 3px 10px oklch(0 0 0 / 15%);
+  animation: fab-pulse 1.5s ease-in-out infinite;
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab-primary {
+  background: oklch(0.45 0.18 160);
+  box-shadow:
+    0 4px 14px oklch(0.45 0.18 160 / 35%),
+    0 2px 6px oklch(0 0 0 / 10%);
+}
+
+.fab-primary:hover {
+  box-shadow:
+    0 6px 24px oklch(0.45 0.18 160 / 45%),
+    0 3px 10px oklch(0 0 0 / 15%);
+}
+
+.fab-danger {
+  background: oklch(0.55 0.22 27);
+  box-shadow:
+    0 4px 14px oklch(0.55 0.22 27 / 35%),
+    0 2px 6px oklch(0 0 0 / 10%);
+}
+
+.fab-danger:hover {
+  box-shadow:
+    0 6px 24px oklch(0.55 0.22 27 / 45%),
+    0 3px 10px oklch(0 0 0 / 15%);
+}
+
+.fab-success {
+  background: oklch(0.55 0.18 155);
+  box-shadow:
+    0 4px 14px oklch(0.55 0.18 155 / 35%),
+    0 2px 6px oklch(0 0 0 / 10%);
+}
+
+.fab-success:hover {
+  box-shadow:
+    0 6px 24px oklch(0.55 0.18 155 / 45%),
+    0 3px 10px oklch(0 0 0 / 15%);
+}
+
+.dark .fab {
+  box-shadow:
+    0 4px 14px oklch(0 0 0 / 30%),
+    0 2px 6px oklch(0 0 0 / 15%);
+}
+
+.dark .fab-primary:hover {
+  box-shadow:
+    0 6px 24px oklch(0.45 0.18 160 / 30%),
+    0 3px 10px oklch(0 0 0 / 25%);
+}
+
+.dark .fab-danger:hover {
+  box-shadow:
+    0 6px 24px oklch(0.55 0.22 27 / 30%),
+    0 3px 10px oklch(0 0 0 / 25%);
+}
+
+.dark .fab-success:hover {
+  box-shadow:
+    0 6px 24px oklch(0.55 0.18 155 / 30%),
+    0 3px 10px oklch(0 0 0 / 25%);
+}
+
+@keyframes fab-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px oklch(0.45 0.18 160 / 35%),
+      0 0 0 0 oklch(0.45 0.18 160 / 25%);
+  }
+  50% {
+    box-shadow:
+      0 4px 14px oklch(0.45 0.18 160 / 35%),
+      0 0 0 12px oklch(0.45 0.18 160 / 0%);
+  }
+}
+
+/* ========== SECTION 137: STAT CARD ENHANCED ========== */
+/* Premium stat card with gradient overlay, icon circle with blur, and accent bar.
+   Usage: .stat-card-enhanced .stat-card-blue / .stat-card-green / .stat-card-amber / .stat-card-rose */
+
+.stat-card-enhanced {
+  position: relative;
+  background: oklch(0.985 0.005 260);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px oklch(0.15 0.01 260 / 8%);
+}
+
+.stat-card-enhanced::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4rem;
+  opacity: 0.08;
+  border-radius: 1rem 1rem 0 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-card-enhanced::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.stat-card-enhanced:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px oklch(0.15 0.01 260 / 12%);
+}
+
+.stat-card-enhanced:hover::before {
+  opacity: 0.12;
+}
+
+.stat-card-enhanced-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+}
+
+.stat-card-enhanced-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: oklch(0.20 0.02 260);
+  margin-bottom: 0.25rem;
+}
+
+.stat-card-enhanced-label {
+  font-size: 0.8125rem;
+  color: oklch(0.50 0.01 260);
+  font-weight: 500;
+}
+
+/* Blue variant */
+.stat-card-blue::before {
+  background: oklch(0.55 0.18 240);
+}
+.stat-card-blue::after {
+  background: oklch(0.55 0.18 240);
+}
+.stat-card-blue .stat-card-enhanced-icon {
+  background: oklch(0.55 0.18 240 / 12%);
+  color: oklch(0.50 0.16 240);
+  backdrop-filter: blur(8px);
+}
+.stat-card-blue .stat-card-enhanced-value {
+  color: oklch(0.35 0.12 240);
+}
+
+/* Green variant */
+.stat-card-green::before {
+  background: oklch(0.55 0.18 155);
+}
+.stat-card-green::after {
+  background: oklch(0.55 0.18 155);
+}
+.stat-card-green .stat-card-enhanced-icon {
+  background: oklch(0.55 0.18 155 / 12%);
+  color: oklch(0.45 0.16 155);
+  backdrop-filter: blur(8px);
+}
+.stat-card-green .stat-card-enhanced-value {
+  color: oklch(0.35 0.12 155);
+}
+
+/* Amber variant */
+.stat-card-amber::before {
+  background: oklch(0.65 0.18 75);
+}
+.stat-card-amber::after {
+  background: oklch(0.65 0.18 75);
+}
+.stat-card-amber .stat-card-enhanced-icon {
+  background: oklch(0.65 0.18 75 / 12%);
+  color: oklch(0.55 0.16 75);
+  backdrop-filter: blur(8px);
+}
+.stat-card-amber .stat-card-enhanced-value {
+  color: oklch(0.40 0.12 75);
+}
+
+/* Rose variant */
+.stat-card-rose::before {
+  background: oklch(0.58 0.20 10);
+}
+.stat-card-rose::after {
+  background: oklch(0.58 0.20 10);
+}
+.stat-card-rose .stat-card-enhanced-icon {
+  background: oklch(0.58 0.20 10 / 12%);
+  color: oklch(0.50 0.18 10);
+  backdrop-filter: blur(8px);
+}
+.stat-card-rose .stat-card-enhanced-value {
+  color: oklch(0.40 0.14 10);
+}
+
+/* Dark mode for stat cards */
+.dark .stat-card-enhanced {
+  background: oklch(0.18 0.01 260);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 20%);
+}
+
+.dark .stat-card-enhanced:hover {
+  box-shadow: 0 8px 24px oklch(0 0 0 / 30%);
+}
+
+.dark .stat-card-enhanced::before {
+  opacity: 0.10;
+}
+
+.dark .stat-card-enhanced:hover::before {
+  opacity: 0.16;
+}
+
+.dark .stat-card-enhanced-value {
+  color: oklch(0.90 0.01 260);
+}
+
+.dark .stat-card-enhanced-label {
+  color: oklch(0.60 0.01 260);
+}
+
+.dark .stat-card-blue .stat-card-enhanced-icon {
+  background: oklch(0.55 0.18 240 / 15%);
+  color: oklch(0.72 0.16 240);
+}
+
+.dark .stat-card-green .stat-card-enhanced-icon {
+  background: oklch(0.55 0.18 155 / 15%);
+  color: oklch(0.72 0.16 155);
+}
+
+.dark .stat-card-amber .stat-card-enhanced-icon {
+  background: oklch(0.65 0.18 75 / 15%);
+  color: oklch(0.80 0.14 75);
+}
+
+.dark .stat-card-rose .stat-card-enhanced-icon {
+  background: oklch(0.58 0.20 10 / 15%);
+  color: oklch(0.78 0.16 10);
+}
+
+/* ========== SECTION 138: INPUT FOCUS GLOW ========== */
+/* Input fields that emit a soft glow in primary color when focused.
+   Usage: Add .input-focus-glow to any <input>, <textarea>, or <select>. */
+
+.input-focus-glow {
+  border: 1.5px solid oklch(0.88 0.01 260);
+  border-radius: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  background: oklch(0.995 0.002 260);
+  color: oklch(0.20 0.02 260);
+  transition: all 0.3s ease;
+  outline: none;
+  width: 100%;
+}
+
+.input-focus-glow::placeholder {
+  color: oklch(0.65 0.01 260);
+}
+
+.input-focus-glow:hover {
+  border-color: oklch(0.75 0.06 160);
+}
+
+.input-focus-glow:focus {
+  border-color: oklch(0.55 0.18 160);
+  box-shadow:
+    0 0 0 3px oklch(0.55 0.18 160 / 12%),
+    0 0 16px oklch(0.55 0.18 160 / 10%);
+  background: oklch(1 0 0);
+}
+
+.dark .input-focus-glow {
+  background: oklch(0.17 0.01 260);
+  border-color: oklch(0.35 0.02 260);
+  color: oklch(0.88 0.01 260);
+}
+
+.dark .input-focus-glow::placeholder {
+  color: oklch(0.50 0.01 260);
+}
+
+.dark .input-focus-glow:hover {
+  border-color: oklch(0.50 0.10 160);
+}
+
+.dark .input-focus-glow:focus {
+  border-color: oklch(0.65 0.18 160);
+  background: oklch(0.15 0.01 260);
+  box-shadow:
+    0 0 0 3px oklch(0.65 0.18 160 / 15%),
+    0 0 20px oklch(0.65 0.18 160 / 12%);
+}
+
+/* ========== SECTION 139: SCROLL REVEAL ANIMATION ========== */
+/* Utility classes for scroll-triggered fade-in animations via IntersectionObserver.
+   Note: Requires JS to add .scroll-reveal--visible class when element enters viewport.
+   Usage: .scroll-reveal / .scroll-reveal-left / .scroll-reveal-right / .scroll-reveal-scale */
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scroll-reveal-left {
+  opacity: 0;
+  transform: translateX(-32px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[dir="rtl"] .scroll-reveal-left {
+  transform: translateX(32px);
+}
+
+.scroll-reveal-right {
+  opacity: 0;
+  transform: translateX(32px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[dir="rtl"] .scroll-reveal-right {
+  transform: translateX(-32px);
+}
+
+.scroll-reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Visible state — add via JS IntersectionObserver */
+.scroll-reveal--visible,
+.scroll-reveal-left.scroll-reveal--visible,
+.scroll-reveal-right.scroll-reveal--visible,
+.scroll-reveal-scale.scroll-reveal--visible {
+  opacity: 1;
+  transform: translateY(0) translateX(0) scale(1);
+}
+
+/* ========== SECTION 140: STATUS PILL ========== */
+/* Compact inline status indicator with colored dot and text.
+   Usage: <span class="status-pill status-pill-success">نشط</span> */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.status-pill::before {
+  content: "";
+  display: block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-pill-success {
+  background: oklch(0.55 0.15 155 / 10%);
+  color: oklch(0.45 0.14 155);
+}
+
+.status-pill-success::before {
+  background: oklch(0.55 0.20 155);
+}
+
+.status-pill-warning {
+  background: oklch(0.70 0.16 75 / 10%);
+  color: oklch(0.55 0.14 75);
+}
+
+.status-pill-warning::before {
+  background: oklch(0.70 0.18 75);
+}
+
+.status-pill-danger {
+  background: oklch(0.58 0.20 27 / 10%);
+  color: oklch(0.50 0.18 27);
+}
+
+.status-pill-danger::before {
+  background: oklch(0.58 0.22 27);
+}
+
+.status-pill-info {
+  background: oklch(0.55 0.16 240 / 10%);
+  color: oklch(0.45 0.14 240);
+}
+
+.status-pill-info::before {
+  background: oklch(0.55 0.18 240);
+}
+
+.status-pill-neutral {
+  background: oklch(0.70 0.005 260 / 10%);
+  color: oklch(0.45 0.01 260);
+}
+
+.status-pill-neutral::before {
+  background: oklch(0.60 0.01 260);
+}
+
+.dark .status-pill-success {
+  background: oklch(0.55 0.15 155 / 15%);
+  color: oklch(0.72 0.16 155);
+}
+
+.dark .status-pill-warning {
+  background: oklch(0.70 0.16 75 / 15%);
+  color: oklch(0.82 0.14 75);
+}
+
+.dark .status-pill-danger {
+  background: oklch(0.58 0.20 27 / 15%);
+  color: oklch(0.78 0.18 27);
+}
+
+.dark .status-pill-info {
+  background: oklch(0.55 0.16 240 / 15%);
+  color: oklch(0.72 0.16 240);
+}
+
+.dark .status-pill-neutral {
+  background: oklch(0.70 0.005 260 / 15%);
+  color: oklch(0.65 0.01 260);
+}
+
+/* ========== SECTION 141: ANIMATED UNDERLINE LINK ========== */
+/* Links with animated underline that slides in on hover. RTL-compatible.
+   Usage: <a class="link-animated">الرابط</a> / <a class="link-animated link-animated-thick"> */
+
+.link-animated {
+  position: relative;
+  display: inline-block;
+  color: oklch(0.40 0.12 160);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.25s ease;
+}
+
+.link-animated::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  right: 0;
+  width: 0;
+  height: 1.5px;
+  background: oklch(0.40 0.12 160);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.link-animated:hover {
+  color: oklch(0.35 0.15 160);
+}
+
+.link-animated:hover::after {
+  width: 100%;
+}
+
+.link-animated-thick::after {
+  height: 2.5px;
+}
+
+.dark .link-animated {
+  color: oklch(0.72 0.14 160);
+}
+
+.dark .link-animated::after {
+  background: oklch(0.72 0.14 160);
+}
+
+.dark .link-animated:hover {
+  color: oklch(0.78 0.16 160);
+}
+
+/* ========== SECTION 142: CONTENT CARD WITH HEADER ========== */
+/* Versatile content card with gradient header, body, and optional footer.
+   Usage: .content-card > .content-card-header + .content-card-body + .content-card-footer */
+
+.content-card {
+  background: oklch(0.985 0.005 260);
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid oklch(0.92 0.005 260 / 60%);
+  box-shadow: 0 1px 3px oklch(0.15 0.01 260 / 6%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.content-card:hover {
+  box-shadow: 0 4px 16px oklch(0.15 0.01 260 / 10%);
+}
+
+.content-card-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.10 160 / 8%),
+    oklch(0.60 0.08 160 / 4%)
+  );
+  border-bottom: 1px solid oklch(0.92 0.005 260 / 40%);
+}
+
+.content-card-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: oklch(0.55 0.15 160 / 10%);
+  color: oklch(0.45 0.14 160);
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.content-card-header-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: oklch(0.22 0.02 260);
+}
+
+.content-card-header-subtitle {
+  font-size: 0.75rem;
+  color: oklch(0.55 0.01 260);
+  font-weight: 400;
+}
+
+.content-card-body {
+  padding: 1.25rem;
+}
+
+.content-card-footer {
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid oklch(0.92 0.005 260 / 40%);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+[dir="rtl"] .content-card-footer {
+  justify-content: flex-start;
+}
+
+/* Dark mode */
+.dark .content-card {
+  background: oklch(0.18 0.01 260);
+  border-color: oklch(0.32 0.02 260 / 50%);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 15%);
+}
+
+.dark .content-card:hover {
+  box-shadow: 0 4px 16px oklch(0 0 0 / 25%);
+}
+
+.dark .content-card-header {
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.12 160 / 6%),
+    oklch(0.60 0.08 160 / 3%)
+  );
+  border-bottom-color: oklch(0.32 0.02 260 / 40%);
+}
+
+.dark .content-card-header-icon {
+  background: oklch(0.55 0.15 160 / 12%);
+  color: oklch(0.72 0.14 160);
+}
+
+.dark .content-card-header-title {
+  color: oklch(0.88 0.01 260);
+}
+
+.dark .content-card-header-subtitle {
+  color: oklch(0.55 0.01 260);
+}
+
+.dark .content-card-footer {
+  border-top-color: oklch(0.32 0.02 260 / 40%);
+}
+
+/* ========== SECTION 143: RESPONSIVE GRID ENHANCEMENTS ========== */
+/* CSS Grid utilities with auto-fill for responsive layouts without media queries.
+   Usage: .grid-auto-fill-sm / .grid-auto-fill-md / .grid-auto-fill-lg */
+
+.grid-auto-fill {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.grid-auto-fill-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+
+.grid-auto-fill-md {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+
+.grid-auto-fill-lg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+  gap: 1.25rem;
+}
+
+/* ========== SECTION 144: TAG / CHIP COMPONENTS ========== */
+/* Inline tag/chip component with color variants and optional close button.
+   Usage: <span class="tag tag-green">مبيعات <button class="tag-close">×</button></span> */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.tag-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+  padding: 0;
+  color: inherit;
+}
+
+.tag-close:hover {
+  opacity: 1;
+  background: oklch(0 0 0 / 10%);
+}
+
+/* Color variants — filled */
+.tag-blue {
+  background: oklch(0.55 0.16 240 / 12%);
+  color: oklch(0.42 0.14 240);
+}
+
+.tag-green {
+  background: oklch(0.55 0.16 155 / 12%);
+  color: oklch(0.38 0.14 155);
+}
+
+.tag-red {
+  background: oklch(0.58 0.18 27 / 12%);
+  color: oklch(0.45 0.16 27);
+}
+
+.tag-amber {
+  background: oklch(0.68 0.16 75 / 12%);
+  color: oklch(0.48 0.14 75);
+}
+
+.tag-purple {
+  background: oklch(0.55 0.18 300 / 12%);
+  color: oklch(0.42 0.16 300);
+}
+
+.tag-gray {
+  background: oklch(0.70 0.005 260 / 15%);
+  color: oklch(0.38 0.01 260);
+}
+
+/* Outline variant */
+.tag-outline {
+  background: transparent;
+  border: 1px solid oklch(0.82 0.01 260);
+  color: oklch(0.42 0.01 260);
+}
+
+.tag-outline.tag-blue {
+  border-color: oklch(0.55 0.16 240 / 40%);
+  color: oklch(0.42 0.14 240);
+  background: transparent;
+}
+
+.tag-outline.tag-green {
+  border-color: oklch(0.55 0.16 155 / 40%);
+  color: oklch(0.38 0.14 155);
+  background: transparent;
+}
+
+.tag-outline.tag-red {
+  border-color: oklch(0.58 0.18 27 / 40%);
+  color: oklch(0.45 0.16 27);
+  background: transparent;
+}
+
+.tag-outline.tag-amber {
+  border-color: oklch(0.68 0.16 75 / 40%);
+  color: oklch(0.48 0.14 75);
+  background: transparent;
+}
+
+.tag-outline.tag-purple {
+  border-color: oklch(0.55 0.18 300 / 40%);
+  color: oklch(0.42 0.16 300);
+  background: transparent;
+}
+
+.tag-outline.tag-gray {
+  border-color: oklch(0.70 0.005 260 / 40%);
+  color: oklch(0.45 0.01 260);
+  background: transparent;
+}
+
+/* Hover effects */
+.tag:hover {
+  filter: brightness(0.95);
+}
+
+.tag-outline:hover {
+  background: oklch(0.95 0.005 260 / 50%);
+}
+
+/* Dark mode */
+.dark .tag-blue {
+  background: oklch(0.55 0.16 240 / 18%);
+  color: oklch(0.72 0.14 240);
+}
+
+.dark .tag-green {
+  background: oklch(0.55 0.16 155 / 18%);
+  color: oklch(0.72 0.14 155);
+}
+
+.dark .tag-red {
+  background: oklch(0.58 0.18 27 / 18%);
+  color: oklch(0.78 0.16 27);
+}
+
+.dark .tag-amber {
+  background: oklch(0.68 0.16 75 / 18%);
+  color: oklch(0.82 0.14 75);
+}
+
+.dark .tag-purple {
+  background: oklch(0.55 0.18 300 / 18%);
+  color: oklch(0.72 0.16 300);
+}
+
+.dark .tag-gray {
+  background: oklch(0.70 0.005 260 / 15%);
+  color: oklch(0.65 0.01 260);
+}
+
+.dark .tag-outline {
+  border-color: oklch(0.40 0.01 260);
+  color: oklch(0.72 0.01 260);
+}
+
+.dark .tag-outline.tag-blue {
+  border-color: oklch(0.55 0.16 240 / 35%);
+  color: oklch(0.72 0.14 240);
+}
+
+.dark .tag-outline.tag-green {
+  border-color: oklch(0.55 0.16 155 / 35%);
+  color: oklch(0.72 0.14 155);
+}
+
+.dark .tag-outline.tag-red {
+  border-color: oklch(0.58 0.18 27 / 35%);
+  color: oklch(0.78 0.16 27);
+}
+
+.dark .tag-outline.tag-amber {
+  border-color: oklch(0.68 0.16 75 / 35%);
+  color: oklch(0.82 0.14 75);
+}
+
+.dark .tag-outline.tag-purple {
+  border-color: oklch(0.55 0.18 300 / 35%);
+  color: oklch(0.72 0.16 300);
+}
+
+.dark .tag-outline.tag-gray {
+  border-color: oklch(0.45 0.01 260);
+  color: oklch(0.65 0.01 260);
+}
+
+.dark .tag-outline:hover {
+  background: oklch(0.25 0.01 260 / 50%);
+}
+
+.dark .tag-close:hover {
+  background: oklch(1 0 0 / 12%);
+}
+
+/* ========== SECTION 145: PROGRESS RING (CIRCULAR) ========== */
+/* Circular progress indicator using CSS conic-gradient. Animated on load.
+   Usage: <div class="progress-ring progress-ring-md" style="--progress: 65">
+            <span class="progress-ring-value">65%</span>
+          </div> */
+
+@property --progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.progress-ring {
+  --ring-color: oklch(0.55 0.18 160);
+  --ring-track: oklch(0.92 0.005 260);
+  --ring-size: 3rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ring-color) calc(var(--progress, 0) * 1%),
+    var(--ring-track) calc(var(--progress, 0) * 1%)
+  );
+  animation: progress-ring-fill 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.progress-ring::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: oklch(0.985 0.005 260);
+}
+
+.dark .progress-ring {
+  --ring-track: oklch(0.30 0.01 260);
+}
+
+.dark .progress-ring::before {
+  background: oklch(0.16 0.01 260);
+}
+
+.progress-ring-value {
+  position: relative;
+  z-index: 1;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: oklch(0.25 0.02 260);
+  line-height: 1;
+}
+
+.dark .progress-ring-value {
+  color: oklch(0.88 0.01 260);
+}
+
+/* Size variants */
+.progress-ring-sm {
+  --ring-size: 2rem;
+}
+
+.progress-ring-sm::before {
+  inset: 3px;
+}
+
+.progress-ring-sm .progress-ring-value {
+  font-size: 0.5rem;
+}
+
+.progress-ring-md {
+  --ring-size: 3rem;
+}
+
+.progress-ring-lg {
+  --ring-size: 4.5rem;
+}
+
+.progress-ring-lg::before {
+  inset: 6px;
+}
+
+.progress-ring-lg .progress-ring-value {
+  font-size: 0.875rem;
+}
+
+@keyframes progress-ring-fill {
+  from {
+    --progress: 0;
+  }
+  to {
+    --progress: var(--progress-target, 0);
+  }
+}
+
+/* ========== SECTIONS 134-145: REDUCED MOTION ========== */
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-border-animated::before {
+    animation: none;
+  }
+  .fab:hover {
+    animation: none;
+  }
+  .glass-card-v2:hover {
+    transform: none;
+  }
+  .stat-card-enhanced:hover {
+    transform: none;
+  }
+  .scroll-reveal,
+  .scroll-reveal-left,
+  .scroll-reveal-right,
+  .scroll-reveal-scale {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .link-animated::after {
+    transition: none;
+  }
+  .progress-ring {
+    animation: none;
+  }
+}

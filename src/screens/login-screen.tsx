@@ -101,7 +101,7 @@ export function LoginScreen() {
       <div className="absolute top-[20%] left-[10%] w-[200px] h-[200px] rounded-full bg-white/3 blur-2xl" />
 
       <div className="w-full max-w-md px-6 relative z-10">
-        <div className="bg-white/95 dark:bg-card/95 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-black/10 dark:shadow-black/30 p-8 md:p-10 animate-scale-fade border border-white/20 dark:border-border/30 noise-overlay">
+        <div className="glass-card-v2 gradient-border-animated rounded-3xl p-8 md:p-10 animate-scale-fade noise-overlay relative overflow-hidden">
           {/* Logo & Title */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30 logo-glow">
@@ -128,7 +128,7 @@ export function LoginScreen() {
                 placeholder={t('login.usernamePlaceholder')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4"
+                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow"
                 autoFocus
               />
             </div>
@@ -141,7 +141,7 @@ export function LoginScreen() {
                 placeholder={t('login.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4"
+                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow"
               />
             </div>
 
@@ -187,9 +187,13 @@ export function LoginScreen() {
           </div>
         </div>
 
-        <p className="text-center text-white/50 text-xs mt-6">
-          {t('login.copyright')}
-        </p>
+        {/* Decorative security indicator */}
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[10px] text-white/60 link-animated">{t('login.copyright')}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
