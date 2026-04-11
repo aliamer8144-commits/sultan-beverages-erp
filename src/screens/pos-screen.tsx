@@ -1042,11 +1042,7 @@ export function POSScreen() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setSelectedCategoryId('all')}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                selectedCategoryId === 'all'
-                  ? 'bg-primary text-white shadow-md shadow-primary/25'
-                  : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
+              className={`pos-category-pill ${selectedCategoryId === 'all' ? 'active' : ''}`}
             >
               الكل
             </button>
@@ -1054,11 +1050,7 @@ export function POSScreen() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategoryId(cat.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
-                  selectedCategoryId === cat.id
-                    ? 'bg-primary text-white shadow-md shadow-primary/25'
-                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
+                className={`pos-category-pill flex items-center gap-1.5 ${selectedCategoryId === cat.id ? 'active' : ''}`}
               >
                 {getCategoryIcon(cat.icon, { className: 'w-4 h-4' })}
                 {cat.name}

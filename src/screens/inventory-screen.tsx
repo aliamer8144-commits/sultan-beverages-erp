@@ -1055,7 +1055,7 @@ export function InventoryScreen() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden card-hover data-table-enhanced">
+      <div className="bg-card rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden card-hover data-table-enhanced table-modern table-hover-highlight">
         {loading ? (
           <div className="flex-1 flex items-center justify-center loading-overlay" style={{ position: 'absolute', inset: 0 }}>
             <div className="loading-spinner" />
@@ -1444,10 +1444,10 @@ export function InventoryScreen() {
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="grid gap-4 py-2 glass-card rounded-xl p-4">
               {/* Product Name */}
-              <div className="space-y-2">
-                <Label htmlFor="product-name" className="text-sm font-medium">
-                  اسم المنتج <span className="text-destructive">*</span>
-                </Label>
+              <div className="form-group">
+                <label htmlFor="product-name" className="form-label-enhanced">
+                  اسم المنتج <span className="required-asterisk">*</span>
+                </label>
                 <Input
                   id="product-name"
                   placeholder="مثال: بيبسي 330مل"
@@ -1459,10 +1459,10 @@ export function InventoryScreen() {
               </div>
 
               {/* Category */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  التصنيف <span className="text-destructive">*</span>
-                </Label>
+              <div className="form-group">
+                <label className="form-label-enhanced">
+                  التصنيف <span className="required-asterisk">*</span>
+                </label>
                 <Select
                   value={form.categoryId}
                   onValueChange={(val) => setForm({ ...form, categoryId: val })}
@@ -1482,10 +1482,10 @@ export function InventoryScreen() {
 
               {/* Price & Cost - side by side */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="cost-price" className="text-sm font-medium">
+                <div className="form-group">
+                  <label htmlFor="cost-price" className="form-label-enhanced">
                     سعر الشراء
-                  </Label>
+                  </label>
                   <Input
                     id="cost-price"
                     type="number"
@@ -1497,10 +1497,10 @@ export function InventoryScreen() {
                     className="h-10 rounded-lg text-left"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sell-price" className="text-sm font-medium">
-                    سعر البيع <span className="text-destructive">*</span>
-                  </Label>
+                <div className="form-group">
+                  <label htmlFor="sell-price" className="form-label-enhanced">
+                    سعر البيع <span className="required-asterisk">*</span>
+                  </label>
                   <Input
                     id="sell-price"
                     type="number"

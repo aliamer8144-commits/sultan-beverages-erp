@@ -49,13 +49,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = body;
 
-    // Validate image size (max ~500KB base64)
+    // Validate image size (max 2MB raw, ~2.7MB base64) and type
     if (image && typeof image === 'string') {
       if (!image.startsWith('data:image/')) {
         return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة' }, { status: 400 });
       }
-      if (image.length > 700000) {
-        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 500 كيلوبايت)' }, { status: 400 });
+      const allowedTypes = ['data:image/jpeg', 'data:image/png', 'data:image/webp', 'data:image/gif'];
+      const mimeType = image.substring(0, image.indexOf(';base64,'));
+      if (!allowedTypes.some((t) => mimeType.startsWith(t))) {
+        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة (jpeg, png, webp, gif فقط)' }, { status: 400 });
+      }
+      if (image.length > 2700000) {
+        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 2 ميجابايت)' }, { status: 400 });
       }
     }
 
@@ -92,13 +97,18 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { id, name, categoryId, price, costPrice, quantity, minQuantity, barcode, image, isActive } = body;
 
-    // Validate image size
+    // Validate image size and type
     if (image && typeof image === 'string' && image.length > 0) {
       if (!image.startsWith('data:image/')) {
         return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة' }, { status: 400 });
       }
-      if (image.length > 700000) {
-        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 500 كيلوبايت)' }, { status: 400 });
+      const allowedTypes = ['data:image/jpeg', 'data:image/png', 'data:image/webp', 'data:image/gif'];
+      const mimeType = image.substring(0, image.indexOf(';base64,'));
+      if (!allowedTypes.some((t) => mimeType.startsWith(t))) {
+        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة (jpeg, png, webp, gif فقط)' }, { status: 400 });
+      }
+      if (image.length > 2700000) {
+        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 2 ميجابايت)' }, { status: 400 });
       }
     }
 

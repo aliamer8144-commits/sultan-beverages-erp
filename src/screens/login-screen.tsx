@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useTranslation } from '@/lib/translations'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,13 +27,14 @@ const LOGIN_PARTICLES = [
 
 export function LoginScreen() {
   const { login } = useAppStore()
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   const performLogin = useCallback(async (uname: string, pwd: string) => {
     if (!uname || !pwd) {
-      toast.error('يرجى إدخال اسم المستخدم وكلمة المرور')
+      toast.error(t('login.errorEmpty'))
       return
     }
     setLoading(true)
@@ -46,19 +48,19 @@ export function LoginScreen() {
 
       if (data.success) {
         login(data.user)
-        toast.success(`مرحباً ${data.user.name}!`)
+        toast.success(`${t('login.welcomeMsg')} ${data.user.name}!`)
       } else {
-        toast.error(data.error || 'حدث خطأ في تسجيل الدخول')
+        toast.error(data.error || t('login.errorFailed'))
         // Clear on failure
         setUsername('')
         setPassword('')
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
+      toast.error(t('login.errorConnection'))
     } finally {
       setLoading(false)
     }
-  }, [login])
+  }, [login, t])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,18 +114,18 @@ export function LoginScreen() {
                 <circle cx="15" cy="9" r="0.5" fill="currentColor" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">السلطان للمشروبات</h1>
-            <p className="text-sm text-muted-foreground mt-1">نظام إدارة نقطة البيع</p>
+            <h1 className="text-2xl font-bold text-foreground">{t('login.title')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t('login.subtitle')}</p>
           </div>
 
           {/* Login Form */}
           <form id="login-form" onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium">اسم المستخدم</Label>
+              <Label htmlFor="username" className="text-sm font-medium">{t('login.usernameLabel')}</Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="أدخل اسم المستخدم"
+                placeholder={t('login.usernamePlaceholder')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4"
@@ -132,11 +134,11 @@ export function LoginScreen() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">كلمة المرور</Label>
+              <Label htmlFor="password" className="text-sm font-medium">{t('login.passwordLabel')}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="أدخل كلمة المرور"
+                placeholder={t('login.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4"
@@ -151,17 +153,17 @@ export function LoginScreen() {
               {loading ? (
                 <div className="flex items-center gap-2 relative z-10">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>جاري تسجيل الدخول...</span>
+                  <span>{t('login.loggingIn')}</span>
                 </div>
               ) : (
-                <span className="relative z-10">تسجيل الدخول</span>
+                <span className="relative z-10">{t('login.loginButton')}</span>
               )}
             </Button>
           </form>
 
           {/* Demo credentials */}
           <div className="mt-6 pt-6 border-t border-border/50">
-            <p className="text-xs text-center text-muted-foreground mb-3">بيانات تجريبية للدخول</p>
+            <p className="text-xs text-center text-muted-foreground mb-3">{t('login.demoCredentials')}</p>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -169,7 +171,7 @@ export function LoginScreen() {
                 disabled={loading}
                 className="p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-center btn-ripple credential-card-blue disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <p className="text-xs font-semibold text-primary">مدير</p>
+                <p className="text-xs font-semibold text-primary">{t('login.admin')}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">admin / admin123</p>
               </button>
               <button
@@ -178,7 +180,7 @@ export function LoginScreen() {
                 disabled={loading}
                 className="p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-center btn-ripple credential-card-green disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <p className="text-xs font-semibold text-green-600">كاشير</p>
+                <p className="text-xs font-semibold text-green-600">{t('login.cashier')}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">cashier / cashier123</p>
               </button>
             </div>
@@ -186,7 +188,7 @@ export function LoginScreen() {
         </div>
 
         <p className="text-center text-white/50 text-xs mt-6">
-          © 2024 السلطان للمشروبات - جميع الحقوق محفوظة
+          {t('login.copyright')}
         </p>
       </div>
     </div>

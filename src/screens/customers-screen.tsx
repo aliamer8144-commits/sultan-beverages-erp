@@ -646,7 +646,7 @@ export function CustomersScreen() {
         </div>
 
         {/* ── Data Table ─────────────────────────────────────────── */}
-        <div className="rounded-xl border bg-card shadow-sm card-hover">
+        <div className="rounded-xl border bg-card shadow-sm card-hover table-modern table-hover-highlight">
           <ScrollArea className="max-h-[520px]">
             <Table>
               <TableHeader>
@@ -854,10 +854,10 @@ export function CustomersScreen() {
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4 glass-card rounded-xl p-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="add-name">
-                  اسم العميل <span className="text-destructive">*</span>
-                </Label>
+              <div className="form-group">
+                <label htmlFor="add-name" className="form-label-enhanced">
+                  اسم العميل <span className="required-asterisk">*</span>
+                </label>
                 <Input
                   id="add-name"
                   placeholder="أدخل اسم العميل"
@@ -866,8 +866,8 @@ export function CustomersScreen() {
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="add-phone">رقم الهاتف</Label>
+              <div className="form-group">
+                <label htmlFor="add-phone" className="form-label-enhanced">رقم الهاتف</label>
                 <Input
                   id="add-phone"
                   placeholder="أدخل رقم الهاتف (اختياري)"

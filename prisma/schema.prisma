@@ -187,18 +187,33 @@ model StockAdjustment {
   createdAt     DateTime @default(now())
 }
 
+model ExpenseCategory {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  description    String?
+  icon          String    @default("Receipt")
+  color          String    @default("#6366f1")
+  monthlyBudget  Float?
+  isActive      Boolean   @default(true)
+  expenses      Expense[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
 model Expense {
-  id               String   @id @default(cuid())
-  category         String   @default("عام") // عام, إيجار, رواتب, كهرباء, ماء, صيانة, نقل, تسويق, مصروفات تشغيلية, متنوع
+  id               String            @id @default(cuid())
+  category         String            @default("عام") // عام, إيجار, رواتب, كهرباء, ماء, صيانة, نقل, تسويق, مصروفات تشغيلية, متنوع
   amount           Float
   description      String
-  date             DateTime @default(now())
-  recurring        Boolean  @default(false)  // مصروف متكرر
-  recurringPeriod  String?  // daily, weekly, monthly, yearly
+  date             DateTime          @default(now())
+  recurring        Boolean           @default(false)  // مصروف متكرر
+  recurringPeriod  String?           // daily, weekly, monthly, yearly
   userId           String
   userName         String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  categoryId       String?
+  categoryObj      ExpenseCategory?  @relation(fields: [categoryId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model AuditLog {

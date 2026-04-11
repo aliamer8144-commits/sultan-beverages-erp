@@ -230,7 +230,7 @@ function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteg
   const dual = dualFormat(value)
 
   return (
-    <Card className={`rounded-2xl border-0 shadow-sm card-hover stat-card-gradient data-card-micro ${statClass}`}>
+    <Card className={`rounded-2xl border-0 shadow-sm card-elevated stat-card-gradient data-card-micro ${statClass}`}>
       <CardContent className="p-6 relative z-10">
         <div className="flex items-center justify-between">
           <div>
@@ -356,7 +356,7 @@ function SalesTargetWidget() {
                 هدف المبيعات {getTypeLabel(target.type)}
               </h3>
               {isComplete && (
-                <span className="badge-active text-[10px]">
+                <span className="status-badge-modern badge-success size-sm">
                   <Flame className="w-3 h-3" />
                   تم التحقيق
                 </span>
@@ -737,7 +737,7 @@ export function DashboardScreen() {
             <CardContent className="p-6 pt-0">
               {data.recentSales.length > 0 ? (
                 <ScrollArea className="max-h-96">
-                  <div className="rounded-xl border border-border/50 overflow-hidden data-table-enhanced">
+                  <div className="rounded-xl border border-border/50 overflow-hidden data-table-enhanced table-modern table-hover-highlight">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
