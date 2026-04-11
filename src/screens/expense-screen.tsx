@@ -50,6 +50,7 @@ import {
   TableSkeleton,
 } from '@/components/chart-utils'
 import { formatDate } from '@/lib/date-utils'
+import { useApi } from '@/hooks/use-api'
 import {
   Receipt,
   Plus,
@@ -221,6 +222,14 @@ interface ExpenseSummary {
   averageDailyExpense: number
 }
 
+interface ExpenseFetchResponse {
+  expenses: ExpenseItem[]
+  total: number
+  totalPages: number
+  page: number
+  summary: ExpenseSummary | null
+}
+
 function getCategoryDef(categoryValue: string): CategoryDef {
   return EXPENSE_CATEGORIES.find((c) => c.value === categoryValue) || EXPENSE_CATEGORIES[5]
 }
@@ -309,6 +318,7 @@ function CategoryProgressBar({ total, categoryTotal, color }: { total: number; c
 
 export function ExpenseScreen() {
   const { user } = useAppStore()
+  const { get, post, del } = useApi()
 
   // Data state
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
@@ -347,36 +357,35 @@ export function ExpenseScreen() {
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
 
-    try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      if (categoryFilter) params.set('category', categoryFilter)
-      if (search.trim()) params.set('search', search.trim())
+    const { from, to } = getDateRange(dateRange)
+    const result = await get<ExpenseFetchResponse>('/api/expenses', {
+      page,
+      limit,
+      category: categoryFilter || undefined,
+      search: search.trim() || undefined,
+      dateFrom: from || undefined,
+      dateTo: to || undefined,
+    }, { showErrorToast: false })
 
-      const { from, to } = getDateRange(dateRange)
-      if (from) params.set('dateFrom', from)
-      if (to) params.set('dateTo', to)
-
-      const res = await fetch(`/api/expenses?${params.toString()}`)
-      const json = await res.json()
-
-      if (json.success) {
-        setExpenses(json.data.expenses || [])
-        setTotal(json.data.total || 0)
-        setTotalPages(json.data.totalPages || 1)
-        setCurrentPage(json.data.page || 1)
-        setSummary(json.data.summary || null)
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل المصروفات')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    if (result) {
+       
+      setExpenses(result.expenses || [])
+       
+      setTotal(result.total || 0)
+       
+      setTotalPages(result.totalPages || 1)
+       
+      setCurrentPage(result.page || 1)
+       
+      setSummary(result.summary || null)
     }
-  }, [categoryFilter, dateRange, search])
+
+    setLoading(false)
+    setRefreshing(false)
+  }, [categoryFilter, dateRange, search, get])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData(1)
   }, [fetchData])
 
@@ -397,58 +406,36 @@ export function ExpenseScreen() {
     }
 
     setSubmitting(true)
-    try {
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: newCategory,
-          amount: parseFloat(newAmount),
-          description: newDescription.trim(),
-          date: newDate,
-          recurring: newRecurring,
-          recurringPeriod: newRecurring ? newRecurringPeriod : null,
-          userId: user?.id || '',
-          userName: user?.name || null,
-        }),
-      })
-      const json = await res.json()
+    const result = await post('/api/expenses', {
+      category: newCategory,
+      amount: parseFloat(newAmount),
+      description: newDescription.trim(),
+      date: newDate,
+      recurring: newRecurring,
+      recurringPeriod: newRecurring ? newRecurringPeriod : null,
+      userId: user?.id || '',
+      userName: user?.name || null,
+    }, { showSuccessToast: true, successMessage: 'تم إضافة المصروف بنجاح' })
 
-      if (json.success) {
-        toast.success('تم إضافة المصروف بنجاح')
-        resetAddForm()
-        setAddDialogOpen(false)
-        fetchData(1)
-      } else {
-        toast.error(json.error || 'فشل في إضافة المصروف')
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء إضافة المصروف')
-    } finally {
-      setSubmitting(false)
+    if (result) {
+      resetAddForm()
+      setAddDialogOpen(false)
+      fetchData(1)
     }
+    setSubmitting(false)
   }
 
   const handleDeleteExpense = async () => {
     if (!deleteTarget) return
     setDeleting(true)
-    try {
-      const res = await fetch(`/api/expenses?id=${deleteTarget.id}`, { method: 'DELETE' })
-      const json = await res.json()
+    const success = await del('/api/expenses?id=' + deleteTarget.id)
 
-      if (json.success) {
-        toast.success('تم حذف المصروف بنجاح')
-        setDeleteDialogOpen(false)
-        setDeleteTarget(null)
-        fetchData(currentPage)
-      } else {
-        toast.error(json.error || 'فشل في حذف المصروف')
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء حذف المصروف')
-    } finally {
-      setDeleting(false)
+    if (success) {
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+      fetchData(currentPage)
     }
+    setDeleting(false)
   }
 
   const resetAddForm = () => {

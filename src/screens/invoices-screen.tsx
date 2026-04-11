@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { Search, FileText, Printer, ChevronDown, ChevronUp, Calendar, Eye, Loader2, Filter, X, Download, RotateCcw } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatDate, formatShortDate, formatTime } from '@/lib/date-utils'
@@ -66,6 +67,7 @@ export function InvoicesScreen() {
   const [activeTab, setActiveTab] = useState<'sale' | 'purchase'>('sale')
   const settings = useAppStore((s) => s.settings)
   const { formatCurrency, formatDual, isDualActive } = useCurrency()
+  const { get, post } = useApi()
 
   // Filters
   const [search, setSearch] = useState('')
@@ -98,23 +100,21 @@ export function InvoicesScreen() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('type', activeTab)
-      if (search.trim()) params.set('search', search.trim())
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
-
-      const res = await fetch(`/api/invoices?${params.toString()}`)
-      if (!res.ok) throw new Error('فشل في تحميل الفواتير')
-      const data = await res.json()
-      setInvoices(data.data || [])
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل الفواتير')
-      setInvoices([])
+      const result = await get<Invoice[]>('/api/invoices', {
+        type: activeTab,
+        search: search.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }, { showErrorToast: false })
+      if (result) {
+        setInvoices(result)
+      } else {
+        setInvoices([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [activeTab, search, dateFrom, dateTo])
+  }, [activeTab, search, dateFrom, dateTo, get])
 
   useEffect(() => {
     fetchInvoices()
@@ -168,27 +168,17 @@ export function InvoicesScreen() {
 
     setReturnSubmitting(true)
     try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invoiceId: returnInvoice.id,
-          productId: returnProductId,
-          quantity: returnQuantity,
-          reason: returnReason,
-          userId: user.id,
-          userName: user.name,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('تم إنشاء المرتجع بنجاح')
+      const result = await post('/api/returns', {
+        invoiceId: returnInvoice.id,
+        productId: returnProductId,
+        quantity: returnQuantity,
+        reason: returnReason,
+        userId: user.id,
+        userName: user.name,
+      }, { showSuccessToast: true, successMessage: 'تم إنشاء المرتجع بنجاح' })
+      if (result) {
         setReturnOpen(false)
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء إنشاء المرتجع')
       }
-    } catch {
-      toast.error('حدث خطأ أثناء إنشاء المرتجع')
     } finally {
       setReturnSubmitting(false)
     }

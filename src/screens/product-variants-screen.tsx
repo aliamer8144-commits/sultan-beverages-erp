@@ -14,6 +14,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import {
   Layers, Search, Plus, Pencil, Trash2, ChevronDown, ChevronLeft,
   Loader2, Package, PackagePlus, RotateCcw, RefreshCw,
@@ -74,6 +75,7 @@ interface QuickAdjustment {
 // ─── Component ────────────────────────────────────────────────────
 export function ProductVariantsScreen() {
   const { symbol } = useCurrency()
+  const { get, post, put, del } = useApi()
 
   // Data state
   const [products, setProducts] = useState<Product[]>([])
@@ -107,19 +109,14 @@ export function ProductVariantsScreen() {
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      const res = await fetch(`/api/products?${params.toString()}`)
-      const data = await res.json()
-      if (data.success) {
-        setProducts(data.data)
+      const result = await get<Product[]>('/api/products', search ? { search } : undefined)
+      if (result) {
+        setProducts(result)
       }
-    } catch {
-      toast.error('حدث خطأ في تحميل المنتجات')
     } finally {
       setLoading(false)
     }
-  }, [search])
+  }, [get, search])
 
   useEffect(() => {
     fetchProducts()
@@ -127,16 +124,11 @@ export function ProductVariantsScreen() {
 
   // ─── Fetch variants for a product ──────────────────────────────
   const fetchVariants = useCallback(async (productId: string) => {
-    try {
-      const res = await fetch(`/api/product-variants?productId=${productId}`)
-      const data = await res.json()
-      if (data.success) {
-        setVariantsMap((prev) => ({ ...prev, [productId]: data.data }))
-      }
-    } catch {
-      // Silent
+    const result = await get<ProductVariant[]>('/api/product-variants', { productId }, { showErrorToast: false })
+    if (result) {
+      setVariantsMap((prev) => ({ ...prev, [productId]: result }))
     }
-  }, [])
+  }, [get])
 
   // ─── Toggle product expansion ──────────────────────────────────
   const toggleExpand = async (productId: string) => {
@@ -205,53 +197,34 @@ export function ProductVariantsScreen() {
     }
 
     setSubmitting(true)
-    try {
-      let res: Response
-      if (editingVariant) {
-        res = await fetch(`/api/product-variants?id=${editingVariant.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name.trim(),
-            sku: form.sku.trim() || null,
-            barcode: form.barcode.trim() || null,
-            costPrice: Number(form.costPrice) || 0,
-            sellPrice: Number(form.sellPrice) || 0,
-            stock: Number(form.stock) || 0,
-          }),
-        })
-        toast.success('تم تحديث المتغير بنجاح')
-      } else {
-        res = await fetch('/api/product-variants', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productId: formProduct.id,
-            name: form.name.trim(),
-            sku: form.sku.trim() || null,
-            barcode: form.barcode.trim() || null,
-            costPrice: Number(form.costPrice) || 0,
-            sellPrice: Number(form.sellPrice) || 0,
-            stock: Number(form.stock) || 0,
-          }),
-        })
-        toast.success('تم إضافة المتغير بنجاح')
-      }
+    const payload = {
+      name: form.name.trim(),
+      sku: form.sku.trim() || null,
+      barcode: form.barcode.trim() || null,
+      costPrice: Number(form.costPrice) || 0,
+      sellPrice: Number(form.sellPrice) || 0,
+      stock: Number(form.stock) || 0,
+    }
 
-      const data = await res.json()
-      if (!data.success) {
-        toast.error(data.error || 'حدث خطأ أثناء الحفظ')
-        return
-      }
+    let result
+    if (editingVariant) {
+      result = await put(`/api/product-variants?id=${editingVariant.id}`, payload, {
+        showSuccessToast: true,
+        successMessage: 'تم تحديث المتغير بنجاح',
+      })
+    } else {
+      result = await post('/api/product-variants', { ...payload, productId: formProduct.id }, {
+        showSuccessToast: true,
+        successMessage: 'تم إضافة المتغير بنجاح',
+      })
+    }
 
+    if (result) {
       setFormOpen(false)
       await fetchVariants(formProduct.id)
-      fetchProducts() // Refresh variant counts
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
-    } finally {
-      setSubmitting(false)
+      fetchProducts()
     }
+    setSubmitting(false)
   }
 
   // ─── Delete variant ────────────────────────────────────────────
@@ -262,22 +235,13 @@ export function ProductVariantsScreen() {
 
   const handleDelete = async () => {
     if (!deletingVariant) return
-    try {
-      const res = await fetch(`/api/product-variants?id=${deletingVariant.id}`, { method: 'DELETE' })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('تم حذف المتغير بنجاح')
-        setDeleteOpen(false)
-        // Find product to refresh its variants
-        const productId = deletingVariant.productId
-        await fetchVariants(productId)
-        fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في حذف المتغير')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
-    }
+    await del(`/api/product-variants?id=${deletingVariant.id}`, {
+      successMessage: 'تم حذف المتغير بنجاح',
+    })
+    setDeleteOpen(false)
+    const productId = deletingVariant.productId
+    await fetchVariants(productId)
+    fetchProducts()
   }
 
   // ─── Quick stock adjustment ────────────────────────────────────
@@ -302,25 +266,15 @@ export function ProductVariantsScreen() {
     }
 
     setQuickAdjustSubmitting(true)
-    try {
-      const res = await fetch(`/api/product-variants?id=${quickAdjustVariant.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock: newStock }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(`تم ${adjustment > 0 ? 'إضافة' : 'خصم'} ${Math.abs(adjustment)} وحدة`)
-        setQuickAdjustOpen(false)
-        await fetchVariants(quickAdjustVariant.productId)
-      } else {
-        toast.error(data.error || 'فشل في تعديل المخزون')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
-    } finally {
-      setQuickAdjustSubmitting(false)
+    const result = await put(`/api/product-variants?id=${quickAdjustVariant.id}`, { stock: newStock }, {
+      showSuccessToast: true,
+      successMessage: `تم ${adjustment > 0 ? 'إضافة' : 'خصم'} ${Math.abs(adjustment)} وحدة`,
+    })
+    if (result) {
+      setQuickAdjustOpen(false)
+      await fetchVariants(quickAdjustVariant.productId)
     }
+    setQuickAdjustSubmitting(false)
   }
 
   // ─── Computed stats ────────────────────────────────────────────

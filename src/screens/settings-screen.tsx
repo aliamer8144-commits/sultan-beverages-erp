@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import {
   Store,
   Receipt,
@@ -188,6 +189,7 @@ function SalesTargetsSection() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const { get, post, put, del } = useApi()
 
   // Form state
   const [formType, setFormType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
@@ -196,17 +198,16 @@ function SalesTargetsSection() {
 
   const fetchTargets = useCallback(async () => {
     try {
-      const res = await fetch('/api/sales-targets?all=true')
-      const json = await res.json()
-      if (json.success) {
-        setTargets(json.data || [])
+      const result = await get<SalesTarget[]>('/api/sales-targets', { all: 'true' }, { showErrorToast: false })
+      if (result) {
+        setTargets(result)
       }
     } catch {
       // Silent
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchTargets()
@@ -228,57 +229,34 @@ function SalesTargetsSection() {
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/sales-targets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: formType,
-          targetAmount: amount,
-          endDate: formEndDate || null,
-        }),
-      })
-      const json = await res.json()
-      if (json.success) {
-        toast.success('تم إنشاء هدف المبيعات بنجاح')
+      const result = await post('/api/sales-targets', {
+        type: formType,
+        targetAmount: amount,
+        endDate: formEndDate || null,
+      }, { showSuccessToast: true, successMessage: 'تم إنشاء هدف المبيعات بنجاح' })
+      if (result) {
         resetForm()
         fetchTargets()
-      } else {
-        toast.error(json.error || 'حدث خطأ')
       }
-    } catch {
-      toast.error('خطأ في الاتصال')
     } finally {
       setSaving(false)
     }
   }
 
   const handleToggle = async (target: SalesTarget) => {
-    try {
-      const res = await fetch('/api/sales-targets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: target.id, isActive: !target.isActive }),
-      })
-      const json = await res.json()
-      if (json.success) {
-        toast.success(target.isActive ? 'تم إلغاء تفعيل الهدف' : 'تم تفعيل الهدف')
-        fetchTargets()
-      }
-    } catch {
-      toast.error('خطأ في تحديث الهدف')
+    const result = await put('/api/sales-targets', { id: target.id, isActive: !target.isActive }, {
+      showSuccessToast: true,
+      successMessage: target.isActive ? 'تم إلغاء تفعيل الهدف' : 'تم تفعيل الهدف',
+    })
+    if (result) {
+      fetchTargets()
     }
   }
 
   const handleDelete = async (id: string) => {
-    try {
-      const res = await fetch(`/api/sales-targets?id=${id}`, { method: 'DELETE' })
-      const json = await res.json()
-      if (json.success) {
-        toast.success('تم حذف الهدف بنجاح')
-        fetchTargets()
-      }
-    } catch {
-      toast.error('خطأ في حذف الهدف')
+    const result = await del('/api/sales-targets?id=' + id)
+    if (result) {
+      fetchTargets()
     }
   }
 
@@ -504,6 +482,7 @@ function SalesTargetsSection() {
 // ─── Main Settings Screen ────────────────────────────────────────
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore()
+  const { get } = useApi()
   const initialSettingsRef = useRef<SettingsState>(settings)
   const [localSettings, setLocalSettings] = useState<SettingsState>(settings)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -514,10 +493,9 @@ export function SettingsScreen() {
     let cancelled = false
     const load = async () => {
       try {
-        const res = await fetch('/api/customers')
-        const json = await res.json()
-        if (!cancelled && json.success) {
-          setCustomers(json.data)
+        const result = await get<Customer[]>('/api/customers', undefined, { showErrorToast: false })
+        if (!cancelled && result) {
+          setCustomers(result)
           setCustomersLoaded(true)
         }
       } catch {
@@ -526,7 +504,7 @@ export function SettingsScreen() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [get])
 
   // Track changes by comparing with store
   const hasChanges = JSON.stringify(localSettings) !== JSON.stringify(settings)

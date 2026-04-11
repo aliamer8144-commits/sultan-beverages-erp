@@ -25,6 +25,7 @@ import {
   Clock, Activity, Layers, Save, Upload,
 } from 'lucide-react'
 import { CsvImportDialog } from '@/components/csv-import-dialog'
+import { useApi } from '@/hooks/use-api'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
 import { compressImage } from '@/lib/image-utils'
@@ -38,6 +39,9 @@ import { emptyForm, emptyAdjustmentForm, emptyVariantForm } from './inventory/ty
 import { adjustmentTypeConfig, movementTypeConfig } from './inventory/constants'
 
 export function InventoryScreen() {
+  // API hook
+  const { get, post, put, patch, del, request } = useApi()
+
   // Currency
   const { symbol, formatCurrency } = useCurrency()
   const user = useAppStore((s) => s.user)
@@ -125,17 +129,20 @@ export function InventoryScreen() {
     setEditingVariant(null)
     setVariantsLoading(true)
     try {
-      const res = await fetch(`/api/product-variants?productId=${product.id}`)
-      const data = await res.json()
-      if (data.success) {
-        setVariants(data.data)
+      const result = await get<ProductVariant[]>(
+        '/api/product-variants',
+        { productId: product.id },
+        { showErrorToast: false },
+      )
+      if (result) {
+        setVariants(result)
       }
     } catch {
-      toast.error('فشل في تحميل المتغيرات')
+      // handled by useApi
     } finally {
       setVariantsLoading(false)
     }
-  }, [])
+  }, [get])
 
   const openAddVariantDialog = () => {
     setEditingVariant(null)
@@ -165,69 +172,44 @@ export function InventoryScreen() {
 
     setVariantSubmitting(true)
     try {
-      let res: Response
+      const payload = {
+        name: variantForm.name.trim(),
+        sku: variantForm.sku.trim() || null,
+        barcode: variantForm.barcode.trim() || null,
+        costPrice: Number(variantForm.costPrice) || 0,
+        sellPrice: Number(variantForm.sellPrice) || 0,
+        stock: Number(variantForm.stock) || 0,
+      }
+      let result: ProductVariant | null
       if (editingVariant) {
-        res = await fetch(`/api/product-variants?id=${editingVariant.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: variantForm.name.trim(),
-            sku: variantForm.sku.trim() || null,
-            barcode: variantForm.barcode.trim() || null,
-            costPrice: Number(variantForm.costPrice) || 0,
-            sellPrice: Number(variantForm.sellPrice) || 0,
-            stock: Number(variantForm.stock) || 0,
-          }),
-        })
-        toast.success('تم تحديث المتغير بنجاح')
+        result = await put<ProductVariant>(
+          `/api/product-variants?id=${editingVariant.id}`,
+          payload,
+          { showSuccessToast: true, successMessage: 'تم تحديث المتغير بنجاح' },
+        )
       } else {
-        res = await fetch('/api/product-variants', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productId: variantsProduct.id,
-            name: variantForm.name.trim(),
-            sku: variantForm.sku.trim() || null,
-            barcode: variantForm.barcode.trim() || null,
-            costPrice: Number(variantForm.costPrice) || 0,
-            sellPrice: Number(variantForm.sellPrice) || 0,
-            stock: Number(variantForm.stock) || 0,
-          }),
-        })
-        toast.success('تم إضافة المتغير بنجاح')
+        result = await post<ProductVariant>(
+          '/api/product-variants',
+          { productId: variantsProduct.id, ...payload },
+          { showSuccessToast: true, successMessage: 'تم إضافة المتغير بنجاح' },
+        )
       }
 
-      const data = await res.json()
-      if (!data.success) {
-        toast.error(data.error || 'حدث خطأ أثناء الحفظ')
-        return
-      }
+      if (!result) return
 
       setVariantFormOpen(false)
       openVariantsDialog(variantsProduct)
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setVariantSubmitting(false)
     }
   }
 
   const handleDeleteVariant = async (variantId: string) => {
-    try {
-      const res = await fetch(`/api/product-variants?id=${variantId}`, {
-        method: 'DELETE',
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('تم حذف المتغير بنجاح')
-        if (variantsProduct) {
-          openVariantsDialog(variantsProduct)
-        }
-      } else {
-        toast.error(data.error || 'فشل في حذف المتغير')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
+    const ok = await del(`/api/product-variants?id=${variantId}`)
+    if (ok && variantsProduct) {
+      openVariantsDialog(variantsProduct)
     }
   }
 
@@ -235,23 +217,18 @@ export function InventoryScreen() {
   const fetchProductMovements = useCallback(async (productId: string) => {
     setProductMovementsLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('productId', productId)
-      params.set('page', '1')
-      params.set('limit', '5')
-      const res = await fetch(`/api/stock-adjustments?${params.toString()}`)
-      const data = await res.json()
-      if (data.success) {
-        setProductMovements(data.data || [])
-      } else {
-        setProductMovements([])
-      }
+      const result = await get<{ adjustments: StockAdjustment[] }>(
+        '/api/stock-adjustments',
+        { productId, page: 1, limit: 5 },
+        { showErrorToast: false },
+      )
+      setProductMovements(result?.adjustments || [])
     } catch {
       setProductMovements([])
     } finally {
       setProductMovementsLoading(false)
     }
-  }, [])
+  }, [get])
 
 
 
@@ -277,39 +254,34 @@ export function InventoryScreen() {
 
   // Fetch categories
   const fetchCategories = useCallback(async () => {
-    try {
-      const res = await fetch('/api/categories')
-      const data = await res.json()
-      if (data.success) {
-        setCategories(data.data)
-      }
-    } catch {
-      toast.error('فشل في تحميل التصنيفات')
+    const result = await get<Category[]>('/api/categories', undefined, { showErrorToast: false })
+    if (result) {
+      setCategories(result)
     }
-  }, [])
+  }, [get])
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (categoryId && categoryId !== 'all') params.set('categoryId', categoryId)
-      if (lowStock) params.set('lowStock', 'true')
-
-      const res = await fetch(`/api/products?${params.toString()}`)
-      const data = await res.json()
-      if (data.success) {
-        setProducts(data.data)
-      } else {
-        toast.error(data.error || 'فشل في تحميل المنتجات')
+      const result = await get<Product[]>(
+        '/api/products',
+        {
+          search: search || undefined,
+          categoryId: categoryId !== 'all' ? categoryId : undefined,
+          lowStock: lowStock ? 'true' : undefined,
+        },
+        { showErrorToast: false },
+      )
+      if (result) {
+        setProducts(result)
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setLoading(false)
     }
-  }, [search, categoryId, lowStock])
+  }, [search, categoryId, lowStock, get])
 
   useEffect(() => {
     fetchCategories()
@@ -384,33 +356,27 @@ export function InventoryScreen() {
         image: form.image.trim() || null,
       }
 
-      let res: Response
+      let result: Product | null
       if (editingProduct) {
-        res = await fetch(`/api/products/${editingProduct.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        toast.success('تم تحديث المنتج بنجاح')
+        result = await put<Product>(
+          `/api/products/${editingProduct.id}`,
+          payload,
+          { showSuccessToast: true, successMessage: 'تم تحديث المنتج بنجاح' },
+        )
       } else {
-        res = await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        toast.success('تم إضافة المنتج بنجاح')
+        result = await post<Product>(
+          '/api/products',
+          payload,
+          { showSuccessToast: true, successMessage: 'تم إضافة المنتج بنجاح' },
+        )
       }
 
-      const data = await res.json()
-      if (!data.success) {
-        toast.error(data.error || 'حدث خطأ أثناء الحفظ')
-        return
-      }
+      if (!result) return
 
       setFormOpen(false)
       fetchProducts()
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setSubmitting(false)
     }
@@ -419,23 +385,11 @@ export function InventoryScreen() {
   const handleDelete = async () => {
     if (!deletingProduct) return
 
-    try {
-      const res = await fetch(`/api/products/${deletingProduct.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success('تم حذف المنتج بنجاح')
-        setDeleteOpen(false)
-        setDeletingProduct(null)
-        fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في حذف المنتج')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
+    const ok = await del(`/api/products/${deletingProduct.id}`)
+    if (ok) {
+      setDeleteOpen(false)
+      setDeletingProduct(null)
+      fetchProducts()
     }
   }
 
@@ -459,10 +413,9 @@ export function InventoryScreen() {
 
     setAdjustSubmitting(true)
     try {
-      const res = await fetch('/api/stock-adjustments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const result = await post<StockAdjustment & { message?: string }>(
+        '/api/stock-adjustments',
+        {
           productId: adjustProduct.id,
           type: adjustForm.type,
           quantity: Number(adjustForm.quantity),
@@ -470,21 +423,17 @@ export function InventoryScreen() {
           userId: user?.id || 'unknown',
           userName: user?.name || null,
           reference: adjustForm.reference.trim() || null,
-        }),
-      })
-      const data = await res.json()
+        },
+        { showSuccessToast: true, successMessage: 'تم تعديل المخزون بنجاح' },
+      )
+      if (!result) return
 
-      if (data.success) {
-        toast.success(data.message || 'تم تعديل المخزون بنجاح')
-        setAdjustDialogOpen(false)
-        setAdjustProduct(null)
-        setAdjustForm(emptyAdjustmentForm)
-        fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في تعديل المخزون')
-      }
+      setAdjustDialogOpen(false)
+      setAdjustProduct(null)
+      setAdjustForm(emptyAdjustmentForm)
+      fetchProducts()
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setAdjustSubmitting(false)
     }
@@ -494,39 +443,33 @@ export function InventoryScreen() {
   const fetchHistory = useCallback(async (page = 1) => {
     setHistoryLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', '15')
-      if (historyFilterProduct && historyFilterProduct !== 'all') {
-        params.set('productId', historyFilterProduct)
-      }
-      if (historyFilterType && historyFilterType !== 'all') {
-        params.set('type', historyFilterType)
-      }
-      if (historyDateFrom) {
-        params.set('dateFrom', format(historyDateFrom, 'yyyy-MM-dd'))
-      }
-      if (historyDateTo) {
-        params.set('dateTo', format(historyDateTo, 'yyyy-MM-dd'))
-      }
-
-      const res = await fetch(`/api/stock-adjustments?${params.toString()}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setAdjustments(data.data)
-        setHistoryPage(data.pagination.page)
-        setHistoryTotalPages(data.pagination.totalPages)
-        setHistoryTotal(data.pagination.total)
-      } else {
-        toast.error(data.error || 'فشل في تحميل السجل')
+      const result = await get<{
+        adjustments: StockAdjustment[]
+        pagination: { page: number; totalPages: number; total: number }
+      }>(
+        '/api/stock-adjustments',
+        {
+          page,
+          limit: 15,
+          productId: historyFilterProduct !== 'all' ? historyFilterProduct : undefined,
+          type: historyFilterType !== 'all' ? historyFilterType : undefined,
+          dateFrom: historyDateFrom ? format(historyDateFrom, 'yyyy-MM-dd') : undefined,
+          dateTo: historyDateTo ? format(historyDateTo, 'yyyy-MM-dd') : undefined,
+        },
+        { showErrorToast: false },
+      )
+      if (result) {
+        setAdjustments(result.adjustments)
+        setHistoryPage(result.pagination.page)
+        setHistoryTotalPages(result.pagination.totalPages)
+        setHistoryTotal(result.pagination.total)
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setHistoryLoading(false)
     }
-  }, [historyFilterProduct, historyFilterType, historyDateFrom, historyDateTo])
+  }, [historyFilterProduct, historyFilterType, historyDateFrom, historyDateTo, get])
 
   useEffect(() => {
     if (historyOpen) {
@@ -619,24 +562,16 @@ export function InventoryScreen() {
           : -Number(batchPriceValue)
       }
 
-      const res = await fetch('/api/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(`تم تغيير سعر ${data.data.count} منتج بنجاح`)
+      const result = await patch<{ count: number }>('/api/products', payload)
+      if (result) {
+        toast.success(`تم تغيير سعر ${result.count} منتج بنجاح`)
         setBatchPriceOpen(false)
         setBatchPriceValue('')
         clearSelection()
         fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في تغيير الأسعار')
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setBatchSubmitting(false)
     }
@@ -651,27 +586,19 @@ export function InventoryScreen() {
 
     setBatchSubmitting(true)
     try {
-      const res = await fetch('/api/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ids: Array.from(selectedIds),
-          categoryId: batchNewCategoryId,
-        }),
+      const result = await patch<{ count: number }>('/api/products', {
+        ids: Array.from(selectedIds),
+        categoryId: batchNewCategoryId,
       })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(`تم نقل ${data.data.count} منتج إلى التصنيف الجديد`)
+      if (result) {
+        toast.success(`تم نقل ${result.count} منتج إلى التصنيف الجديد`)
         setBatchCategoryOpen(false)
         setBatchNewCategoryId('')
         clearSelection()
         fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في نقل المنتجات')
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setBatchSubmitting(false)
     }
@@ -682,26 +609,18 @@ export function InventoryScreen() {
 
     setBatchSubmitting(true)
     try {
-      const res = await fetch('/api/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ids: Array.from(selectedIds),
-          isActive: batchNewStatus,
-        }),
+      const result = await patch<{ count: number }>('/api/products', {
+        ids: Array.from(selectedIds),
+        isActive: batchNewStatus,
       })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(`تم ${batchNewStatus ? 'تفعيل' : 'تعطيل'} ${data.data.count} منتج بنجاح`)
+      if (result) {
+        toast.success(`تم ${batchNewStatus ? 'تفعيل' : 'تعطيل'} ${result.count} منتج بنجاح`)
         setBatchStatusOpen(false)
         clearSelection()
         fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في تعديل الحالة')
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setBatchSubmitting(false)
     }
@@ -713,23 +632,23 @@ export function InventoryScreen() {
     setBatchSubmitting(true)
     try {
       const ids = Array.from(selectedIds)
-      const res = await fetch('/api/products', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(`تم حذف ${data.data.count} منتج بنجاح`)
+      const result = await request<{ count: number }>(
+        '/api/products',
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        },
+        { showSuccessToast: false },
+      )
+      if (result) {
+        toast.success(`تم حذف ${result.count} منتج بنجاح`)
         setBatchDeleteOpen(false)
         clearSelection()
         fetchProducts()
-      } else {
-        toast.error(data.error || 'فشل في حذف المنتجات')
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setBatchSubmitting(false)
     }
@@ -769,36 +688,28 @@ export function InventoryScreen() {
     setCatSubmitting(true)
     try {
       if (editingCat) {
-        const res = await fetch(`/api/categories/${editingCat.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: catName.trim(), icon: editingCat.icon }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          toast.success('تم تحديث التصنيف بنجاح')
+        const result = await put<Category>(
+          `/api/categories/${editingCat.id}`,
+          { name: catName.trim(), icon: editingCat.icon },
+          { showSuccessToast: true, successMessage: 'تم تحديث التصنيف بنجاح' },
+        )
+        if (result) {
           setCatFormOpen(false)
           fetchCategories()
-        } else {
-          toast.error(data.error || 'فشل في تحديث التصنيف')
         }
       } else {
-        const res = await fetch('/api/categories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: catName.trim() }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          toast.success('تم إضافة التصنيف بنجاح')
+        const result = await post<Category>(
+          '/api/categories',
+          { name: catName.trim() },
+          { showSuccessToast: true, successMessage: 'تم إضافة التصنيف بنجاح' },
+        )
+        if (result) {
           setCatFormOpen(false)
           fetchCategories()
-        } else {
-          toast.error(data.error || 'فشل في إضافة التصنيف')
         }
       }
     } catch {
-      toast.error('حدث خطأ في الاتصال')
+      // handled by useApi
     } finally {
       setCatSubmitting(false)
     }
@@ -806,22 +717,11 @@ export function InventoryScreen() {
 
   const handleCatDelete = async () => {
     if (!deletingCat) return
-    try {
-      const res = await fetch(`/api/categories/${deletingCat.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('تم حذف التصنيف بنجاح')
-        setCatDeleteOpen(false)
-        setDeletingCat(null)
-        fetchCategories()
-      } else {
-        toast.error(data.error || 'فشل في حذف التصنيف')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال')
+    const ok = await del(`/api/categories/${deletingCat.id}`)
+    if (ok) {
+      setCatDeleteOpen(false)
+      setDeletingCat(null)
+      fetchCategories()
     }
   }
 

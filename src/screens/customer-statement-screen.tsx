@@ -5,6 +5,7 @@ import { useCurrency } from '@/hooks/use-currency'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatDateShortMonth, formatDateTime } from '@/lib/date-utils'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -106,6 +107,7 @@ function TypeBadge({ type }: { type: string }) {
 // ─── Main Screen Component ───────────────────────────────────────────
 export function CustomerStatementScreen() {
   const { formatCurrency, symbol } = useCurrency()
+  const { get } = useApi()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
   const [startDate, setStartDate] = useState<string>(
@@ -126,10 +128,9 @@ export function CustomerStatementScreen() {
   useEffect(() => {
     async function fetchCustomers() {
       try {
-        const res = await fetch('/api/customers')
-        const json = await res.json()
-        if (json.success && json.data) {
-          setCustomers(json.data)
+        const result = await get<Customer[]>('/api/customers', undefined, { showErrorToast: false })
+        if (result) {
+          setCustomers(result)
         }
       } catch {
         toast.error('فشل في تحميل قائمة العملاء')
@@ -138,7 +139,7 @@ export function CustomerStatementScreen() {
       }
     }
     fetchCustomers()
-  }, [])
+  }, [get])
 
   // ── Generate statement ─────────────────────────────────────────────
   const generateStatement = useCallback(async () => {
@@ -151,26 +152,24 @@ export function CustomerStatementScreen() {
     setStatement(null)
 
     try {
-      const params = new URLSearchParams({
+      const result = await get<StatementData>('/api/customer-statement', {
         customerId: selectedCustomerId,
         startDate,
         endDate,
-      })
-      const res = await fetch(`/api/customer-statement?${params}`)
-      const json = await res.json()
+      }, { showErrorToast: false })
 
-      if (json.success && json.data) {
-        setStatement(json.data)
+      if (result) {
+        setStatement(result)
         toast.success('تم إنشاء كشف الحساب بنجاح')
       } else {
-        toast.error(json.error || 'فشل في إنشاء كشف الحساب')
+        toast.error('فشل في إنشاء كشف الحساب')
       }
     } catch {
       toast.error('فشل في الاتصال بالخادم')
     } finally {
       setLoading(false)
     }
-  }, [selectedCustomerId, startDate, endDate])
+  }, [selectedCustomerId, startDate, endDate, get])
 
   // ── Print statement ────────────────────────────────────────────────
   const handlePrint = () => {

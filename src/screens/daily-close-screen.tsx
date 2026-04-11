@@ -43,6 +43,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
+import { useApi } from '@/hooks/use-api'
 import {
   dualFormat,
   formatCurrency,
@@ -212,6 +213,7 @@ function handlePrint(data: DailyCloseData) {
 
 // ─── Main Screen ───────────────────────────────────────────────────
 export function DailyCloseScreen() {
+  const { get } = useApi()
   const [data, setData] = useState<DailyCloseData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -221,18 +223,15 @@ export function DailyCloseScreen() {
     else setLoading(true)
 
     try {
-      const res = await fetch('/api/daily-close')
-      const json = await res.json()
-      if (json.success) {
-        setData(json.data)
+      const result = await get<DailyCloseData>('/api/daily-close', undefined, { showErrorToast: false })
+      if (result) {
+        setData(result)
       }
-    } catch {
-      // silently fail
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchData()

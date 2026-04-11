@@ -33,6 +33,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { formatDateTime } from '@/lib/date-utils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ interface LastBackupInfo {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function BackupScreen() {
+  const { get, post } = useApi()
   // ── Backup state ──
   const [creatingBackup, setCreatingBackup] = useState(false)
   const [backupData, setBackupData] = useState<Record<string, unknown> | null>(null)
@@ -94,15 +96,14 @@ export function BackupScreen() {
   const handleCreateBackup = useCallback(async () => {
     setCreatingBackup(true)
     try {
-      const res = await fetch('/api/backup')
-      const json = await res.json()
+      const result = await get<Record<string, unknown>>('/api/backup', undefined, { showErrorToast: false })
 
-      if (json.success) {
-        setBackupData(json.data)
+      if (result) {
+        setBackupData(result)
         // Save to localStorage
         const info: LastBackupInfo = {
-          date: json.data.backupDate,
-          summary: json.data.summary,
+          date: result.backupDate as string,
+          summary: result.summary as BackupSummary,
         }
         setLastBackupInfo(info)
         localStorage.setItem('sultan-last-backup', JSON.stringify(info))
@@ -115,7 +116,7 @@ export function BackupScreen() {
     } finally {
       setCreatingBackup(false)
     }
-  }, [])
+  }, [get])
 
   // ── Download Backup ──
   const handleDownload = useCallback(() => {
@@ -200,27 +201,23 @@ export function BackupScreen() {
       const text = await selectedFile.text()
       const data = JSON.parse(text)
 
-      const res = await fetch('/api/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      const result = await post<Record<string, number>>('/api/restore', data, {
+        showSuccessToast: true,
+        successMessage: 'تمت استعادة البيانات بنجاح',
       })
-      const json = await res.json()
 
-      if (json.success) {
-        setRestoreResult({ success: true, counts: json.data })
-        toast.success('تمت استعادة البيانات بنجاح')
+      if (result) {
+        setRestoreResult({ success: true, counts: result })
       } else {
-        setRestoreResult({ success: false, counts: {}, error: json.error })
-        toast.error(json.error || 'فشل في استعادة البيانات')
+        setRestoreResult({ success: false, counts: {} })
       }
-    } catch (error) {
+    } catch {
       setRestoreResult({ success: false, counts: {}, error: 'حدث خطأ في الاتصال' })
       toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setRestoring(false)
     }
-  }, [selectedFile, previewData])
+  }, [selectedFile, previewData, post])
 
   // ── Reset ──
   const handleReset = useCallback(() => {

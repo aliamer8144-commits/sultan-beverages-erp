@@ -105,9 +105,8 @@ export const GET = withAuth(async (request: NextRequest) => {
       else if (diff < 0) totalDecrease += Math.abs(diff)
     }
 
-    return NextResponse.json({
-      success: true,
-      data: adjustments,
+    return successResponse({
+      adjustments,
       pagination: {
         page,
         limit,

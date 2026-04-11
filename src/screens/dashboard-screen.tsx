@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -93,24 +94,20 @@ function TopProductTooltip({ active, payload }: { active?: boolean; payload?: Ar
 
 // ─── Sales Target Widget ─────────────────────────────────────────
 function SalesTargetWidget() {
+  const { get } = useApi()
   const [target, setTarget] = useState<SalesTargetData | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchTarget = useCallback(async () => {
-    try {
-      const res = await fetch('/api/sales-targets')
-      const json = await res.json()
-      if (json.success) {
-        setTarget(json.data)
-      }
-    } catch {
-      // Silent
-    } finally {
-      setLoading(false)
+    const result = await get<SalesTargetData>('/api/sales-targets', undefined, { showErrorToast: false })
+    if (result) {
+      setTarget(result)
     }
-  }, [])
+    setLoading(false)
+  }, [get])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTarget()
     const interval = setInterval(fetchTarget, 60000) // refresh every 60s
     return () => clearInterval(interval)
@@ -217,6 +214,7 @@ function SalesTargetWidget() {
 }
 
 export function DashboardScreen() {
+  const { get } = useApi()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -225,18 +223,12 @@ export function DashboardScreen() {
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
 
-    try {
-      const res = await fetch('/api/dashboard')
-      const json = await res.json()
-      if (json.success) {
-        setData(json.data)
-      }
-    } catch {
-      // Silently handle error - data stays null
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    const result = await get<DashboardData>('/api/dashboard', undefined, { showErrorToast: false })
+    if (result) {
+      setData(result)
     }
+    setLoading(false)
+    setRefreshing(false)
   }
 
   // Scroll reveal observer
@@ -260,6 +252,7 @@ export function DashboardScreen() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboard()
   }, [])
 

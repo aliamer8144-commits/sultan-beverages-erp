@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
+import { useApi } from '@/hooks/use-api'
 import { StarRating } from '@/components/star-rating'
 import { formatShortDate } from '@/lib/date-utils'
 
@@ -70,6 +71,7 @@ const PAYMENT_TERMS = [
 export function PurchasesScreen() {
   const { user } = useAppStore()
   const { formatCurrency } = useCurrency()
+  const { get, post, put, del } = useApi()
 
   // ==================== Suppliers State ====================
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -113,31 +115,18 @@ export function PurchasesScreen() {
 
   // ==================== Load Data ====================
   const fetchSuppliers = useCallback(async (search = '', sortBy = 'createdAt') => {
-    try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (sortBy) params.set('sortBy', sortBy)
-      const res = await fetch(`/api/suppliers?${params.toString()}`)
-      const data = await res.json()
-      if (data.success) {
-        setSuppliers(data.data)
-      }
-    } catch {
-      toast.error('فشل في تحميل الموردين')
+    const result = await get<Supplier[]>('/api/suppliers', { search: search || undefined, sortBy: sortBy || undefined })
+    if (result) {
+      setSuppliers(result)
     }
-  }, [])
+  }, [get])
 
   const fetchProducts = useCallback(async () => {
-    try {
-      const res = await fetch('/api/products')
-      const data = await res.json()
-      if (data.success) {
-        setProducts(data.data)
-      }
-    } catch {
-      toast.error('فشل في تحميل المنتجات')
+    const result = await get<Product[]>('/api/products')
+    if (result) {
+      setProducts(result)
     }
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchSuppliers('', supplierSort)
@@ -177,27 +166,20 @@ export function PurchasesScreen() {
 
     setRatingSubmitting(true)
     try {
-      const res = await fetch('/api/supplier-rating', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierId: ratingSupplier.id,
-          rating: ratingValue,
-          review: ratingReview.trim() || undefined,
-          userName: user?.name || undefined,
-        }),
+      const result = await post('/api/supplier-rating', {
+        supplierId: ratingSupplier.id,
+        rating: ratingValue,
+        review: ratingReview.trim() || undefined,
+        userName: user?.name || undefined,
+      }, {
+        showSuccessToast: true,
+        successMessage: `تم تقييم المورد ${ratingValue} نجوم`,
       })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(`تم تقييم المورد ${ratingValue} نجوم`)
+      if (result) {
         setRatingDialogOpen(false)
         setRatingSupplier(null)
         fetchSuppliers(supplierSearch, supplierSort)
-      } else {
-        toast.error(data.error || 'فشل في تسجيل التقييم')
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تسجيل التقييم')
     } finally {
       setRatingSubmitting(false)
     }
@@ -233,47 +215,27 @@ export function PurchasesScreen() {
     setSupplierLoading(true)
     try {
       const isEditing = !!editingSupplier
-      const res = await fetch(
-        isEditing ? `/api/suppliers/${editingSupplier.id}` : '/api/suppliers',
-        {
-          method: isEditing ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(supplierForm),
-        }
-      )
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(isEditing ? 'تم تحديث المورد بنجاح' : 'تم إضافة المورد بنجاح')
+      const result = isEditing
+        ? await put(`/api/suppliers/${editingSupplier.id}`, supplierForm, {
+            showSuccessToast: true,
+            successMessage: 'تم تحديث المورد بنجاح',
+          })
+        : await post('/api/suppliers', supplierForm, {
+            showSuccessToast: true,
+            successMessage: 'تم إضافة المورد بنجاح',
+          })
+      if (result) {
         setSupplierDialogOpen(false)
         fetchSuppliers(supplierSearch, supplierSort)
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء الحفظ')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setSupplierLoading(false)
     }
   }
 
   const handleDeleteSupplier = async (supplier: Supplier) => {
-    try {
-      const res = await fetch(`/api/suppliers/${supplier.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success('تم حذف المورد بنجاح')
-        fetchSuppliers(supplierSearch, supplierSort)
-      } else {
-        toast.error(data.error || 'فشل في حذف المورد')
-      }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
-    }
+    await del(`/api/suppliers/${supplier.id}`)
+    fetchSuppliers(supplierSearch, supplierSort)
   }
 
   // ==================== Supplier Payment Handlers ====================
@@ -299,28 +261,21 @@ export function PurchasesScreen() {
 
     setPaymentSubmitting(true)
     try {
-      const res = await fetch('/api/supplier-payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierId: paymentSupplier.id,
-          amount,
-          method: paymentMethod,
-          notes: paymentNotes.trim() || null,
-        }),
+      const methodLabel = paymentMethod === 'cash' ? 'نقدي' : paymentMethod === 'transfer' ? 'تحويل' : 'شيك'
+      const result = await post('/api/supplier-payments', {
+        supplierId: paymentSupplier.id,
+        amount,
+        method: paymentMethod,
+        notes: paymentNotes.trim() || null,
+      }, {
+        showSuccessToast: true,
+        successMessage: `تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${paymentSupplier.name}`,
       })
-      const data = await res.json()
-      if (data.success) {
-        const methodLabel = paymentMethod === 'cash' ? 'نقدي' : paymentMethod === 'transfer' ? 'تحويل' : 'شيك'
-        toast.success(`تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${paymentSupplier.name}`)
+      if (result) {
         setOpenPaymentDialog(false)
         setPaymentSupplier(null)
         fetchSuppliers(supplierSearch, supplierSort)
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء تسجيل الدفعة')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setPaymentSubmitting(false)
     }
@@ -332,13 +287,10 @@ export function PurchasesScreen() {
     setOpenHistoryDialog(true)
     setHistoryLoading(true)
     try {
-      const res = await fetch(`/api/supplier-payments?supplierId=${supplier.id}`)
-      const data = await res.json()
-      if (data.success) {
-        setPaymentHistory(data.data)
+      const result = await get<SupplierPayment[]>('/api/supplier-payments', { supplierId: supplier.id }, { showErrorToast: false })
+      if (result) {
+        setPaymentHistory(result)
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل سجل الدفعات')
     } finally {
       setHistoryLoading(false)
     }
@@ -440,37 +392,29 @@ export function PurchasesScreen() {
 
     setSubmittingInvoice(true)
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'purchase',
-          supplierId: selectedSupplierId,
-          discount: 0,
-          paidAmount: totalAmount,
-          userId: user.id,
-          items: purchaseItems.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.costPrice,
-          })),
-        }),
+      const result = await post('/api/invoices', {
+        type: 'purchase',
+        supplierId: selectedSupplierId,
+        discount: 0,
+        paidAmount: totalAmount,
+        userId: user.id,
+        items: purchaseItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.costPrice,
+        })),
+      }, {
+        showSuccessToast: true,
+        successMessage: 'تم إنشاء فاتورة الشراء بنجاح',
       })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success('تم إنشاء فاتورة الشراء بنجاح')
+      if (result) {
         setSelectedSupplierId('')
         setPurchaseItems([])
         setSelectedProductId('')
         setItemQuantity(1)
         setItemCostPrice(0)
         fetchSuppliers(supplierSearch, supplierSort)
-      } else {
-        toast.error(data.error || 'فشل في إنشاء فاتورة الشراء')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setSubmittingInvoice(false)
     }

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { formatDate, formatTime } from '@/lib/date-utils'
 import { useTranslation } from '@/lib/translations'
 import {
@@ -94,6 +95,20 @@ interface CustomerOption {
   id: string
   name: string
   phone: string | null
+}
+
+interface LoyaltyDashboardData {
+  totalEarned: number
+  totalRedeemed: number
+  customerLeaderboard: LeaderboardCustomer[]
+  activityByDate: Record<string, { earned: number; redeemed: number }>
+  recentTransactions: RecentTransaction[]
+}
+
+interface LoyaltyCustomerDetailData {
+  transactions: CustomerTransaction[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  currentPoints: number
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -172,6 +187,7 @@ function TransactionSkeleton() {
 
 export function LoyaltyScreen() {
   const { t, isRTL, lang } = useTranslation()
+  const { get, post } = useApi()
 
   // ── State ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true)
@@ -207,32 +223,29 @@ export function LoyaltyScreen() {
     else setLoading(true)
 
     try {
-      const res = await fetch('/api/loyalty')
-      const json = await res.json()
-      if (json.success) {
-        setTotalEarned(json.data.totalEarned || 0)
-        setTotalRedeemed(json.data.totalRedeemed || 0)
-        setLeaderboard(json.data.customerLeaderboard || [])
-        setRecentTransactions(json.data.recentTransactions || [])
+      const result = await get<LoyaltyDashboardData>('/api/loyalty', undefined, { showErrorToast: false })
+      if (result) {
+        setTotalEarned(result.totalEarned || 0)
+        setTotalRedeemed(result.totalRedeemed || 0)
+        setLeaderboard(result.customerLeaderboard || [])
+        setRecentTransactions(result.recentTransactions || [])
 
         // Transform activityByDate into array for chart
-        const actMap = json.data.activityByDate || {}
+        const actMap = result.activityByDate || {}
         const actArray = Object.entries(actMap)
           .map(([date, val]) => ({
             date,
-            earned: (val as { earned: number; redeemed: number }).earned || 0,
-            redeemed: (val as { earned: number; redeemed: number }).redeemed || 0,
+            earned: val.earned || 0,
+            redeemed: val.redeemed || 0,
           }))
           .sort((a, b) => a.date.localeCompare(b.date))
         setActivityByDate(actArray)
       }
-    } catch {
-      toast.error(t('common.error'))
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [t])
+  }, [get])
 
   useEffect(() => {
     fetchDashboard()
@@ -245,19 +258,16 @@ export function LoyaltyScreen() {
     setCustomerPage(page)
 
     try {
-      const res = await fetch(`/api/loyalty?customerId=${customer.id}&page=${page}&limit=10`)
-      const json = await res.json()
-      if (json.success) {
-        setCustomerTransactions(json.data || [])
-        setCurrentPoints(json.currentPoints || 0)
-        setCustomerTotalPages(json.pagination?.totalPages || 1)
+      const result = await get<LoyaltyCustomerDetailData>('/api/loyalty', { customerId: customer.id, page, limit: 10 })
+      if (result) {
+        setCustomerTransactions(result.transactions || [])
+        setCurrentPoints(result.currentPoints || 0)
+        setCustomerTotalPages(result.pagination?.totalPages || 1)
       }
-    } catch {
-      toast.error(t('common.error'))
     } finally {
       setLoadingCustomer(false)
     }
-  }, [t])
+  }, [get])
 
   // ── Fetch Customers for Adjust Dialog ──────────────────────────
   const openAdjustDialog = async () => {
@@ -267,14 +277,9 @@ export function LoyaltyScreen() {
     setAdjustReason('')
     setAdjustType('add')
 
-    try {
-      const res = await fetch('/api/customers')
-      const json = await res.json()
-      if (json.success) {
-        setAdjustCustomers(json.data || [])
-      }
-    } catch {
-      toast.error(t('common.error'))
+    const result = await get<CustomerOption[]>('/api/customers')
+    if (result) {
+      setAdjustCustomers(result)
     }
   }
 
@@ -295,31 +300,21 @@ export function LoyaltyScreen() {
     try {
       const finalPoints = adjustType === 'add' ? pointsValue : -pointsValue
 
-      const res = await fetch('/api/loyalty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: adjustCustomerId,
-          points: finalPoints,
-          transactionType: 'adjusted',
-          description: adjustReason,
-        }),
-      })
-      const json = await res.json()
+      const result = await post<{ transaction: unknown; newPointsBalance: number }>('/api/loyalty', {
+        customerId: adjustCustomerId,
+        points: finalPoints,
+        transactionType: 'adjusted',
+        description: adjustReason,
+      }, { showSuccessToast: true, successMessage: t('common.success') })
 
-      if (json.success) {
-        toast.success(t('common.success'))
+      if (result) {
         setAdjustDialogOpen(false)
         fetchDashboard(true)
         // If viewing a customer and they were adjusted, refresh their detail
         if (selectedCustomer && selectedCustomer.id === adjustCustomerId) {
-          fetchCustomerDetail({ ...selectedCustomer, loyaltyPoints: json.newPointsBalance ?? selectedCustomer.loyaltyPoints }, customerPage)
+          fetchCustomerDetail({ ...selectedCustomer, loyaltyPoints: result.newPointsBalance ?? selectedCustomer.loyaltyPoints }, customerPage)
         }
-      } else {
-        toast.error(json.error || t('common.error'))
       }
-    } catch {
-      toast.error(t('common.error'))
     } finally {
       setSubmittingAdjust(false)
     }

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { getRelativeTime } from '@/lib/date-utils'
 import { exportToCSV } from '@/lib/export-csv'
 import {
@@ -56,6 +57,13 @@ interface AuditLogEntry {
   ipAddress: string | null
   createdAt: string
   createdAtRaw: string
+}
+
+interface AuditLogResponse {
+  logs: AuditLogEntry[]
+  total: number
+  page: number
+  totalPages: number
 }
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -121,6 +129,8 @@ function getActionIcon(action: string) {
 // ── Component ──────────────────────────────────────────────────────
 
 export function AuditLogScreen() {
+  const { get } = useApi()
+
   // Filters
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('')
@@ -149,29 +159,27 @@ export function AuditLogScreen() {
   const fetchLogs = useCallback(async (page = 1) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      if (search.trim()) params.set('search', search.trim())
-      if (actionFilter) params.set('action', actionFilter)
-      if (entityFilter) params.set('entity', entityFilter)
-      if (startDate) params.set('startDate', startDate)
-      if (endDate) params.set('endDate', endDate)
-
-      const res = await fetch(`/api/audit-log?${params.toString()}`)
-      if (!res.ok) throw new Error('فشل في تحميل سجل العمليات')
-      const data = await res.json()
-      setLogs(data.data || [])
-      setTotal(data.total || 0)
-      setTotalPages(data.totalPages || 1)
-      setCurrentPage(data.page || 1)
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل سجل العمليات')
-      setLogs([])
+      const result = await get<AuditLogResponse>('/api/audit-log', {
+        page,
+        limit,
+        search: search.trim() || undefined,
+        action: actionFilter || undefined,
+        entity: entityFilter || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      })
+      if (result) {
+        setLogs(result.logs || [])
+        setTotal(result.total || 0)
+        setTotalPages(result.totalPages || 1)
+        setCurrentPage(result.page || 1)
+      } else {
+        setLogs([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [search, actionFilter, entityFilter, startDate, endDate])
+  }, [search, actionFilter, entityFilter, startDate, endDate, get])
 
   useEffect(() => {
     fetchLogs(1)

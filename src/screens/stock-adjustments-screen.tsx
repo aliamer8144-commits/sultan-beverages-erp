@@ -54,6 +54,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
+import { useApi } from '@/hooks/use-api'
 import { formatDate, formatTime, formatShortDate, formatDateFull } from '@/lib/date-utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -92,6 +93,12 @@ interface AdjustmentStats {
   totalIncrease: number
   totalDecrease: number
   netChange: number
+}
+
+interface StockAdjustmentsResponse {
+  adjustments: StockAdjustmentItem[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  stats: AdjustmentStats
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -161,6 +168,7 @@ const typeConfig: Record<string, {
 
 export function StockAdjustmentsScreen() {
   const user = useAppStore((s) => s.user)
+  const { get, post } = useApi()
 
   // Filters
   const [search, setSearch] = useState('')
@@ -196,32 +204,33 @@ export function StockAdjustmentsScreen() {
   const fetchAdjustments = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      if (typeFilter && typeFilter !== 'all') params.set('type', typeFilter)
-      if (search.trim()) params.set('search', search.trim())
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
+      const result = await get<StockAdjustmentsResponse>('/api/stock-adjustments', {
+        page,
+        limit,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        search: search.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }, { showErrorToast: false })
 
-      const res = await fetch(`/api/stock-adjustments?${params.toString()}`)
-      if (!res.ok) throw new Error('فشل في تحميل التعديلات')
-      const data = await res.json()
-      setAdjustments(data.data || [])
-      setTotal(data.pagination?.total || 0)
-      setTotalPages(data.pagination?.totalPages || 0)
-      if (data.stats) {
-        setStats(data.stats)
+      if (result) {
+        setAdjustments(result.adjustments || [])
+        setTotal(result.pagination.total)
+        setTotalPages(result.pagination.totalPages)
+        if (result.stats) {
+          setStats(result.stats)
+        }
+      } else {
+        toast.error('حدث خطأ أثناء تحميل تعديلات المخزون')
+        setAdjustments([])
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل تعديلات المخزون')
-      setAdjustments([])
     } finally {
       setLoading(false)
     }
-  }, [page, typeFilter, search, dateFrom, dateTo])
+  }, [page, typeFilter, search, dateFrom, dateTo, get])
 
   useEffect(() => {
+     
     fetchAdjustments()
   }, [fetchAdjustments])
 
@@ -274,13 +283,10 @@ export function StockAdjustmentsScreen() {
 
     setProductsLoading(true)
     try {
-      const res = await fetch('/api/products?limit=500')
-      if (res.ok) {
-        const data = await res.json()
-        setProducts(data.data || [])
+      const result = await get<ProductItem[]>('/api/products', { limit: 500 }, { showErrorToast: false })
+      if (result) {
+        setProducts(result)
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل المنتجات')
     } finally {
       setProductsLoading(false)
     }
@@ -316,30 +322,22 @@ export function StockAdjustmentsScreen() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/stock-adjustments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: selectedProductId,
-          type: adjType,
-          quantity: adjQuantity,
-          reason: adjReason,
-          reference: adjReference || null,
-          referenceType: 'manual',
-          userId: user.id,
-          userName: user.name,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(data.message || 'تم تعديل المخزون بنجاح')
+      const result = await post('/api/stock-adjustments', {
+        productId: selectedProductId,
+        type: adjType,
+        quantity: adjQuantity,
+        reason: adjReason,
+        reference: adjReference || null,
+        referenceType: 'manual',
+        userId: user.id,
+        userName: user.name,
+      }, { showSuccessToast: true, successMessage: 'تم إنشاء التعديل بنجاح' })
+
+      if (result) {
         setNewAdjOpen(false)
+         
         fetchAdjustments()
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء تعديل المخزون')
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تعديل المخزون')
     } finally {
       setSubmitting(false)
     }

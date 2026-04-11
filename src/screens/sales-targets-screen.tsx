@@ -33,6 +33,7 @@ import {
   HourglassIcon,
 } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
+import { useApi } from '@/hooks/use-api'
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -179,6 +180,8 @@ function StatPill({ icon: Icon, label, value, colorClass = '' }: { icon: React.E
 // ── Main Component ────────────────────────────────────────────────
 
 export function SalesTargetsScreen() {
+  const { get, post, put, del } = useApi()
+
   // Data state
   const [targets, setTargets] = useState<SalesTarget[]>([])
   const [loading, setLoading] = useState(true)
@@ -203,21 +206,19 @@ export function SalesTargetsScreen() {
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
 
-    try {
-      const res = await fetch('/api/sales-targets?all=true')
-      const json = await res.json()
-      if (json.success) {
-        setTargets(json.data || [])
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل الأهداف')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    const result = await get<SalesTarget[]>('/api/sales-targets', { all: 'true' }, { showErrorToast: false })
+
+    if (result) {
+       
+      setTargets(result)
     }
-  }, [])
+
+    setLoading(false)
+    setRefreshing(false)
+  }, [get])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTargets()
   }, [fetchTargets])
 
@@ -252,56 +253,35 @@ export function SalesTargetsScreen() {
     }
 
     setSubmitting(true)
-    try {
-      const url = '/api/sales-targets'
-      const method = editingTarget ? 'PUT' : 'POST'
-      const body: Record<string, unknown> = {
-        type: formType,
-        targetAmount: parseFloat(formAmount),
-      }
-      if (editingTarget) body.id = editingTarget.id
-      if (formEndDate) body.endDate = formEndDate
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const json = await res.json()
-
-      if (json.success) {
-        toast.success(editingTarget ? 'تم تحديث الهدف بنجاح' : 'تم إنشاء الهدف بنجاح')
-        setDialogOpen(false)
-        fetchTargets()
-      } else {
-        toast.error(json.error || 'فشل في حفظ الهدف')
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء حفظ الهدف')
-    } finally {
-      setSubmitting(false)
+    const body: Record<string, unknown> = {
+      type: formType,
+      targetAmount: parseFloat(formAmount),
     }
+    if (editingTarget) body.id = editingTarget.id
+    if (formEndDate) body.endDate = formEndDate
+
+    const result = editingTarget
+      ? await put('/api/sales-targets', body, { showSuccessToast: true, successMessage: 'تم تحديث الهدف بنجاح' })
+      : await post('/api/sales-targets', body, { showSuccessToast: true, successMessage: 'تم إنشاء الهدف بنجاح' })
+
+    if (result) {
+      setDialogOpen(false)
+      fetchTargets()
+    }
+    setSubmitting(false)
   }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
-    try {
-      const res = await fetch(`/api/sales-targets?id=${deleteTarget.id}`, { method: 'DELETE' })
-      const json = await res.json()
-      if (json.success) {
-        toast.success('تم حذف الهدف بنجاح')
-        setDeleteDialogOpen(false)
-        setDeleteTarget(null)
-        fetchTargets()
-      } else {
-        toast.error(json.error || 'فشل في حذف الهدف')
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء حذف الهدف')
-    } finally {
-      setDeleting(false)
+    const success = await del('/api/sales-targets?id=' + deleteTarget.id)
+
+    if (success) {
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+      fetchTargets()
     }
+    setDeleting(false)
   }
 
   // ── Render ─────────────────────────────────────────────────────

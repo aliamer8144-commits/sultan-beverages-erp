@@ -47,6 +47,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react'
 import { formatCurrency, CHART_COLORS } from '@/components/chart-utils'
+import { useApi } from '@/hooks/use-api'
 
 const EXPENSE_COLORS = ['#e03131', '#f08c00', '#9c36b5', '#e8590c', '#1c7ed6', '#c92a2a', '#364fc7']
 
@@ -251,6 +252,7 @@ function TableSkeleton() {
 
 // ─── Main Component ──────────────────────────────────────────────
 export function AnalyticsScreen() {
+  const { get } = useApi()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -262,34 +264,30 @@ export function AnalyticsScreen() {
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
 
-    try {
-      let url = '/api/analytics?'
-      if (selectedPreset === 'custom' && customStart && customEnd) {
-        url += `startDate=${customStart}&endDate=${customEnd}`
+    let params: Record<string, string> = {}
+    if (selectedPreset === 'custom' && customStart && customEnd) {
+      params = { startDate: customStart, endDate: customEnd }
+    } else {
+      const range = getPresetRange(selectedPreset)
+      if (range.startDate && range.endDate) {
+        params = { startDate: range.startDate, endDate: range.endDate }
       } else {
-        const range = getPresetRange(selectedPreset)
-        if (range.startDate && range.endDate) {
-          url += `startDate=${range.startDate}&endDate=${range.endDate}`
-        } else {
-          url += 'range=30'
-        }
+        params = { range: '30' }
       }
-
-      const res = await fetch(url)
-      const json = await res.json()
-      if (json.success) {
-        setData(json.data)
-      }
-    } catch {
-      // Silently handle
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
     }
-  }, [selectedPreset, customStart, customEnd])
+
+    const result = await get<AnalyticsData>('/api/analytics', params, { showErrorToast: false })
+    if (result) {
+      setData(result)
+    }
+
+    setLoading(false)
+    setRefreshing(false)
+  }, [selectedPreset, customStart, customEnd, get])
 
   useEffect(() => {
     if (selectedPreset !== 'custom') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAnalytics()
     }
   }, [fetchAnalytics, selectedPreset])

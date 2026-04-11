@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { useAppStore } from '@/store/app-store'
+import { useApi } from '@/hooks/use-api'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, UserCog, Shield, ShieldCheck } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
@@ -61,6 +62,7 @@ const emptyForm: UserFormData = {
 
 export function UsersScreen() {
   const { user: currentUser } = useAppStore()
+  const { get, post, put, del } = useApi()
 
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,19 +86,14 @@ export function UsersScreen() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/users')
-      const data = await res.json()
-      if (data.success) {
-        setUsers(data.data)
-      } else {
-        toast.error(data.error || 'فشل في تحميل المستخدمين')
+      const result = await get<UserRow[]>('/api/users')
+      if (result) {
+        setUsers(result)
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchUsers()
@@ -115,27 +112,17 @@ export function UsersScreen() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: addForm.username,
-          password: addForm.password,
-          name: addForm.name,
-          role: addForm.role,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(`تم إضافة المستخدم "${addForm.name}" بنجاح`)
+      const result = await post('/api/users', {
+        username: addForm.username,
+        password: addForm.password,
+        name: addForm.name,
+        role: addForm.role,
+      }, { showSuccessToast: true, successMessage: `تم إضافة المستخدم "${addForm.name}" بنجاح` })
+      if (result) {
         setAddForm({ ...emptyForm })
         setAddDialogOpen(false)
         fetchUsers()
-      } else {
-        toast.error(data.error || 'فشل في إضافة المستخدم')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setSubmitting(false)
     }
@@ -166,28 +153,18 @@ export function UsersScreen() {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/users/${editingUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editForm.name,
-          role: editForm.role,
-          isActive: editForm.isActive,
-          password: editForm.password || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(`تم تحديث بيانات المستخدم "${editForm.name}" بنجاح`)
+      const result = await put(`/api/users/${editingUserId}`, {
+        name: editForm.name,
+        role: editForm.role,
+        isActive: editForm.isActive,
+        password: editForm.password || undefined,
+      }, { showSuccessToast: true, successMessage: `تم تحديث بيانات المستخدم "${editForm.name}" بنجاح` })
+      if (result) {
         setEditDialogOpen(false)
         setEditingUserId(null)
         setEditForm({ ...emptyForm })
         fetchUsers()
-      } else {
-        toast.error(data.error || 'فشل في تحديث المستخدم')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setSubmitting(false)
     }
@@ -208,21 +185,12 @@ export function UsersScreen() {
 
     setDeleting(true)
     try {
-      const res = await fetch(`/api/users/${deletingUser.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(`تم حذف المستخدم "${deletingUser.name}" بنجاح`)
+      const ok = await del(`/api/users/${deletingUser.id}`, { successMessage: `تم حذف المستخدم "${deletingUser.name}" بنجاح` })
+      if (ok) {
         setDeleteDialogOpen(false)
         setDeletingUser(null)
         fetchUsers()
-      } else {
-        toast.error(data.error || 'فشل في حذف المستخدم')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setDeleting(false)
     }
@@ -383,7 +351,7 @@ export function UsersScreen() {
                             <Switch
                               checked={user.isActive}
                               disabled={user.id === currentUser?.id}
-                              onCheckedChange={(checked) => {
+                              onCheckedChange={async (checked) => {
                                 // Inline toggle via edit
                                 setEditingUserId(user.id)
                                 setEditForm({
@@ -394,31 +362,17 @@ export function UsersScreen() {
                                   isActive: checked,
                                 })
                                 // Fire the update immediately
-                                fetch(`/api/users/${user.id}`, {
-                                  method: 'PUT',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    name: user.name,
-                                    role: user.role,
-                                    isActive: checked,
-                                  }),
+                                const result = await put(`/api/users/${user.id}`, {
+                                  name: user.name,
+                                  role: user.role,
+                                  isActive: checked,
+                                }, {
+                                  showSuccessToast: true,
+                                  successMessage: checked ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم',
                                 })
-                                  .then((res) => res.json())
-                                  .then((data) => {
-                                    if (data.success) {
-                                      toast.success(
-                                        checked
-                                          ? 'تم تفعيل المستخدم'
-                                          : 'تم تعطيل المستخدم'
-                                      )
-                                      fetchUsers()
-                                    } else {
-                                      toast.error(data.error || 'فشل في تحديث الحالة')
-                                    }
-                                  })
-                                  .catch(() => {
-                                    toast.error('حدث خطأ في الاتصال بالخادم')
-                                  })
+                                if (result) {
+                                  fetchUsers()
+                                }
                               }}
                               className="scale-90"
                             />

@@ -60,6 +60,7 @@ import {
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
+import { useApi } from '@/hooks/use-api'
 
 // ─── Types ──────────────────────────────────────────────────────
 interface Customer {
@@ -124,6 +125,7 @@ const emptyForm: CustomerFormData = { name: '', phone: '', debt: '0', category: 
 
 export function CustomersScreen() {
   const { formatCurrency, symbol } = useCurrency()
+  const { get, post, put, del } = useApi()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
@@ -169,18 +171,13 @@ export function CustomersScreen() {
 
   // ─── Fetch Customers ───────────────────────────────────────────────
   const fetchCustomers = async (query = '', category = 'all') => {
+    setLoading(true)
     try {
-      setLoading(true)
-      let url = `/api/customers?search=${encodeURIComponent(query)}`
-      if (category !== 'all') {
-        url += `&category=${encodeURIComponent(category)}`
-      }
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('فشل في تحميل البيانات')
-      const data = await res.json()
-      setCustomers(data.data || [])
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل العملاء')
+      const result = await get<Customer[]>('/api/customers', {
+        search: query || undefined,
+        category: category !== 'all' ? category : undefined,
+      }, { showErrorToast: false })
+      setCustomers(result || [])
     } finally {
       setLoading(false)
     }
@@ -220,23 +217,20 @@ export function CustomersScreen() {
     }
     try {
       setSubmitting(true)
-      const res = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: form.phone.trim() || null,
-          category: form.category,
-          notes: form.notes.trim() || null,
-        }),
+      const result = await post('/api/customers', {
+        name: form.name.trim(),
+        phone: form.phone.trim() || null,
+        category: form.category,
+        notes: form.notes.trim() || null,
+      }, {
+        showSuccessToast: true,
+        successMessage: 'تم إضافة العميل بنجاح',
       })
-      if (!res.ok) throw new Error('فشل في إنشاء العميل')
-      toast.success('تم إضافة العميل بنجاح')
-      setOpenAddDialog(false)
-      resetForm()
-      fetchCustomers(search, activeCategory)
-    } catch {
-      toast.error('حدث خطأ أثناء إضافة العميل')
+      if (result) {
+        setOpenAddDialog(false)
+        resetForm()
+        fetchCustomers(search, activeCategory)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -251,24 +245,21 @@ export function CustomersScreen() {
     }
     try {
       setSubmitting(true)
-      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: form.phone.trim() || null,
-          debt: parseFloat(form.debt) || 0,
-          category: form.category,
-          notes: form.notes.trim() || null,
-        }),
+      const result = await put(`/api/customers/${selectedCustomer.id}`, {
+        name: form.name.trim(),
+        phone: form.phone.trim() || null,
+        debt: parseFloat(form.debt) || 0,
+        category: form.category,
+        notes: form.notes.trim() || null,
+      }, {
+        showSuccessToast: true,
+        successMessage: 'تم تحديث بيانات العميل بنجاح',
       })
-      if (!res.ok) throw new Error('فشل في تحديث العميل')
-      toast.success('تم تحديث بيانات العميل بنجاح')
-      setOpenEditDialog(false)
-      resetForm()
-      fetchCustomers(search, activeCategory)
-    } catch {
-      toast.error('حدث خطأ أثناء تحديث العميل')
+      if (result) {
+        setOpenEditDialog(false)
+        resetForm()
+        fetchCustomers(search, activeCategory)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -277,19 +268,12 @@ export function CustomersScreen() {
   // ─── Delete Customer ──────────────────────────────────────────────
   const handleDelete = async () => {
     if (!selectedCustomer) return
+    setDeleting(true)
     try {
-      setDeleting(true)
-      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      if (!res.ok) throw new Error('فشل في حذف العميل')
-      toast.success('تم حذف العميل بنجاح')
+      await del(`/api/customers/${selectedCustomer.id}`)
       setOpenDeleteDialog(false)
       resetForm()
       fetchCustomers(search, activeCategory)
-    } catch {
-      toast.error('حدث خطأ أثناء حذف العميل')
     } finally {
       setDeleting(false)
     }
@@ -338,28 +322,20 @@ export function CustomersScreen() {
 
     setPaymentSubmitting(true)
     try {
-      const res = await fetch('/api/customer-payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: paymentCustomer.id,
-          amount,
-          method: paymentMethod,
-          notes: paymentNotes.trim() || null,
-        }),
+      const result = await post('/api/customer-payments', {
+        customerId: paymentCustomer.id,
+        amount,
+        method: paymentMethod,
+        notes: paymentNotes.trim() || null,
+      }, {
+        showSuccessToast: true,
+        successMessage: `تم تسجيل دفعة ${formatCurrency(amount)} (${paymentMethod === 'cash' ? 'نقدي' : 'تحويل'}) للعميل ${paymentCustomer.name}`,
       })
-      const data = await res.json()
-      if (data.success) {
-        const methodLabel = paymentMethod === 'cash' ? 'نقدي' : 'تحويل'
-        toast.success(`تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للعميل ${paymentCustomer.name}`)
+      if (result) {
         setOpenPaymentDialog(false)
         setPaymentCustomer(null)
         fetchCustomers(search, activeCategory)
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء تسجيل الدفعة')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setPaymentSubmitting(false)
     }
@@ -372,13 +348,10 @@ export function CustomersScreen() {
     setOpenHistoryDialog(true)
     setHistoryLoading(true)
     try {
-      const res = await fetch(`/api/customer-payments?customerId=${customer.id}`)
-      const data = await res.json()
-      if (data.success) {
-        setPaymentHistory(data.data)
+      const result = await get<Payment[]>('/api/customer-payments', { customerId: customer.id }, { showErrorToast: false })
+      if (result) {
+        setPaymentHistory(result)
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل سجل الدفعات')
     } finally {
       setHistoryLoading(false)
     }
@@ -391,13 +364,10 @@ export function CustomersScreen() {
     setOpenLoyaltyDialog(true)
     setLoyaltyLoading(true)
     try {
-      const res = await fetch(`/api/loyalty?customerId=${customer.id}`)
-      const data = await res.json()
-      if (data.success) {
-        setLoyaltyHistory(data.data)
+      const result = await get<LoyaltyTransaction[]>('/api/loyalty', { customerId: customer.id }, { showErrorToast: false })
+      if (result) {
+        setLoyaltyHistory(result)
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل سجل النقاط')
     } finally {
       setLoyaltyLoading(false)
     }
@@ -430,28 +400,21 @@ export function CustomersScreen() {
 
     setLoyaltySubmitting(true)
     try {
-      const res = await fetch('/api/loyalty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: loyaltyCustomer.id,
-          points: loyaltyMode === 'grant' ? points : -points,
-          transactionType: 'adjusted',
-          description: loyaltyDescription.trim() || (loyaltyMode === 'grant' ? 'منح نقاط يدوي' : 'خصم نقاط يدوي'),
-        }),
+      const action = loyaltyMode === 'grant' ? 'منح' : 'خصم'
+      const result = await post('/api/loyalty', {
+        customerId: loyaltyCustomer.id,
+        points: loyaltyMode === 'grant' ? points : -points,
+        transactionType: 'adjusted',
+        description: loyaltyDescription.trim() || (loyaltyMode === 'grant' ? 'منح نقاط يدوي' : 'خصم نقاط يدوي'),
+      }, {
+        showSuccessToast: true,
+        successMessage: `تم ${action} ${points} نقطة ${loyaltyMode === 'grant' ? 'لـ' : 'من'} ${loyaltyCustomer.name}`,
       })
-      const data = await res.json()
-      if (data.success) {
-        const action = loyaltyMode === 'grant' ? 'منح' : 'خصم'
-        toast.success(`تم ${action} ${points} نقطة ${loyaltyMode === 'grant' ? 'لـ' : 'من'} ${loyaltyCustomer.name}`)
+      if (result) {
         setOpenLoyaltyDialog(false)
         setLoyaltyCustomer(null)
         fetchCustomers(search, activeCategory)
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء تحديث النقاط')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setLoyaltySubmitting(false)
     }
@@ -464,13 +427,10 @@ export function CustomersScreen() {
     setOpenPurchaseDialog(true)
     setPurchaseLoading(true)
     try {
-      const res = await fetch(`/api/invoices?customerId=${customer.id}&type=sale`)
-      const data = await res.json()
-      if (data.success) {
-        setCustomerInvoices(data.data.slice(0, 10))
+      const result = await get<CustomerInvoice[]>('/api/invoices', { customerId: customer.id, type: 'sale' }, { showErrorToast: false })
+      if (result) {
+        setCustomerInvoices(result.slice(0, 10))
       }
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل سجل المشتريات')
     } finally {
       setPurchaseLoading(false)
     }

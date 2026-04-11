@@ -43,6 +43,7 @@ import { getRelativeTime, formatShortDate } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
 import { useCurrency } from '@/hooks/use-currency'
+import { useApi } from '@/hooks/use-api'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -154,18 +155,14 @@ export function POSScreen() {
   const loyaltySettings = settings
   const isLoyaltyActive = loyaltySettings.loyaltyEnabled && !!cartCustomerId && customerPoints >= (loyaltySettings.loyaltyMinPointsToRedeem || 0)
 
+  // ── useApi hook ──
+  const { get, post } = useApi()
+
   // ── Fetch customers (needed before loyalty handlers) ──
   const fetchCustomers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/customers')
-      const json = await res.json()
-      if (json.success) {
-        setCustomers(json.data)
-      }
-    } catch {
-      // Silent fail
-    }
-  }, [])
+    const result = await get<any[]>('/api/customers', undefined, { showErrorToast: false })
+    if (result) setCustomers(result)
+  }, [get])
 
   // ── Loyalty redeem handler ──
   const handleOpenLoyaltyRedeem = useCallback(() => {
@@ -188,32 +185,25 @@ export function POSScreen() {
 
     setRedeemingPoints(true)
     try {
-      const res = await fetch('/api/loyalty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: selectedCustomer.id,
-          points: -pts,
-          transactionType: 'redeemed',
-          description: `استبدال ${pts} نقطة كخصم في نقطة البيع`,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
+      const result = await post('/api/loyalty', {
+        customerId: selectedCustomer.id,
+        points: -pts,
+        transactionType: 'redeemed',
+        description: `استبدال ${pts} نقطة كخصم في نقطة البيع`,
+      }, { showErrorToast: false })
+      if (result) {
         const discountValue = pts * (loyaltySettings.loyaltyRedemptionValue || 0)
         setLoyaltyDiscount(discountValue)
         toast.success(`تم استبدال ${pts} نقطة — خصم ${formatDual(discountValue).display}`)
         setLoyaltyRedeemDialogOpen(false)
         fetchCustomers()
       } else {
-        toast.error(data.error || 'حدث خطأ أثناء استبدال النقاط')
+        toast.error('حدث خطأ أثناء استبدال النقاط')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setRedeemingPoints(false)
     }
-  }, [selectedCustomer, redeemPoints, customerPoints, loyaltySettings, formatDual, fetchCustomers])
+  }, [selectedCustomer, redeemPoints, customerPoints, loyaltySettings, formatDual, fetchCustomers, post])
 
   // ── Reset loyalty discount when customer changes ──
   useEffect(() => {
@@ -271,31 +261,17 @@ export function POSScreen() {
 
   // ── Fetch data ──
   const fetchProducts = useCallback(async (search = '', categoryId = '') => {
-    try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (categoryId && categoryId !== 'all') params.set('categoryId', categoryId)
-      const res = await fetch(`/api/products?${params.toString()}`)
-      const json = await res.json()
-      if (json.success) {
-        setProducts(json.data)
-      }
-    } catch {
-      // Silent fail for POS speed
-    }
-  }, [])
+    const params: Record<string, string | undefined> = {}
+    if (search) params.search = search
+    if (categoryId && categoryId !== 'all') params.categoryId = categoryId
+    const result = await get<any[]>('/api/products', params, { showErrorToast: false })
+    if (result) setProducts(result)
+  }, [get])
 
   const fetchCategories = useCallback(async () => {
-    try {
-      const res = await fetch('/api/categories')
-      const json = await res.json()
-      if (json.success) {
-        setCategories(json.data)
-      }
-    } catch {
-      // Silent fail
-    }
-  }, [])
+    const result = await get<any[]>('/api/categories', undefined, { showErrorToast: false })
+    if (result) setCategories(result)
+  }, [get])
 
   useEffect(() => {
     const init = async () => {
@@ -310,25 +286,20 @@ export function POSScreen() {
   useEffect(() => {
     let cancelled = false
     const fetchTarget = async () => {
-      try {
-        const res = await fetch('/api/sales-targets')
-        const json = await res.json()
-        if (!cancelled && json.success && json.data) {
-          setSalesTarget({
-            progressPercent: json.data.progressPercent,
-            targetAmount: json.data.targetAmount,
-            currentAmount: json.data.currentAmount,
-            type: json.data.type,
-          })
-        }
-      } catch {
-        // Silent
+      const json = await get<any>('/api/sales-targets', undefined, { showErrorToast: false })
+      if (!cancelled && json && json.progressPercent !== undefined) {
+        setSalesTarget({
+          progressPercent: json.progressPercent,
+          targetAmount: json.targetAmount,
+          currentAmount: json.currentAmount,
+          type: json.type,
+        })
       }
     }
     fetchTarget()
     const interval = setInterval(fetchTarget, 60000)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [])
+  }, [get])
 
   // ── Debounced search ──
   useEffect(() => {
@@ -396,22 +367,18 @@ export function POSScreen() {
     try {
       const earnedPoints = Math.floor(totalAmount * (loyaltySettings.loyaltyPointsPerUnit || 0))
       if (earnedPoints <= 0) return
-      await fetch('/api/loyalty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId,
-          points: earnedPoints,
-          transactionType: 'earned',
-          invoiceId,
-          description: `كسب ${earnedPoints} نقطة من مشتريات بقيمة ${formatDual(totalAmount).display}`,
-        }),
-      })
+      await post('/api/loyalty', {
+        customerId,
+        points: earnedPoints,
+        transactionType: 'earned',
+        invoiceId,
+        description: `كسب ${earnedPoints} نقطة من مشتريات بقيمة ${formatDual(totalAmount).display}`,
+      }, { showErrorToast: false })
       fetchCustomers()
     } catch {
       // Silent — don't block payment for loyalty
     }
-  }, [loyaltySettings, formatDual, fetchCustomers])
+  }, [loyaltySettings, formatDual, fetchCustomers, post])
 
   const handleConfirmPayment = useCallback(async () => {
     if (!user) {
@@ -446,38 +413,31 @@ export function POSScreen() {
 
     setProcessingPayment(true)
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'sale',
-          customerId: cartCustomerId || null,
-          discount: cartDiscount,
-          paidAmount: paid,
-          userId: user.id,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-        }),
-      })
-      const json = await res.json()
+      const result = await post<any>('/api/invoices', {
+        type: 'sale',
+        customerId: cartCustomerId || null,
+        discount: cartDiscount,
+        paidAmount: paid,
+        userId: user.id,
+        items: cart.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+      }, { showErrorToast: false })
 
-      if (json.success) {
+      if (result) {
         toast.success(`تم إنشاء الفاتورة ${receiptNumber} بنجاح`)
         // Auto-award loyalty points after successful payment
-        awardLoyaltyPoints(json.data.id, json.data.totalAmount || subtotal, cartCustomerId)
+        awardLoyaltyPoints(result.id, result.totalAmount || subtotal, cartCustomerId)
         clearCart()
         setLoyaltyDiscount(0)
         setPaymentDialogOpen(false)
         // Refresh products to update stock
         fetchProducts(searchQuery, selectedCategoryId)
       } else {
-        toast.error(json.error || 'حدث خطأ في إنشاء الفاتورة')
+        toast.error('حدث خطأ في إنشاء الفاتورة')
       }
-    } catch {
-      toast.error('حدث خطأ في الاتصال بالخادم')
     } finally {
       setProcessingPayment(false)
     }
@@ -499,6 +459,7 @@ export function POSScreen() {
     splitCashNum,
     splitCardNum,
     isSplitValid,
+    post,
   ])
 
   const handleClearCart = useCallback(() => {
@@ -582,39 +543,29 @@ export function POSScreen() {
     async (barcode: string) => {
       const trimmed = barcode.trim()
       if (!trimmed) return
-      try {
-        const res = await fetch(`/api/products?barcode=${encodeURIComponent(trimmed)}`)
-        const json = await res.json()
-        if (json.success && json.data.length > 0) {
-          const product = json.data[0]
-          handleAddToCart(product)
-          toast.success(`تمت إضافة ${product.name}`)
-        } else {
-          toast.error('المنتج غير موجود')
-        }
-      } catch {
-        toast.error('حدث خطأ في البحث عن المنتج')
+      const result = await get<any[]>('/api/products', { barcode: trimmed }, { showErrorToast: false })
+      if (result && result.length > 0) {
+        const product = result[0]
+        handleAddToCart(product)
+        toast.success(`تمت إضافة ${product.name}`)
+      } else {
+        toast.error('المنتج غير موجود')
       }
       setBarcodeInput('')
     },
-    [handleAddToCart]
+    [handleAddToCart, get]
   )
 
   // ── Fetch last invoices for popover ──
   const fetchLastInvoices = useCallback(async () => {
     setLastInvoicesLoading(true)
     try {
-      const res = await fetch('/api/invoices?type=sale')
-      const json = await res.json()
-      if (json.success) {
-        setLastInvoices(json.data.slice(0, 3))
-      }
-    } catch {
-      // Silent
+      const result = await get<any[]>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
+      if (result) setLastInvoices(result.slice(0, 3))
     } finally {
       setLastInvoicesLoading(false)
     }
-  }, [])
+  }, [get])
 
   // ── Open product quick view ──
   const handleProductClick = useCallback(async (product: Product) => {
@@ -626,10 +577,9 @@ export function POSScreen() {
       setVariantSelectorOpen(true)
       setVariantSelectorLoading(true)
       try {
-        const res = await fetch(`/api/product-variants?productId=${product.id}`)
-        const data = await res.json()
-        if (data.success) {
-          setVariantSelectorVariants(data.data.filter((v: ProductVariant) => v.isActive))
+        const result = await get<any[]>('/api/product-variants', { productId: product.id }, { showErrorToast: false })
+        if (result) {
+          setVariantSelectorVariants(result.filter((v: ProductVariant) => v.isActive))
         } else {
           toast.error('فشل في تحميل المتغيرات')
           setVariantSelectorOpen(false)
@@ -647,7 +597,7 @@ export function POSScreen() {
     setQuickViewProduct(product)
     const inCart = cart.find((c) => c.productId === product.id)?.quantity || 0
     setQuickViewQuantity(inCart > 0 ? 1 : 1)
-  }, [cart])
+  }, [cart, get])
 
   const handleVariantSelect = useCallback((product: Product, variant: ProductVariant) => {
     if (variant.stock <= 0) {

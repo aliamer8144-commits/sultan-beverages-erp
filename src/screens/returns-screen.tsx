@@ -32,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { useApi } from '@/hooks/use-api'
 import { formatCurrency } from '@/components/chart-utils'
 import { formatDate, formatShortDate } from '@/lib/date-utils'
 import {
@@ -48,6 +49,15 @@ import {
   PackageOpen,
   AlertTriangle,
 } from 'lucide-react'
+
+// ── API Response Types ─────────────────────────────────────────────────
+
+interface ReturnsListResponse {
+  returns: ReturnItem[]
+  total: number
+  page: number
+  totalPages: number
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -127,6 +137,7 @@ export function ReturnsScreen() {
   const user = useAppStore((s) => s.user)
   const settings = useAppStore((s) => s.settings)
   const currencySymbol = CURRENCY_MAP[settings.currency]?.symbol || 'ر.س'
+  const { get, patch, post } = useApi()
 
   // Filters
   const [search, setSearch] = useState('')
@@ -161,61 +172,64 @@ export function ReturnsScreen() {
   const fetchReturns = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
-      if (search.trim()) params.set('search', search.trim())
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
-
-      const res = await fetch(`/api/returns?${params.toString()}`)
-      if (!res.ok) throw new Error('فشل في تحميل المرتجعات')
-      const data = await res.json()
-      setReturns(data.data || [])
-      setTotal(data.total || 0)
-      setTotalPages(data.totalPages || 0)
-    } catch {
-      toast.error('حدث خطأ أثناء تحميل المرتجعات')
-      setReturns([])
+      const result = await get<ReturnsListResponse>('/api/returns', {
+        page,
+        limit,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: search.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }, { showErrorToast: false })
+      if (result) {
+        setReturns(result.returns || [])
+        setTotal(result.total || 0)
+        setTotalPages(result.totalPages || 0)
+      } else {
+        setReturns([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, search, dateFrom, dateTo])
+  }, [page, statusFilter, search, dateFrom, dateTo, get])
 
   // ── Fetch Stats ──────────────────────────────────────────────────────
 
   const fetchStats = useCallback(async () => {
     try {
-      // Fetch today's returns
       const today = new Date().toISOString().split('T')[0]
-      const res = await fetch(`/api/returns?dateFrom=${today}&dateTo=${today}&limit=1000`)
-      if (res.ok) {
-        const data = await res.json()
-        const todayReturns = data.data || []
+      const todayResult = await get<ReturnsListResponse>('/api/returns', {
+        dateFrom: today,
+        dateTo: today,
+        limit: 1000,
+      }, { showErrorToast: false })
+      const todayReturns = todayResult?.returns || []
 
-        // Fetch all pending returns
-        const pendingRes = await fetch('/api/returns?status=pending&limit=1000')
-        const pendingData = pendingRes.ok ? await pendingRes.json() : { data: [] }
+      const pendingResult = await get<ReturnsListResponse>('/api/returns', {
+        status: 'pending',
+        limit: 1000,
+      }, { showErrorToast: false })
+      const pendingReturns = pendingResult?.returns || []
 
-        // Fetch all approved returns
-        const approvedRes = await fetch('/api/returns?status=approved&dateFrom=${today}&limit=1000')
-        const approvedData = approvedRes.ok ? await approvedRes.json() : { data: [] }
+      const approvedResult = await get<ReturnsListResponse>('/api/returns', {
+        status: 'approved',
+        dateFrom: today,
+        limit: 1000,
+      }, { showErrorToast: false })
+      const approvedReturns = approvedResult?.returns || []
 
-        setStats({
-          todayTotal: todayReturns.length,
-          pendingCount: (pendingData.data || []).length,
-          approvedCount: approvedData.data ? approvedData.data.filter((r: ReturnItem) => {
-            const d = new Date(r.createdAt).toISOString().split('T')[0]
-            return d === today
-          }).length : 0,
-          todayAmount: todayReturns.reduce((sum: number, r: ReturnItem) => sum + r.totalAmount, 0),
-        })
-      }
+      setStats({
+        todayTotal: todayReturns.length,
+        pendingCount: pendingReturns.length,
+        approvedCount: approvedReturns.filter((r: ReturnItem) => {
+          const d = new Date(r.createdAt).toISOString().split('T')[0]
+          return d === today
+        }).length,
+        todayAmount: todayReturns.reduce((sum: number, r: ReturnItem) => sum + r.totalAmount, 0),
+      })
     } catch {
       // Silently fail for stats
     }
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchReturns()
@@ -234,24 +248,13 @@ export function ReturnsScreen() {
   // ── Update Return Status ─────────────────────────────────────────────
 
   const handleUpdateStatus = async (id: string, status: 'approved' | 'rejected') => {
-    try {
-      const res = await fetch('/api/returns', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(
-          status === 'approved' ? 'تم قبول المرتجع بنجاح' : 'تم رفض المرتجع'
-        )
-        fetchReturns()
-        fetchStats()
-      } else {
-        toast.error(data.error || 'حدث خطأ')
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء تحديث حالة المرتجع')
+    const result = await patch('/api/returns', { id, status }, {
+      showSuccessToast: true,
+      successMessage: status === 'approved' ? 'تم قبول المرتجع بنجاح' : 'تم رفض المرتجع',
+    })
+    if (result) {
+      fetchReturns()
+      fetchStats()
     }
   }
 
@@ -268,10 +271,9 @@ export function ReturnsScreen() {
     setSubmitting(false)
 
     try {
-      const res = await fetch('/api/invoices?type=sale')
-      if (res.ok) {
-        const data = await res.json()
-        setSaleInvoices(data.data || [])
+      const result = await get<SaleInvoice[]>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
+      if (result) {
+        setSaleInvoices(result)
       }
     } catch {
       toast.error('حدث خطأ أثناء تحميل الفواتير')
@@ -318,29 +320,19 @@ export function ReturnsScreen() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invoiceId: selectedInvoiceId,
-          productId: selectedProductId,
-          quantity: returnQuantity,
-          reason: returnReason,
-          userId: user.id,
-          userName: user.name,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('تم إنشاء المرتجع بنجاح')
+      const result = await post('/api/returns', {
+        invoiceId: selectedInvoiceId,
+        productId: selectedProductId,
+        quantity: returnQuantity,
+        reason: returnReason,
+        userId: user.id,
+        userName: user.name,
+      }, { showSuccessToast: true, successMessage: 'تم إنشاء المرتجع بنجاح' })
+      if (result) {
         setNewReturnOpen(false)
         fetchReturns()
         fetchStats()
-      } else {
-        toast.error(data.error || 'حدث خطأ أثناء إنشاء المرتجع')
       }
-    } catch {
-      toast.error('حدث خطأ أثناء إنشاء المرتجع')
     } finally {
       setSubmitting(false)
     }
