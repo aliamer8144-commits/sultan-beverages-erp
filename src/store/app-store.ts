@@ -48,7 +48,8 @@ interface AppState {
   // Auth
   user: User | null
   isAuthenticated: boolean
-  login: (user: User) => void
+  token: string | null
+  login: (user: User, token: string) => void
   logout: () => void
 
   // Navigation
@@ -92,8 +93,9 @@ export const useAppStore = create<AppState>()(
       // Auth
       user: null,
       isAuthenticated: false,
-      login: (user) => set({ user, isAuthenticated: true }),
-      logout: () => set({ user: null, isAuthenticated: false, cart: [], cartDiscount: 0, cartCustomerId: null }),
+      token: null,
+      login: (user, token) => set({ user, isAuthenticated: true, token }),
+      logout: () => set({ user: null, isAuthenticated: false, token: null, cart: [], cartDiscount: 0, cartCustomerId: null }),
 
       // Navigation
       currentScreen: 'pos',
@@ -216,6 +218,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        token: state.token,
         currentScreen: state.currentScreen,
         sidebarOpen: state.sidebarOpen,
         settings: state.settings,

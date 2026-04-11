@@ -165,11 +165,10 @@ export function UsersScreen() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetch(`/api/users/${editingUserId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: editingUserId,
           name: editForm.name,
           role: editForm.role,
           isActive: editForm.isActive,
@@ -208,10 +207,9 @@ export function UsersScreen() {
 
     setDeleting(true)
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetch(`/api/users/${deletingUser.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deletingUser.id }),
       })
       const data = await res.json()
       if (data.success) {
@@ -401,11 +399,10 @@ export function UsersScreen() {
                                   isActive: checked,
                                 })
                                 // Fire the update immediately
-                                fetch('/api/users', {
+                                fetch(`/api/users/${user.id}`, {
                                   method: 'PUT',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
-                                    id: user.id,
                                     name: user.name,
                                     role: user.role,
                                     isActive: checked,

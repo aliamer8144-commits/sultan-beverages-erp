@@ -103,3 +103,51 @@ Stage Summary:
 - Zero breaking changes — all 22+ importers still work via re-exports
 - TypeScript: 0 errors, ESLint: 0 errors
 - All API endpoints functional
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Phase 2 — Auth + Users APIs (bcrypt + JWT + middleware)
+
+Work Log:
+- Installed bcryptjs, jose, @types/bcryptjs
+- Created src/lib/auth.ts — centralized auth library (hashPassword, verifyPassword, generateToken, verifyToken, extractToken, getAuthUser)
+- Created src/lib/auth-middleware.ts — withAuth wrapper, requireAdmin, setAuthCookie, clearAuthCookie, getRequestUser
+- Updated src/app/api/auth/route.ts — now uses bcrypt verifyPassword, generates JWT token, sets HTTP-only cookie, supports plaintext→hash migration
+- Created src/app/api/auth/me/route.ts — session verification endpoint
+- Created src/app/api/auth/seed-passwords/route.ts — one-time migration to hash all plaintext passwords
+- Updated src/app/api/users/route.ts — GET/POST now protected with withAuth + requireAdmin, passwords auto-hashed on create
+- Created src/app/api/users/[id]/route.ts — PUT/DELETE with proper REST URL params, admin-only, passwords auto-hashed on update
+- Created src/middleware.ts — blanket JWT verification for all /api/* routes (allows /api/auth, /_next, static)
+- Updated src/store/app-store.ts — added token to auth state, login now accepts (user, token), persisted to localStorage
+- Updated src/screens/login-screen.tsx — passes token from login response to store
+- Updated src/screens/users-screen.tsx — fixed 3 fetch calls to use /api/users/${id} for PUT/DELETE
+- Added JWT_SECRET to .env file
+- Executed seed-passwords: hashed 2 passwords (admin, cashier)
+- Fixed DATABASE_URL system env override issue (SQLite default was interfering)
+
+Verified:
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- 14 comprehensive auth tests ALL PASSED
+- Login (admin) → 200 + JWT token ✅
+- Login (cashier) → 200 + JWT token ✅
+- Login (wrong password) → 401 ✅
+- API without token → 401 (blocked by middleware) ✅
+- API with admin token → 200 ✅
+- API with cashier token → 200 ✅
+- /api/auth/me with token → 200 + user data ✅
+- /api/auth/me without token → 401 ✅
+- /api/users with admin → 200 ✅
+- /api/users with cashier → 403 (admin only) ✅
+- 11 API endpoints with valid token → all 200 ✅
+- Main page (public) → 200 ✅
+- Seed-passwords idempotent → 0 re-hashed ✅
+- Dev log: 0 server errors (500)
+
+Stage Summary:
+- 7 new files created (auth.ts, auth-middleware.ts, me/route.ts, seed-passwords/route.ts, users/[id]/route.ts, middleware.ts, constants update)
+- 5 existing files updated (auth/route.ts, users/route.ts, app-store.ts, login-screen.tsx, users-screen.tsx)
+- Complete auth system: bcrypt hashing, JWT tokens, HTTP-only cookies, Edge middleware, role-based access
+- Backward compatible: login still works for plaintext passwords during migration
+- All APIs now protected by default — middleware blocks unauthenticated requests
