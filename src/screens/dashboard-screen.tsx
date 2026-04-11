@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import { DollarSign, TrendingUp, FileText, AlertTriangle, RefreshCw, Download, Target, Clock, Flame } from 'lucide-react'
+import { ExchangeRateWidget } from '@/components/exchange-rate-widget'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
 import { useAppStore } from '@/store/app-store'
@@ -497,6 +498,9 @@ export function DashboardScreen() {
       {/* Sales Target Widget */}
       <SalesTargetWidget />
 
+      {/* Exchange Rate Widget */}
+      <ExchangeRateWidget />
+
       {/* Summary Cards */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -564,10 +568,10 @@ export function DashboardScreen() {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 stagger-children">
             {/* Monthly Sales Bar Chart */}
-            <div className="chart-container">
+            <div className="chart-container chart-container-glass">
             <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-bold text-foreground">المبيعات الشهرية</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground heading-decoration">المبيعات الشهرية</CardTitle>
                 <p className="text-xs text-muted-foreground">إجمالي المبيعات خلال آخر 6 أشهر</p>
               </CardHeader>
               <CardContent className="p-6 pt-2">
@@ -604,10 +608,10 @@ export function DashboardScreen() {
             </div>
 
             {/* Top 5 Selling Products */}
-            <div className="chart-container">
+            <div className="chart-container chart-container-glass">
             <Card className="rounded-2xl border-0 shadow-sm bg-transparent border-0">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-bold text-foreground">أفضل المنتجات مبيعاً</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground heading-decoration">أفضل المنتجات مبيعاً</CardTitle>
                 <p className="text-xs text-muted-foreground">أكثر 5 منتجات مبيعاً حسب الكمية</p>
               </CardHeader>
               <CardContent className="p-6 pt-2">

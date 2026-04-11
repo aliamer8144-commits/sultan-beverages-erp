@@ -114,7 +114,7 @@ export function LoginScreen() {
                 <circle cx="15" cy="9" r="0.5" fill="currentColor" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">{t('login.title')}</h1>
+            <h1 className="text-2xl font-bold text-gradient">{t('login.title')}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t('login.subtitle')}</p>
           </div>
 
@@ -128,7 +128,7 @@ export function LoginScreen() {
                 placeholder={t('login.usernamePlaceholder')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow"
+                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow input-glass"
                 autoFocus
               />
             </div>
@@ -141,7 +141,7 @@ export function LoginScreen() {
                 placeholder={t('login.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow"
+                className="h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/30 text-base px-4 input-focus-glow input-glass"
               />
             </div>
 

@@ -274,7 +274,7 @@ export function AuditLogScreen() {
               <ClipboardList className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground">سجل العمليات</h2>
+              <h2 className="text-lg font-bold text-foreground heading-decoration">سجل العمليات</h2>
               <p className="text-xs text-muted-foreground">تتبع جميع العمليات في النظام</p>
             </div>
           </div>

@@ -157,6 +157,7 @@ export type Screen =
   | 'sales-targets'
   | 'customer-statement'
   | 'loyalty'
+  | 'product-variants'
 
 interface AppState {
   // Auth

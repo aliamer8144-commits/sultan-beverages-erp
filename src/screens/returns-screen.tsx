@@ -378,7 +378,7 @@ export function ReturnsScreen() {
             <RotateCcw className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-foreground">المرتجعات</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground heading-decoration">المرتجعات</h2>
             <p className="text-sm text-muted-foreground mt-0.5">إدارة عمليات إرجاع المنتجات</p>
           </div>
         </div>

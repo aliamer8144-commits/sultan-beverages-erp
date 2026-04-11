@@ -549,7 +549,7 @@ export function SettingsScreen() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-foreground">الإعدادات</h2>
+            <h2 className="text-xl font-bold text-foreground heading-decoration">الإعدادات</h2>
             <p className="text-sm text-muted-foreground mt-1">
               تخصيص إعدادات النظام حسب احتياجاتك
             </p>

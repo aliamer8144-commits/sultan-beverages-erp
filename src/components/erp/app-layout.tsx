@@ -29,6 +29,7 @@ import { StockAdjustmentsScreen } from '@/screens/stock-adjustments-screen'
 import { SalesTargetsScreen } from '@/screens/sales-targets-screen'
 import { CustomerStatementScreen } from '@/screens/customer-statement-screen'
 import { LoyaltyScreen } from '@/screens/loyalty-screen'
+import { ProductVariantsScreen } from '@/screens/product-variants-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { StockAlertsWidget } from '@/components/stock-alerts-widget'
 import { GlobalSearchDialog } from '@/components/global-search-dialog'
@@ -62,6 +63,7 @@ import {
   Search,
   Languages,
   Gift,
+  Layers,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/translations'
 import { useTheme } from 'next-themes'
@@ -93,6 +95,7 @@ const screenLabels: Record<Screen, string> = {
   'sales-targets': 'أهداف المبيعات',
   'customer-statement': 'كشف حساب عميل',
   loyalty: 'برنامج النقاط',
+  'product-variants': 'متغيرات المنتجات',
 }
 
 // ─── Keyboard Shortcuts Definition (uses translation keys) ──────
@@ -124,6 +127,7 @@ const navItems: { id: Screen; label: string; icon: React.ElementType; adminOnly?
   { id: 'analytics', label: 'التحليلات المتقدمة', icon: TrendingUp },
   { id: 'sales-targets', label: 'أهداف المبيعات', icon: Target, adminOnly: true },
   { id: 'customer-statement', label: 'كشف حساب عميل', icon: FileText, adminOnly: true },
+  { id: 'product-variants', label: 'متغيرات المنتجات', icon: Layers, adminOnly: true },
 ]
 
 // ─── Theme Toggle Component ────────────────────────────────────────
@@ -333,6 +337,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
     'sales-targets': 'nav.sales-targets',
     'customer-statement': 'nav.customer-statement',
     loyalty: 'nav.loyalty',
+    'product-variants': 'nav.product-variants',
   }
 
   const handleNav = (screen: Screen) => {
@@ -482,6 +487,7 @@ export function AppLayout() {
     'sales-targets': 'nav.sales-targets',
     'customer-statement': 'nav.customer-statement',
     loyalty: 'nav.loyalty',
+    'product-variants': 'nav.product-variants',
   }
 
   // ── Screen navigation toast ───────────────────────────────────────
@@ -551,6 +557,7 @@ export function AppLayout() {
       case 'sales-targets': return <SalesTargetsScreen />
       case 'customer-statement': return <CustomerStatementScreen />
       case 'loyalty': return <LoyaltyScreen />
+      case 'product-variants': return <ProductVariantsScreen />
       default: return <POSScreen />
     }
   }

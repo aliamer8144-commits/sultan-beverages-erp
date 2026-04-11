@@ -4,10 +4,16 @@ import { db } from '@/lib/db'
 // ─── GET: Aggregated quick-stats for the floating panel ─────────────
 export async function GET() {
   try {
-    const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
     const now = new Date()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+    // Previous period for trends
+    const prevDayStart = new Date(startOfDay.getTime() - 86400000)
+    const prevDayEnd = new Date(prevDayStart.getTime() + 86400000 - 1)
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
 
     // Run all independent queries in parallel
     const [
@@ -28,6 +34,12 @@ export async function GET() {
       activeTargets,
       topCustomerToday,
       itemsSoldTodayAgg,
+      // Previous period data for trends
+      prevDaySalesAgg,
+      prevDayInvoiceCount,
+      prevDayItemsAgg,
+      prevMonthSalesAgg,
+      prevDayExpensesAgg,
     ] = await Promise.all([
       // 1. Today's total sales (sale invoices)
       db.invoice.aggregate({
@@ -66,7 +78,7 @@ export async function GET() {
         _sum: { amount: true },
       }),
 
-      // 9. Today's expenses (kept for backward compatibility)
+      // 9. Today's expenses
       db.expense.aggregate({
         where: { date: { gte: startOfDay } },
         _sum: { amount: true },
@@ -78,7 +90,7 @@ export async function GET() {
         _sum: { totalAmount: true },
       }),
 
-      // 11. Monthly expenses (redundant with 8 but explicit for clarity)
+      // 11. Monthly expenses
       db.expense.aggregate({
         where: { date: { gte: monthStart, lte: monthEnd } },
         _sum: { amount: true },
@@ -129,6 +141,35 @@ export async function GET() {
         where: { invoice: { type: 'sale', createdAt: { gte: startOfDay } } },
         _sum: { quantity: true },
       }),
+
+      // 18. Previous day sales
+      db.invoice.aggregate({
+        where: { type: 'sale', createdAt: { gte: prevDayStart, lte: prevDayEnd } },
+        _sum: { totalAmount: true },
+      }),
+
+      // 19. Previous day invoice count
+      db.invoice.count({
+        where: { type: 'sale', createdAt: { gte: prevDayStart, lte: prevDayEnd } },
+      }),
+
+      // 20. Previous day invoice items (for profit comparison)
+      db.invoiceItem.findMany({
+        where: { invoice: { type: 'sale', createdAt: { gte: prevDayStart, lte: prevDayEnd } } },
+        include: { product: { select: { costPrice: true } } },
+      }),
+
+      // 21. Previous month sales
+      db.invoice.aggregate({
+        where: { type: 'sale', createdAt: { gte: prevMonthStart, lte: prevMonthEnd } },
+        _sum: { totalAmount: true },
+      }),
+
+      // 22. Previous day expenses
+      db.expense.aggregate({
+        where: { date: { gte: prevDayStart, lte: prevDayEnd } },
+        _sum: { amount: true },
+      }),
     ])
 
     // ── Derived values ─────────────────────────────────────────────
@@ -143,22 +184,32 @@ export async function GET() {
       totalSalesToday > 0 ? Math.round((totalProfitToday / totalSalesToday) * 1000) / 10 : 0
 
     const invoicesCountToday = invoiceCount
-
     const lowStockProducts = lowStockCount
-
     const totalCustomers = customerCount
-
     const totalSuppliers = supplierCount
-
     const totalProducts = productCount
-
     const totalExpensesToday = todayExpensesAgg._sum.amount ?? 0
-
     const monthlySales = monthlySalesAgg._sum.totalAmount ?? 0
-
     const totalExpenses = expensesAgg._sum.amount ?? 0
-
     const totalDebt = totalDebtAgg._sum.debt ?? 0
+
+    // ── Trend calculations ───────────────────────────────────────
+    const prevDaySales = prevDaySalesAgg._sum.totalAmount ?? 0
+    const prevDayInvoices = prevDayInvoiceCount
+    const prevMonthSales = prevMonthSalesAgg._sum.totalAmount ?? 0
+    const prevDayExpenses = prevDayExpensesAgg._sum.amount ?? 0
+
+    // Previous day profit
+    const prevDayProfit = prevDayItemsAgg.reduce(
+      (sum, item) => sum + (item.price - item.product.costPrice) * item.quantity,
+      0,
+    )
+
+    // Helper: calculate trend percentage
+    function calcTrend(current: number, previous: number): number {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return Math.round(((current - previous) / previous) * 1000) / 10
+    }
 
     // Top 3 products (resolve names from the items already fetched)
     const productIdToName = new Map<string, string>()
@@ -201,9 +252,8 @@ export async function GET() {
           : 0
     }
 
-    // ── New stats ────────────────────────────────────────────────
+    // ── Additional stats ────────────────────────────────────────
     const itemsSoldToday = itemsSoldTodayAgg._sum.quantity ?? 0
-
     const averageSaleToday = invoicesCountToday > 0 ? Math.round((totalSalesToday / invoicesCountToday) * 100) / 100 : 0
 
     // Resolve top customer name
@@ -231,17 +281,51 @@ export async function GET() {
         recentActivity,
         salesTargetProgress,
 
-        // New fields
+        // Additional fields
         totalProducts,
         totalSuppliers,
         totalDebt,
         monthlySales,
         totalExpenses,
 
-        // Task 12-b stats
+        // Extra stats
         topCustomerTodayName,
         itemsSoldToday,
         averageSaleToday,
+
+        // ── Trend data (NEW) ────────────────────────────────────
+        trends: {
+          salesToday: {
+            value: totalSalesToday,
+            previous: prevDaySales,
+            change: calcTrend(totalSalesToday, prevDaySales),
+            period: 'يوم أمس',
+          },
+          profitToday: {
+            value: totalProfitToday,
+            previous: prevDayProfit,
+            change: calcTrend(totalProfitToday, prevDayProfit),
+            period: 'يوم أمس',
+          },
+          invoicesToday: {
+            value: invoicesCountToday,
+            previous: prevDayInvoices,
+            change: calcTrend(invoicesCountToday, prevDayInvoices),
+            period: 'يوم أمس',
+          },
+          monthlySales: {
+            value: monthlySales,
+            previous: prevMonthSales,
+            change: calcTrend(monthlySales, prevMonthSales),
+            period: 'الشهر الماضي',
+          },
+          expensesToday: {
+            value: totalExpensesToday,
+            previous: prevDayExpenses,
+            change: calcTrend(totalExpensesToday, prevDayExpenses),
+            period: 'يوم أمس',
+          },
+        },
       },
     })
   } catch (error) {

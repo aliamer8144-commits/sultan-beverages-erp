@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useAppStore } from '@/store/app-store'
+import { useAppStore, type Screen } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { toast } from 'sonner'
 import {
@@ -29,6 +29,9 @@ import {
   Crown,
   ShoppingCart,
   BarChart,
+  Minimize2,
+  Maximize2,
+  Zap,
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -46,6 +49,13 @@ interface RecentActivityItem {
   createdAt: string
 }
 
+interface TrendData {
+  value: number
+  previous: number
+  change: number
+  period: string
+}
+
 interface StatsData {
   totalSalesToday: number
   totalProfitToday: number
@@ -57,16 +67,21 @@ interface StatsData {
   topProducts: TopProduct[]
   recentActivity: RecentActivityItem[]
   salesTargetProgress: number | null
-  // New fields
   totalProducts: number
   totalSuppliers: number
   totalDebt: number
   monthlySales: number
   totalExpenses: number
-  // Task 12-b stats
   topCustomerTodayName: string | null
   itemsSoldToday: number
   averageSaleToday: number
+  trends: {
+    salesToday: TrendData
+    profitToday: TrendData
+    invoicesToday: TrendData
+    monthlySales: TrendData
+    expensesToday: TrendData
+  }
 }
 
 // ─── Relative Arabic time ───────────────────────────────────────────
@@ -147,7 +162,7 @@ function MetricSkeleton() {
         <div className="skeleton-shimmer h-3 w-24 rounded-md" />
         <div className="skeleton-shimmer h-5 w-20 rounded-md" />
       </div>
-      <div className="skeleton-shimmer h-5 w-12 rounded-lg" />
+      <div className="skeleton-shimmer h-5 w-16 rounded-lg" />
     </div>
   )
 }
@@ -198,6 +213,41 @@ function ProgressSkeleton() {
   )
 }
 
+// ─── Trend Indicator Component ──────────────────────────────────────
+function TrendIndicator({ trend, compact }: { trend?: TrendData; compact?: boolean }) {
+  if (!trend || compact) return null
+
+  const isPositive = trend.change > 0
+  const isNeutral = trend.change === 0
+
+  return (
+    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg ${
+      isNeutral
+        ? 'bg-muted'
+        : isPositive
+          ? 'bg-emerald-50 dark:bg-emerald-500/10'
+          : 'bg-red-50 dark:bg-red-500/10'
+    }`}>
+      {isPositive ? (
+        <TrendingUp className="w-3 h-3 text-emerald-500" />
+      ) : isNeutral ? (
+        <Activity className="w-3 h-3 text-muted-foreground" />
+      ) : (
+        <TrendingDown className="w-3 h-3 text-red-500" />
+      )}
+      <span className={`text-[10px] font-semibold tabular-nums ${
+        isNeutral
+          ? 'text-muted-foreground'
+          : isPositive
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : 'text-red-600 dark:text-red-400'
+      }`}>
+        {isPositive ? '+' : ''}{trend.change}%
+      </span>
+    </div>
+  )
+}
+
 // ─── Single Metric Row ──────────────────────────────────────────────
 function MetricRow({
   label,
@@ -207,10 +257,10 @@ function MetricRow({
   iconColor,
   valueColor,
   suffix,
-  trendIcon: TrendIcon,
-  trendBg,
-  trendColor,
-  trendLabel,
+  trend,
+  navigateTo,
+  onNavigate,
+  compact,
 }: {
   label: string
   value: string
@@ -219,28 +269,37 @@ function MetricRow({
   iconColor: string
   valueColor: string
   suffix?: string
-  trendIcon: React.ElementType
-  trendBg: string
-  trendColor: string
-  trendLabel: string
+  trend?: TrendData
+  navigateTo?: Screen
+  onNavigate?: (screen: Screen) => void
+  compact?: boolean
 }) {
+  const isClickable = !!navigateTo && !!onNavigate
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors group card-hover">
-      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center flex-shrink-0`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
+    <div
+      onClick={() => isClickable && onNavigate!(navigateTo!)}
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group data-card-micro ${
+        isClickable ? 'cursor-pointer hover:bg-primary/5 active:scale-[0.98]' : 'hover:bg-muted/40'
+      } ${compact ? 'p-2 gap-2' : ''}`}
+    >
+      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center flex-shrink-0 ${compact ? 'w-8 h-8' : ''}`}>
+        <Icon className={`w-5 h-5 ${iconColor} ${compact ? 'w-4 h-4' : ''}`} />
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground leading-tight">{label}</p>
-        <p className={`text-base font-bold ${valueColor} tabular-nums leading-snug mt-0.5`}>
+        <p className={`text-[11px] font-medium text-muted-foreground leading-tight ${compact ? 'text-[10px]' : ''}`}>{label}</p>
+        <p className={`font-bold ${valueColor} tabular-nums leading-snug mt-0.5 ${compact ? 'text-sm' : 'text-base'}`}>
           {value}
           {suffix && <span className="text-xs font-medium opacity-70 mr-1">{suffix}</span>}
         </p>
       </div>
 
-      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg ${trendBg}`}>
-        <TrendIcon className={`w-3 h-3 ${trendColor}`} />
-        <span className={`text-[10px] font-semibold ${trendColor}`}>{trendLabel}</span>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <TrendIndicator trend={trend} compact={compact} />
+        {isClickable && (
+          <ArrowLeft className="w-3 h-3 text-muted-foreground/40 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
+        )}
       </div>
     </div>
   )
@@ -288,6 +347,54 @@ function SalesTargetProgress({ progress }: { progress: number }) {
   )
 }
 
+// ─── Auto Refresh Countdown ─────────────────────────────────────────
+function RefreshCountdown({ refreshing, lastRefreshAt }: { refreshing: boolean; lastRefreshAt: Date | null }) {
+  const [countdown, setCountdown] = useState(30)
+
+  useEffect(() => {
+    // When lastRefreshAt changes, reset countdown via interval
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev <= 1 ? 30 : prev - 1))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [lastRefreshAt])
+
+  // Reset to 30 whenever refreshing starts
+  useEffect(() => {
+    if (refreshing) {
+      // We set it via the interval callback to avoid direct setState in effect
+      const id = requestAnimationFrame(() => setCountdown(30))
+      return () => cancelAnimationFrame(id)
+    }
+  }, [refreshing])
+
+  const progress = refreshing ? 100 : Math.round(((30 - countdown) / 30) * 100)
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-4 h-4 relative">
+        <svg className="w-4 h-4 -rotate-90" viewBox="0 0 16 16">
+          <circle cx="8" cy="8" r="6" fill="none" className="stroke-muted" strokeWidth="2" />
+          <circle
+            cx="8" cy="8" r="6" fill="none"
+            className={refreshing ? 'stroke-primary' : 'stroke-primary/60'}
+            strokeWidth="2"
+            strokeDasharray={`${progress * 0.377} 37.7`}
+            strokeLinecap="round"
+            style={{ transition: refreshing ? 'none' : 'stroke-dasharray 1s linear' }}
+          />
+        </svg>
+        {refreshing && (
+          <RefreshCw className="w-2 h-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-spin" />
+        )}
+      </div>
+      {!refreshing && countdown <= 5 && (
+        <Zap className="w-3 h-3 text-amber-500 animate-pulse" />
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ─────────────────────────────────────────────────
 export function QuickStatsPanel() {
   const { setScreen } = useAppStore()
@@ -296,8 +403,16 @@ export function QuickStatsPanel() {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [compact, setCompact] = useState(false)
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Navigate to a screen ───────────────────────────────────────
+  const handleNavigate = useCallback((screen: Screen) => {
+    setIsOpen(false)
+    setScreen(screen)
+  }, [setScreen])
 
   // ── Fetch all stats from single endpoint ─────────────────────────
   const fetchStats = useCallback(
@@ -310,6 +425,7 @@ export function QuickStatsPanel() {
 
         if (json.success && json.data) {
           setStats(json.data)
+          setLastRefreshAt(new Date())
         } else {
           toast.error('فشل في تحميل الإحصائيات')
         }
@@ -326,7 +442,7 @@ export function QuickStatsPanel() {
   // ── Initial load + auto-refresh every 30s ─────────────────────────
   useEffect(() => {
     fetchStats()
-    intervalRef.current = setInterval(() => fetchStats(), 30000)
+    intervalRef.current = setInterval(() => fetchStats(true), 30000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
@@ -373,7 +489,7 @@ export function QuickStatsPanel() {
       {/* ── Stats Panel ─────────────────────────────────────────── */}
       <div
         ref={panelRef}
-        className={`fixed bottom-24 left-4 sm:left-6 z-[100] w-[calc(100vw-2rem)] sm:w-[400px] transition-all duration-300 ease-out ${
+        className={`fixed bottom-24 left-4 sm:left-6 z-[100] w-[calc(100vw-2rem)] sm:${compact ? 'w-[320px]' : 'w-[400px]'} transition-all duration-300 ease-out ${
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
@@ -393,6 +509,9 @@ export function QuickStatsPanel() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Auto-refresh indicator */}
+              <RefreshCountdown refreshing={refreshing} lastRefreshAt={lastRefreshAt} />
+
               {/* Refresh button */}
               <button
                 onClick={() => fetchStats(true)}
@@ -402,6 +521,20 @@ export function QuickStatsPanel() {
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* Compact toggle */}
+              <button
+                onClick={() => setCompact(!compact)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                aria-label={compact ? 'عرض موسع' : 'عرض مضغوط'}
+              >
+                {compact ? (
+                  <Maximize2 className="w-3.5 h-3.5" />
+                ) : (
+                  <Minimize2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+
               {/* Close button */}
               <button
                 onClick={() => setIsOpen(false)}
@@ -420,12 +553,16 @@ export function QuickStatsPanel() {
             {loading ? (
               // ── Skeleton Loading ─────────────────────────────
               <div className="space-y-0.5">
-                {Array.from({ length: 6 }).map((_, i) => (
+                {Array.from({ length: compact ? 4 : 6 }).map((_, i) => (
                   <MetricSkeleton key={`m-${i}`} />
                 ))}
-                <TopProductsSkeleton />
-                <ProgressSkeleton />
-                <RecentActivitySkeleton />
+                {!compact && (
+                  <>
+                    <TopProductsSkeleton />
+                    <ProgressSkeleton />
+                    <RecentActivitySkeleton />
+                  </>
+                )}
               </div>
             ) : stats ? (
               // ── Actual Data ──────────────────────────────────
@@ -439,10 +576,10 @@ export function QuickStatsPanel() {
                     iconBg="bg-emerald-50 dark:bg-emerald-500/10"
                     iconColor="text-emerald-500"
                     valueColor="text-emerald-600 dark:text-emerald-400"
-                    trendIcon={TrendingUp}
-                    trendBg="bg-emerald-50 dark:bg-emerald-500/10"
-                    trendColor="text-emerald-500"
-                    trendLabel="اليوم"
+                    trend={stats.trends.salesToday}
+                    navigateTo="dashboard"
+                    onNavigate={handleNavigate}
+                    compact={compact}
                   />
 
                   <MetricRow
@@ -452,25 +589,26 @@ export function QuickStatsPanel() {
                     iconBg={stats.totalProfitToday >= 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'}
                     iconColor={stats.totalProfitToday >= 0 ? 'text-green-500' : 'text-red-500'}
                     valueColor={stats.totalProfitToday >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
-                    trendIcon={stats.totalProfitToday >= 0 ? TrendingUp : TrendingDown}
-                    trendBg={stats.totalProfitToday >= 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'}
-                    trendColor={stats.totalProfitToday >= 0 ? 'text-green-500' : 'text-red-500'}
-                    trendLabel={stats.totalProfitToday >= 0 ? 'إيجابي' : 'سلبي'}
+                    trend={stats.trends.profitToday}
+                    navigateTo="dashboard"
+                    onNavigate={handleNavigate}
+                    compact={compact}
                   />
 
-                  {/* Profit Margin */}
-                  <MetricRow
-                    label="معدل الربح"
-                    value={`${Math.abs(stats.profitMargin)}%`}
-                    icon={Percent}
-                    iconBg={stats.profitMargin >= 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'}
-                    iconColor={stats.profitMargin >= 0 ? 'text-emerald-500' : 'text-red-500'}
-                    valueColor={profitMarginColor}
-                    trendIcon={stats.profitMargin >= 15 ? TrendingUp : TrendingDown}
-                    trendBg={stats.profitMargin >= 15 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}
-                    trendColor={stats.profitMargin >= 15 ? 'text-emerald-500' : 'text-amber-500'}
-                    trendLabel={stats.profitMargin >= 15 ? 'ممتاز' : stats.profitMargin >= 5 ? 'مقبول' : 'منخفض'}
-                  />
+                  {!compact && (
+                    <>
+                      {/* Profit Margin */}
+                      <MetricRow
+                        label="معدل الربح"
+                        value={`${Math.abs(stats.profitMargin)}%`}
+                        icon={Percent}
+                        iconBg={stats.profitMargin >= 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'}
+                        iconColor={stats.profitMargin >= 0 ? 'text-emerald-500' : 'text-red-500'}
+                        valueColor={profitMarginColor}
+                        compact={compact}
+                      />
+                    </>
+                  )}
 
                   <MetricRow
                     label="عدد الفواتير"
@@ -479,10 +617,10 @@ export function QuickStatsPanel() {
                     iconBg="bg-blue-50 dark:bg-blue-500/10"
                     iconColor="text-blue-500"
                     valueColor="text-blue-600 dark:text-blue-400"
-                    trendIcon={FileText}
-                    trendBg="bg-blue-50 dark:bg-blue-500/10"
-                    trendColor="text-blue-400"
-                    trendLabel="فواتير"
+                    trend={stats.trends.invoicesToday}
+                    navigateTo="invoices"
+                    onNavigate={handleNavigate}
+                    compact={compact}
                   />
 
                   <MetricRow
@@ -492,10 +630,9 @@ export function QuickStatsPanel() {
                     iconBg="bg-amber-50 dark:bg-amber-500/10"
                     iconColor="text-amber-500"
                     valueColor={stats.lowStockProducts > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}
-                    trendIcon={AlertTriangle}
-                    trendBg={stats.lowStockProducts > 0 ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-green-50 dark:bg-green-500/10'}
-                    trendColor={stats.lowStockProducts > 0 ? 'text-amber-500' : 'text-green-500'}
-                    trendLabel={stats.lowStockProducts > 0 ? 'تحذير' : 'جيد'}
+                    navigateTo="inventory"
+                    onNavigate={handleNavigate}
+                    compact={compact}
                   />
 
                   <MetricRow
@@ -505,217 +642,201 @@ export function QuickStatsPanel() {
                     iconBg="bg-red-50 dark:bg-red-500/10"
                     iconColor="text-red-500"
                     valueColor="text-red-600 dark:text-red-400"
-                    trendIcon={Receipt}
-                    trendBg="bg-red-50 dark:bg-red-500/10"
-                    trendColor="text-red-400"
-                    trendLabel="مصروفات"
+                    trend={stats.trends.expensesToday}
+                    navigateTo="expenses"
+                    onNavigate={handleNavigate}
+                    compact={compact}
                   />
 
-                  <MetricRow
-                    label="عدد العملاء"
-                    value={stats.totalCustomers.toLocaleString('ar-SA')}
-                    icon={Users}
-                    iconBg="bg-violet-50 dark:bg-violet-500/10"
-                    iconColor="text-violet-500"
-                    valueColor="text-violet-600 dark:text-violet-400"
-                    trendIcon={Users}
-                    trendBg="bg-violet-50 dark:bg-violet-500/10"
-                    trendColor="text-violet-400"
-                    trendLabel="عملاء"
-                  />
+                  {!compact && (
+                    <>
+                      <MetricRow
+                        label="عدد العملاء"
+                        value={stats.totalCustomers.toLocaleString('ar-SA')}
+                        icon={Users}
+                        iconBg="bg-violet-50 dark:bg-violet-500/10"
+                        iconColor="text-violet-500"
+                        valueColor="text-violet-600 dark:text-violet-400"
+                        navigateTo="customers"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="عدد المنتجات"
-                    value={stats.totalProducts.toLocaleString('ar-SA')}
-                    icon={Package}
-                    iconBg="bg-cyan-50 dark:bg-cyan-500/10"
-                    iconColor="text-cyan-500"
-                    valueColor="text-cyan-600 dark:text-cyan-400"
-                    trendIcon={Package}
-                    trendBg="bg-cyan-50 dark:bg-cyan-500/10"
-                    trendColor="text-cyan-400"
-                    trendLabel="منتج"
-                  />
+                      <MetricRow
+                        label="عدد المنتجات"
+                        value={stats.totalProducts.toLocaleString('ar-SA')}
+                        icon={Package}
+                        iconBg="bg-cyan-50 dark:bg-cyan-500/10"
+                        iconColor="text-cyan-500"
+                        valueColor="text-cyan-600 dark:text-cyan-400"
+                        navigateTo="inventory"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="عدد الموردين"
-                    value={stats.totalSuppliers.toLocaleString('ar-SA')}
-                    icon={Truck}
-                    iconBg="bg-orange-50 dark:bg-orange-500/10"
-                    iconColor="text-orange-500"
-                    valueColor="text-orange-600 dark:text-orange-400"
-                    trendIcon={Truck}
-                    trendBg="bg-orange-50 dark:bg-orange-500/10"
-                    trendColor="text-orange-400"
-                    trendLabel="مورد"
-                  />
+                      <MetricRow
+                        label="عدد الموردين"
+                        value={stats.totalSuppliers.toLocaleString('ar-SA')}
+                        icon={Truck}
+                        iconBg="bg-orange-50 dark:bg-orange-500/10"
+                        iconColor="text-orange-500"
+                        valueColor="text-orange-600 dark:text-orange-400"
+                        navigateTo="purchases"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="مبيعات الشهر"
-                    value={`${formatCurrency(stats.monthlySales)} ${symbol}`}
-                    icon={CalendarDays}
-                    iconBg="bg-indigo-50 dark:bg-indigo-500/10"
-                    iconColor="text-indigo-500"
-                    valueColor="text-indigo-600 dark:text-indigo-400"
-                    trendIcon={TrendingUp}
-                    trendBg={stats.monthlySales > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-muted'}
-                    trendColor={stats.monthlySales > 0 ? 'text-emerald-500' : 'text-muted-foreground'}
-                    trendLabel="شهري"
-                  />
+                      <MetricRow
+                        label="مبيعات الشهر"
+                        value={`${formatCurrency(stats.monthlySales)} ${symbol}`}
+                        icon={CalendarDays}
+                        iconBg="bg-indigo-50 dark:bg-indigo-500/10"
+                        iconColor="text-indigo-500"
+                        valueColor="text-indigo-600 dark:text-indigo-400"
+                        trend={stats.trends.monthlySales}
+                        navigateTo="dashboard"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="مصروفات الشهر"
-                    value={`${formatCurrency(stats.totalExpenses)} ${symbol}`}
-                    icon={Receipt}
-                    iconBg="bg-rose-50 dark:bg-rose-500/10"
-                    iconColor="text-rose-500"
-                    valueColor="text-rose-600 dark:text-rose-400"
-                    trendIcon={TrendingDown}
-                    trendBg="bg-rose-50 dark:bg-rose-500/10"
-                    trendColor="text-rose-400"
-                    trendLabel="شهري"
-                  />
+                      <MetricRow
+                        label="إجمالي مديونية العملاء"
+                        value={`${formatCurrency(stats.totalDebt)} ${symbol}`}
+                        icon={Wallet}
+                        iconBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
+                        iconColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
+                        valueColor={stats.totalDebt > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
+                        navigateTo="customers"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="إجمالي مديونية العملاء"
-                    value={`${formatCurrency(stats.totalDebt)} ${symbol}`}
-                    icon={Wallet}
-                    iconBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
-                    iconColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
-                    valueColor={stats.totalDebt > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
-                    trendIcon={stats.totalDebt > 0 ? AlertTriangle : CheckCircle2}
-                    trendBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
-                    trendColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
-                    trendLabel={stats.totalDebt > 0 ? 'مديونية' : 'لا ديون'}
-                  />
+                      <MetricRow
+                        label="أفضل عميل اليوم"
+                        value={stats.topCustomerTodayName || '—'}
+                        icon={Crown}
+                        iconBg="bg-amber-50 dark:bg-amber-500/10"
+                        iconColor="text-amber-500"
+                        valueColor="text-amber-600 dark:text-amber-400"
+                        navigateTo="customers"
+                        onNavigate={handleNavigate}
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="أفضل عميل اليوم"
-                    value={stats.topCustomerTodayName || '—'}
-                    icon={Crown}
-                    iconBg="bg-amber-50 dark:bg-amber-500/10"
-                    iconColor="text-amber-500"
-                    valueColor="text-amber-600 dark:text-amber-400"
-                    trendIcon={Crown}
-                    trendBg="bg-amber-50 dark:bg-amber-500/10"
-                    trendColor="text-amber-500"
-                    trendLabel="اليوم"
-                  />
+                      <MetricRow
+                        label="المنتجات المباعة اليوم"
+                        value={stats.itemsSoldToday.toLocaleString('ar-SA')}
+                        icon={ShoppingCart}
+                        iconBg="bg-cyan-50 dark:bg-cyan-500/10"
+                        iconColor="text-cyan-500"
+                        valueColor="text-cyan-600 dark:text-cyan-400"
+                        compact={compact}
+                      />
 
-                  <MetricRow
-                    label="المنتجات المباعة اليوم"
-                    value={stats.itemsSoldToday.toLocaleString('ar-SA')}
-                    icon={ShoppingCart}
-                    iconBg="bg-cyan-50 dark:bg-cyan-500/10"
-                    iconColor="text-cyan-500"
-                    valueColor="text-cyan-600 dark:text-cyan-400"
-                    trendIcon={ShoppingCart}
-                    trendBg="bg-cyan-50 dark:bg-cyan-500/10"
-                    trendColor="text-cyan-400"
-                    trendLabel="وحدة"
-                  />
-
-                  <MetricRow
-                    label="متوسط الفاتورة اليوم"
-                    value={`${formatCurrency(stats.averageSaleToday)} ${symbol}`}
-                    icon={BarChart}
-                    iconBg="bg-violet-50 dark:bg-violet-500/10"
-                    iconColor="text-violet-500"
-                    valueColor="text-violet-600 dark:text-violet-400"
-                    trendIcon={TrendingUp}
-                    trendBg={stats.averageSaleToday > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-muted'}
-                    trendColor={stats.averageSaleToday > 0 ? 'text-emerald-500' : 'text-muted-foreground'}
-                    trendLabel="متوسط"
-                  />
+                      <MetricRow
+                        label="متوسط الفاتورة اليوم"
+                        value={`${formatCurrency(stats.averageSaleToday)} ${symbol}`}
+                        icon={BarChart}
+                        iconBg="bg-violet-50 dark:bg-violet-500/10"
+                        iconColor="text-violet-500"
+                        valueColor="text-violet-600 dark:text-violet-400"
+                        compact={compact}
+                      />
+                    </>
+                  )}
                 </div>
 
                 {/* ── Divider ─────────────────────────────────── */}
                 <div className="mx-3 h-px bg-border/40 my-1" />
 
-                {/* ── Top Selling Products ────────────────────── */}
-                <div className="p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="text-[11px] font-semibold text-foreground">المنتجات الأكثر مبيعاً</span>
-                    <span className="text-[10px] text-muted-foreground mr-auto">اليوم</span>
-                  </div>
-                  {stats.topProducts.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {stats.topProducts.map((product, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <span
-                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                              idx === 0
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-                                : idx === 1
-                                  ? 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
-                                  : 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
-                            }`}
-                          >
-                            {idx + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-foreground truncate">{product.name}</p>
-                          </div>
-                          <span className="text-[11px] font-semibold text-muted-foreground tabular-nums flex-shrink-0">
-                            {product.quantity} وحدة
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground text-center py-2">لا توجد مبيعات اليوم</p>
-                  )}
-                </div>
-
-                {/* ── Divider ─────────────────────────────────── */}
-                <div className="mx-3 h-px bg-border/40 my-0" />
-
-                {/* ── Sales Target Progress ───────────────────── */}
-                {stats.salesTargetProgress !== null ? (
-                  <SalesTargetProgress progress={stats.salesTargetProgress} />
-                ) : null}
-
-                {/* ── Divider ─────────────────────────────────── */}
-                <div className="mx-3 h-px bg-border/40 my-0" />
-
-                {/* ── Recent Activity Feed ────────────────────── */}
-                <div className="p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Activity className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-[11px] font-semibold text-foreground">آخر العمليات</span>
-                  </div>
-                  <div className="space-y-2">
-                    {stats.recentActivity.map((item) => {
-                      const meta = activityMeta(item.action)
-                      const Icon = meta.icon
-                      return (
-                        <div key={item.id} className="flex items-start gap-2.5 group/act">
-                          <div
-                            className={`w-6 h-6 rounded-full ${meta.bg} flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors group-hover/act:scale-110`}
-                          >
-                            <Icon className={`w-3 h-3 ${meta.color}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-medium text-foreground leading-tight truncate">
-                              {activityLabel(item.action, item.entity, item.details)}
-                            </p>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Clock className="w-2.5 h-2.5 text-muted-foreground/60" />
-                              <span className="text-[10px] text-muted-foreground">
-                                {item.userName ? `${item.userName} · ` : ''}
-                                {relativeArabicTime(item.createdAt)}
+                {/* ── Top Selling Products (hidden in compact mode) ─ */}
+                {!compact && (
+                  <>
+                    <div className="p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-[11px] font-semibold text-foreground">المنتجات الأكثر مبيعاً</span>
+                        <span className="text-[10px] text-muted-foreground mr-auto">اليوم</span>
+                      </div>
+                      {stats.topProducts.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {stats.topProducts.map((product, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                            >
+                              <span
+                                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                  idx === 0
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+                                    : idx === 1
+                                      ? 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                                      : 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
+                                }`}
+                              >
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-foreground truncate">{product.name}</p>
+                              </div>
+                              <span className="text-[11px] font-semibold text-muted-foreground tabular-nums flex-shrink-0">
+                                {product.quantity} وحدة
                               </span>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground text-center py-2">لا توجد مبيعات اليوم</p>
+                      )}
+                    </div>
+
+                    {/* ── Divider ─────────────────────────────────── */}
+                    <div className="mx-3 h-px bg-border/40 my-0" />
+
+                    {/* ── Sales Target Progress ───────────────────── */}
+                    {stats.salesTargetProgress !== null ? (
+                      <SalesTargetProgress progress={stats.salesTargetProgress} />
+                    ) : null}
+
+                    {/* ── Divider ─────────────────────────────────── */}
+                    <div className="mx-3 h-px bg-border/40 my-0" />
+
+                    {/* ── Recent Activity Feed ────────────────────── */}
+                    <div className="p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Activity className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-[11px] font-semibold text-foreground">آخر العمليات</span>
+                      </div>
+                      <div className="space-y-2">
+                        {stats.recentActivity.map((item) => {
+                          const meta = activityMeta(item.action)
+                          const Icon = meta.icon
+                          return (
+                            <div key={item.id} className="flex items-start gap-2.5 group/act">
+                              <div
+                                className={`w-6 h-6 rounded-full ${meta.bg} flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors group-hover/act:scale-110`}
+                              >
+                                <Icon className={`w-3 h-3 ${meta.color}`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-medium text-foreground leading-tight truncate">
+                                  {activityLabel(item.action, item.entity, item.details)}
+                                </p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Clock className="w-2.5 h-2.5 text-muted-foreground/60" />
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {item.userName ? `${item.userName} · ` : ''}
+                                    {relativeArabicTime(item.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               // ── Error / empty state ──────────────────────────
@@ -729,10 +850,7 @@ export function QuickStatsPanel() {
           {/* Panel Footer */}
           <div className="p-3 pt-1 flex-shrink-0">
             <button
-              onClick={() => {
-                setIsOpen(false)
-                setScreen('dashboard')
-              }}
+              onClick={() => handleNavigate('dashboard')}
               className="btn-ripple w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/5 hover:bg-primary/10 text-primary font-semibold text-sm transition-colors"
             >
               <span>عرض التقارير</span>

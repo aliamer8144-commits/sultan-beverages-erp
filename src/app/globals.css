@@ -16278,3 +16278,1731 @@ button:active:not(:disabled) {
     animation: none;
   }
 }
+
+/* ============================================================================
+   146. CHART VISUALIZATION ENHANCEMENTS
+   ============================================================================ */
+
+/* Glassmorphism container for charts */
+.chart-container-glass {
+  background: oklch(0.985 0.005 260 / 60%);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid oklch(0.92 0.005 260 / 40%);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 4px 16px oklch(0.15 0.01 260 / 8%),
+    inset 0 1px 0 oklch(1 0 0 / 40%);
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chart-container-glass::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40%;
+  height: 60%;
+  background: radial-gradient(
+    ellipse at top right,
+    oklch(0.55 0.2 260 / 5%),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.chart-container-glass:hover {
+  border-color: oklch(0.55 0.2 260 / 20%);
+  box-shadow:
+    0 8px 32px oklch(0.15 0.01 260 / 12%),
+    inset 0 1px 0 oklch(1 0 0 / 60%);
+}
+
+.dark .chart-container-glass {
+  background: oklch(0.2 0.01 260 / 60%);
+  border-color: oklch(0.35 0.02 260 / 40%);
+  box-shadow:
+    0 4px 16px oklch(0 0 0 / 25%),
+    inset 0 1px 0 oklch(1 0 0 / 5%);
+}
+
+.dark .chart-container-glass::before {
+  background: radial-gradient(
+    ellipse at top right,
+    oklch(0.65 0.22 260 / 8%),
+    transparent 70%
+  );
+}
+
+.dark .chart-container-glass:hover {
+  border-color: oklch(0.65 0.22 260 / 25%);
+}
+
+/* Enhanced chart legends */
+.legend-enhanced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: oklch(0.98 0.002 260 / 50%);
+  border: 1px solid oklch(0.93 0.005 260 / 50%);
+}
+
+.legend-enhanced-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: oklch(0.45 0.02 260);
+  transition: color 0.2s ease;
+}
+
+.legend-enhanced-item:hover {
+  color: oklch(0.25 0.02 260);
+}
+
+.legend-enhanced-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.legend-enhanced-item:hover .legend-enhanced-dot {
+  transform: scale(1.3);
+}
+
+.dark .legend-enhanced {
+  background: oklch(0.22 0.01 260 / 50%);
+  border-color: oklch(0.3 0.02 260 / 50%);
+}
+
+.dark .legend-enhanced-item {
+  color: oklch(0.65 0.01 260);
+}
+
+.dark .legend-enhanced-item:hover {
+  color: oklch(0.85 0.005 260);
+}
+
+/* RTL legend */
+[dir="rtl"] .legend-enhanced {
+  direction: rtl;
+}
+
+[dir="rtl"] .legend-enhanced-item {
+  flex-direction: row-reverse;
+}
+
+/* Floating data labels on charts */
+@keyframes data-label-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.data-label-float {
+  position: absolute;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: oklch(0.35 0.02 260);
+  background: oklch(0.99 0.002 260 / 90%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid oklch(0.9 0.005 260 / 60%);
+  box-shadow: 0 2px 8px oklch(0.15 0.01 260 / 10%);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: data-label-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  z-index: 2;
+}
+
+.dark .data-label-float {
+  color: oklch(0.85 0.005 260);
+  background: oklch(0.25 0.01 260 / 90%);
+  border-color: oklch(0.35 0.02 260 / 60%);
+  box-shadow: 0 2px 8px oklch(0 0 0 / 20%);
+}
+
+/* ============================================================================
+   147. ENHANCED FORM & INPUT STYLES
+   ============================================================================ */
+
+/* Floating label form groups */
+.form-group-float {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.form-group-float input,
+.form-group-float textarea,
+.form-group-float select {
+  width: 100%;
+  padding: 1rem 0.875rem 0.5rem;
+  font-size: 0.9375rem;
+  background: oklch(0.985 0.005 260 / 60%);
+  border: 1.5px solid oklch(0.88 0.005 260);
+  border-radius: var(--radius-md);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: inherit;
+}
+
+.form-group-float input:focus,
+.form-group-float textarea:focus,
+.form-group-float select:focus {
+  outline: none;
+  border-color: oklch(0.55 0.2 260);
+  box-shadow:
+    0 0 0 3px oklch(0.55 0.2 260 / 10%),
+    0 2px 8px oklch(0.55 0.2 260 / 6%);
+  background: oklch(0.99 0.005 260 / 80%);
+}
+
+.form-group-float label {
+  position: absolute;
+  top: 50%;
+  right: 0.875rem;
+  transform: translateY(-50%);
+  font-size: 0.9375rem;
+  color: oklch(0.55 0.01 260);
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  padding: 0 0.25rem;
+  transform-origin: right center;
+}
+
+.form-group-float input:focus ~ label,
+.form-group-float input:not(:placeholder-shown) ~ label,
+.form-group-float textarea:focus ~ label,
+.form-group-float textarea:not(:placeholder-shown) ~ label,
+.form-group-float select:focus ~ label,
+.form-group-float select:valid ~ label {
+  top: 0;
+  transform: translateY(-50%) scale(0.75);
+  color: oklch(0.55 0.2 260);
+  background: oklch(1 0 0);
+  padding: 0 0.375rem;
+}
+
+[dir="rtl"] .form-group-float label {
+  right: auto;
+  left: 0.875rem;
+  transform-origin: left center;
+}
+
+[dir="rtl"] .form-group-float input:focus ~ label,
+[dir="rtl"] .form-group-float input:not(:placeholder-shown) ~ label,
+[dir="rtl"] .form-group-float textarea:focus ~ label,
+[dir="rtl"] .form-group-float textarea:not(:placeholder-shown) ~ label,
+[dir="rtl"] .form-group-float select:focus ~ label,
+[dir="rtl"] .form-group-float select:valid ~ label {
+  right: auto;
+  left: 0;
+}
+
+.dark .form-group-float input,
+.dark .form-group-float textarea,
+.dark .form-group-float select {
+  background: oklch(0.22 0.01 260 / 60%);
+  border-color: oklch(0.35 0.02 260);
+}
+
+.dark .form-group-float input:focus,
+.dark .form-group-float textarea:focus,
+.dark .form-group-float select:focus {
+  background: oklch(0.25 0.01 260 / 80%);
+  border-color: oklch(0.65 0.22 260);
+  box-shadow:
+    0 0 0 3px oklch(0.65 0.22 260 / 10%),
+    0 2px 8px oklch(0.65 0.22 260 / 6%);
+}
+
+.dark .form-group-float label {
+  color: oklch(0.55 0.01 260);
+}
+
+.dark .form-group-float input:focus ~ label,
+.dark .form-group-float input:not(:placeholder-shown) ~ label,
+.dark .form-group-float textarea:focus ~ label,
+.dark .form-group-float textarea:not(:placeholder-shown) ~ label,
+.dark .form-group-float select:focus ~ label,
+.dark .form-group-float select:valid ~ label {
+  color: oklch(0.65 0.22 260);
+  background: oklch(0.2 0.01 260);
+}
+
+/* Custom checkbox styling */
+.checkbox-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.875rem;
+}
+
+.checkbox-custom input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-custom .checkmark {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid oklch(0.82 0.005 260);
+  border-radius: 0.3125rem;
+  background: oklch(0.99 0.002 260);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.checkbox-custom .checkmark::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.25rem;
+  border-left: 2px solid oklch(1 0 0);
+  border-bottom: 2px solid oklch(1 0 0);
+  transform: rotate(-45deg) scale(0);
+  transition: transform 0.15s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  margin-top: -0.1rem;
+}
+
+.checkbox-custom input:checked ~ .checkmark {
+  background: oklch(0.55 0.2 260);
+  border-color: oklch(0.55 0.2 260);
+  box-shadow: 0 2px 6px oklch(0.55 0.2 260 / 30%);
+}
+
+.checkbox-custom input:checked ~ .checkmark::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+.checkbox-custom:hover .checkmark {
+  border-color: oklch(0.55 0.2 260 / 50%);
+  box-shadow: 0 0 0 3px oklch(0.55 0.2 260 / 8%);
+}
+
+.checkbox-custom input:focus-visible ~ .checkmark {
+  outline: 2px solid oklch(0.55 0.2 260 / 60%);
+  outline-offset: 2px;
+}
+
+.dark .checkbox-custom .checkmark {
+  background: oklch(0.25 0.01 260);
+  border-color: oklch(0.45 0.02 260);
+}
+
+.dark .checkbox-custom input:checked ~ .checkmark {
+  background: oklch(0.65 0.22 260);
+  border-color: oklch(0.65 0.22 260);
+}
+
+.dark .checkbox-custom:hover .checkmark {
+  border-color: oklch(0.65 0.22 260 / 50%);
+  box-shadow: 0 0 0 3px oklch(0.65 0.22 260 / 8%);
+}
+
+/* Custom radio button styling */
+.radio-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.875rem;
+}
+
+.radio-custom input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radio-custom .radiomark {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid oklch(0.82 0.005 260);
+  border-radius: 50%;
+  background: oklch(0.99 0.002 260);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.radio-custom .radiomark::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: oklch(1 0 0);
+  transform: scale(0);
+  transition: transform 0.15s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.radio-custom input:checked ~ .radiomark {
+  background: oklch(0.55 0.2 260);
+  border-color: oklch(0.55 0.2 260);
+  box-shadow: 0 2px 6px oklch(0.55 0.2 260 / 30%);
+}
+
+.radio-custom input:checked ~ .radiomark::after {
+  transform: scale(1);
+}
+
+.radio-custom:hover .radiomark {
+  border-color: oklch(0.55 0.2 260 / 50%);
+  box-shadow: 0 0 0 3px oklch(0.55 0.2 260 / 8%);
+}
+
+.radio-custom input:focus-visible ~ .radiomark {
+  outline: 2px solid oklch(0.55 0.2 260 / 60%);
+  outline-offset: 2px;
+}
+
+.dark .radio-custom .radiomark {
+  background: oklch(0.25 0.01 260);
+  border-color: oklch(0.45 0.02 260);
+}
+
+.dark .radio-custom input:checked ~ .radiomark {
+  background: oklch(0.65 0.22 260);
+  border-color: oklch(0.65 0.22 260);
+}
+
+.dark .radio-custom:hover .radiomark {
+  border-color: oklch(0.65 0.22 260 / 50%);
+  box-shadow: 0 0 0 3px oklch(0.65 0.22 260 / 8%);
+}
+
+/* Form validation states */
+.form-error {
+  border-color: oklch(0.58 0.24 27 / 60%) !important;
+  box-shadow: 0 0 0 3px oklch(0.58 0.24 27 / 10%) !important;
+}
+
+.form-error ~ label,
+.form-group-float .form-error ~ label {
+  color: oklch(0.58 0.24 27) !important;
+}
+
+.form-success {
+  border-color: oklch(0.65 0.2 145 / 60%) !important;
+  box-shadow: 0 0 0 3px oklch(0.65 0.2 145 / 10%) !important;
+}
+
+.form-success ~ label,
+.form-group-float .form-success ~ label {
+  color: oklch(0.50 0.16 145) !important;
+}
+
+.dark .form-error {
+  border-color: oklch(0.65 0.24 27 / 60%) !important;
+  box-shadow: 0 0 0 3px oklch(0.65 0.24 27 / 10%) !important;
+}
+
+.dark .form-success {
+  border-color: oklch(0.65 0.2 145 / 60%) !important;
+  box-shadow: 0 0 0 3px oklch(0.65 0.2 145 / 10%) !important;
+}
+
+/* ============================================================================
+   148. ADVANCED CARD & CONTAINER STYLES
+   ============================================================================ */
+
+/* 3D tilt effect on hover */
+.card-3d-tilt {
+  perspective: 800px;
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out;
+}
+
+.card-3d-tilt:hover {
+  transform: rotateY(var(--tilt-x, 3deg)) rotateX(var(--tilt-y, -3deg)) translateZ(10px);
+  box-shadow:
+    0 20px 40px oklch(0.15 0.01 260 / 15%),
+    0 8px 16px oklch(0.15 0.01 260 / 8%);
+}
+
+.card-3d-tilt:active {
+  transform: rotateY(0deg) rotateX(0deg) translateZ(0px);
+  transition-duration: 0.4s ease;
+}
+
+.card-3d-tilt > * {
+  transform: translateZ(0px);
+}
+
+.card-3d-tilt:hover > * {
+  transform: translateZ(20px);
+}
+
+.dark .card-3d-tilt:hover {
+  box-shadow:
+    0 20px 40px oklch(0 0 0 / 30%),
+    0 8px 16px oklch(0 0 0 / 15%);
+}
+
+/* Gradient border effect using border-image */
+.card-gradient-border {
+  border: 2px solid transparent;
+  border-image: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260),
+    oklch(0.58 0.24 27),
+    oklch(0.65 0.18 240)
+  ) 1;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+
+/* Fallback for border-radius + border-image conflict: use pseudo-element */
+.card-gradient-border {
+  position: relative;
+  border: 2px solid transparent;
+  border-image: none;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(oklch(1 0 0), oklch(1 0 0)) padding-box,
+    linear-gradient(135deg, oklch(0.55 0.2 260), oklch(0.58 0.24 27), oklch(0.65 0.18 240)) border-box;
+  transition: all 0.3s ease;
+}
+
+.card-gradient-border:hover {
+  box-shadow:
+    0 8px 24px oklch(0.55 0.2 260 / 15%),
+    0 4px 12px oklch(0.58 0.24 27 / 10%);
+  transform: translateY(-2px);
+}
+
+.dark .card-gradient-border {
+  background:
+    linear-gradient(oklch(0.2 0.01 260), oklch(0.2 0.01 260)) padding-box,
+    linear-gradient(135deg, oklch(0.65 0.22 260), oklch(0.65 0.24 27), oklch(0.70 0.18 240)) border-box;
+}
+
+.dark .card-gradient-border:hover {
+  box-shadow:
+    0 8px 24px oklch(0 0 0 / 30%),
+    0 4px 12px oklch(0 0 0 / 15%);
+}
+
+/* Mouse-following spotlight on cards (CSS radial-gradient approach) */
+.card-spotlight-hover {
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+
+.card-spotlight-hover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    oklch(0.55 0.2 260 / 6%),
+    transparent 40%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.card-spotlight-hover:hover::before {
+  opacity: 1;
+}
+
+.card-spotlight-hover > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dark .card-spotlight-hover::before {
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    oklch(0.65 0.22 260 / 10%),
+    transparent 40%
+  );
+}
+
+/* Masonry-like layout for varied-height cards */
+.container-masonry {
+  columns: 3;
+  column-gap: 1rem;
+  width: 100%;
+}
+
+.container-masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+  display: inline-block;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .container-masonry {
+    columns: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .container-masonry {
+    columns: 1;
+  }
+}
+
+[dir="rtl"] .container-masonry {
+  direction: rtl;
+}
+
+/* ============================================================================
+   149. ENHANCED NAVIGATION & MENU STYLES
+   ============================================================================ */
+
+/* Dropdown menus with glassmorphism */
+.nav-dropdown-enhanced {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  min-width: 12rem;
+  background: oklch(0.99 0.003 260 / 85%);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid oklch(0.9 0.005 260 / 60%);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 16px 48px oklch(0.15 0.01 260 / 12%),
+    0 4px 12px oklch(0.15 0.01 260 / 6%);
+  padding: 0.375rem;
+  z-index: 50;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-dropdown-enhanced.active,
+.nav-dropdown-enhanced[data-open="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.nav-dropdown-enhanced-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: oklch(0.35 0.02 260);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.nav-dropdown-enhanced-item:hover {
+  background: oklch(0.55 0.2 260 / 6%);
+  color: oklch(0.25 0.02 260);
+}
+
+[dir="rtl"] .nav-dropdown-enhanced {
+  right: 0;
+  left: auto;
+}
+
+.dark .nav-dropdown-enhanced {
+  background: oklch(0.2 0.01 260 / 85%);
+  border-color: oklch(0.35 0.02 260 / 60%);
+  box-shadow:
+    0 16px 48px oklch(0 0 0 / 30%),
+    0 4px 12px oklch(0 0 0 / 15%);
+}
+
+.dark .nav-dropdown-enhanced-item {
+  color: oklch(0.75 0.01 260);
+}
+
+.dark .nav-dropdown-enhanced-item:hover {
+  background: oklch(0.65 0.22 260 / 8%);
+  color: oklch(0.95 0.005 260);
+}
+
+/* Breadcrumb navigation with separators */
+.breadcrumb-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 0.8125rem;
+  color: oklch(0.5 0.01 260);
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0.5rem 0;
+}
+
+.breadcrumb-enhanced-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumb-enhanced-item:hover {
+  background: oklch(0.55 0.2 260 / 6%);
+  color: oklch(0.35 0.02 260);
+}
+
+.breadcrumb-enhanced-item.active {
+  color: oklch(0.35 0.02 260);
+  font-weight: 600;
+}
+
+.breadcrumb-enhanced-separator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.125rem;
+  color: oklch(0.8 0.005 260);
+  font-size: 0.625rem;
+  user-select: none;
+}
+
+[dir="rtl"] .breadcrumb-enhanced {
+  direction: rtl;
+}
+
+[dir="rtl"] .breadcrumb-enhanced-separator {
+  transform: scaleX(-1);
+}
+
+.dark .breadcrumb-enhanced-item:hover {
+  background: oklch(0.65 0.22 260 / 8%);
+  color: oklch(0.85 0.005 260);
+}
+
+.dark .breadcrumb-enhanced-item.active {
+  color: oklch(0.85 0.005 260);
+}
+
+.dark .breadcrumb-enhanced-separator {
+  color: oklch(0.5 0.01 260);
+}
+
+/* Vertical tab navigation */
+.tab-group-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-right: 2px solid oklch(0.92 0.005 260);
+  padding-right: 1rem;
+  min-width: 180px;
+}
+
+.tab-group-vertical-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: oklch(0.5 0.01 260);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+  position: relative;
+}
+
+.tab-group-vertical-item:hover {
+  background: oklch(0.55 0.2 260 / 5%);
+  color: oklch(0.35 0.02 260);
+}
+
+.tab-group-vertical-item.active {
+  background: oklch(0.55 0.2 260 / 8%);
+  color: oklch(0.55 0.2 260);
+  font-weight: 600;
+}
+
+.tab-group-vertical-item.active::after {
+  content: "";
+  position: absolute;
+  right: calc(-1rem - 1px);
+  top: 0.375rem;
+  bottom: 0.375rem;
+  width: 2px;
+  background: oklch(0.55 0.2 260);
+  border-radius: 1px;
+}
+
+[dir="rtl"] .tab-group-vertical {
+  border-right: none;
+  border-left: 2px solid oklch(0.92 0.005 260);
+  padding-right: 0;
+  padding-left: 1rem;
+}
+
+[dir="rtl"] .tab-group-vertical-item.active::after {
+  right: auto;
+  left: calc(-1rem - 1px);
+}
+
+.dark .tab-group-vertical {
+  border-color: oklch(0.3 0.02 260);
+}
+
+.dark .tab-group-vertical-item {
+  color: oklch(0.6 0.01 260);
+}
+
+.dark .tab-group-vertical-item:hover {
+  background: oklch(0.65 0.22 260 / 5%);
+  color: oklch(0.8 0.005 260);
+}
+
+.dark .tab-group-vertical-item.active {
+  background: oklch(0.65 0.22 260 / 8%);
+  color: oklch(0.65 0.22 260);
+}
+
+.dark .tab-group-vertical-item.active::after {
+  background: oklch(0.65 0.22 260);
+}
+
+/* Smooth collapsible menu items */
+@keyframes collapsible-expand {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: var(--collapsible-max-height, 500px);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-collapse {
+  from {
+    max-height: var(--collapsible-max-height, 500px);
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+
+.menu-collapsible {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease;
+}
+
+.menu-collapsible.open {
+  max-height: var(--collapsible-max-height, 500px);
+  opacity: 1;
+}
+
+.menu-collapsible-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.2s ease;
+  color: oklch(0.35 0.02 260);
+  background: none;
+  border: none;
+  text-align: inherit;
+}
+
+.menu-collapsible-trigger:hover {
+  background: oklch(0.55 0.2 260 / 5%);
+}
+
+.menu-collapsible-arrow {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.75rem;
+  color: oklch(0.55 0.01 260);
+}
+
+.menu-collapsible.open ~ .menu-collapsible-trigger .menu-collapsible-arrow,
+.menu-collapsible-trigger[aria-expanded="true"] .menu-collapsible-arrow {
+  transform: rotate(180deg);
+}
+
+.dark .menu-collapsible-trigger {
+  color: oklch(0.75 0.01 260);
+}
+
+.dark .menu-collapsible-trigger:hover {
+  background: oklch(0.65 0.22 260 / 5%);
+}
+
+/* ============================================================================
+   150. ADVANCED ANIMATION UTILITIES
+   ============================================================================ */
+
+/* Staggered entrance animation */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stagger > * {
+  animation: stagger-fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-stagger > *:nth-child(1)  { animation-delay: 0.0s; }
+.animate-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+.animate-stagger > *:nth-child(3)  { animation-delay: 0.12s; }
+.animate-stagger > *:nth-child(4)  { animation-delay: 0.18s; }
+.animate-stagger > *:nth-child(5)  { animation-delay: 0.24s; }
+.animate-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+.animate-stagger > *:nth-child(7)  { animation-delay: 0.36s; }
+.animate-stagger > *:nth-child(8)  { animation-delay: 0.42s; }
+.animate-stagger > *:nth-child(9)  { animation-delay: 0.48s; }
+.animate-stagger > *:nth-child(10) { animation-delay: 0.54s; }
+.animate-stagger > *:nth-child(11) { animation-delay: 0.60s; }
+.animate-stagger > *:nth-child(12) { animation-delay: 0.66s; }
+
+/* Slide in from left */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Slide in from right (additional variant for specificity) */
+.animate-slide-in-right-alt {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scale in */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scale out */
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.animate-scale-out {
+  animation: scaleOut 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* 3D flip entrance */
+@keyframes flipIn {
+  from {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-15deg) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(600px) rotateX(0deg) translateY(0);
+  }
+}
+
+.animate-flip-in {
+  animation: flipIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  backface-visibility: hidden;
+}
+
+/* Line drawing animation (for borders/underlines) */
+@keyframes drawLine {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-draw-line {
+  position: relative;
+}
+
+.animate-draw-line::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: oklch(0.55 0.2 260);
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: drawLine 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.3s;
+}
+
+[dir="rtl"] .animate-draw-line::after {
+  transform-origin: center;
+}
+
+.dark .animate-draw-line::after {
+  background: oklch(0.65 0.22 260);
+}
+
+/* Smooth shape morphing effect */
+@keyframes morphShape {
+  0%, 100% {
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  }
+  25% {
+    border-radius: var(--radius-xl) var(--radius-md) var(--radius-xl) var(--radius-md);
+  }
+  50% {
+    border-radius: var(--radius-md) var(--radius-xl) var(--radius-md) var(--radius-xl);
+  }
+  75% {
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-md) var(--radius-xl);
+  }
+}
+
+.animate-morph {
+  animation: morphShape 8s ease-in-out infinite;
+}
+
+/* ============================================================================
+   151. ADVANCED TYPOGRAPHY
+   ============================================================================ */
+
+/* Text outline effects */
+.text-outline {
+  -webkit-text-stroke: 1px oklch(0.35 0.02 260);
+  color: transparent;
+}
+
+.text-outline-reverse {
+  -webkit-text-stroke: 1px oklch(0.92 0.005 260);
+  color: oklch(0.15 0.01 260);
+}
+
+.dark .text-outline {
+  -webkit-text-stroke: 1px oklch(0.65 0.01 260);
+  color: transparent;
+}
+
+.dark .text-outline-reverse {
+  -webkit-text-stroke: 1px oklch(0.3 0.02 260);
+  color: oklch(0.95 0.005 260);
+}
+
+/* Typewriter animation effect */
+@keyframes typewriter-cursor {
+  0%, 100% {
+    border-color: transparent;
+  }
+  50% {
+    border-color: currentColor;
+  }
+}
+
+.text-typewriter {
+  overflow: hidden;
+  white-space: nowrap;
+  border-left: 2px solid currentColor;
+  animation: typewriter-cursor 1s step-end infinite;
+  display: inline-block;
+}
+
+/* Decorative underlines for headings */
+.heading-decoration {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.375rem;
+}
+
+.heading-decoration::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(
+    to left,
+    oklch(0.55 0.2 260),
+    oklch(0.65 0.18 240),
+    oklch(0.58 0.24 27)
+  );
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: right center;
+  animation: drawLine 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.2s;
+}
+
+[dir="rtl"] .heading-decoration::after {
+  right: auto;
+  left: 0;
+  transform-origin: left center;
+  background: linear-gradient(
+    to right,
+    oklch(0.55 0.2 260),
+    oklch(0.65 0.18 240),
+    oklch(0.58 0.24 27)
+  );
+}
+
+.dark .heading-decoration::after {
+  background: linear-gradient(
+    to left,
+    oklch(0.65 0.22 260),
+    oklch(0.70 0.18 240),
+    oklch(0.65 0.24 27)
+  );
+}
+
+/* Highlighted text background effect */
+.text-highlight {
+  background: linear-gradient(
+    120deg,
+    oklch(0.55 0.2 260 / 15%) 0%,
+    oklch(0.55 0.2 260 / 15%) 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 35%;
+  background-position: 0 88%;
+  padding: 0 0.125rem;
+  border-radius: 0.125rem;
+}
+
+.dark .text-highlight {
+  background: linear-gradient(
+    120deg,
+    oklch(0.65 0.22 260 / 20%) 0%,
+    oklch(0.65 0.22 260 / 20%) 100%
+  );
+  background-size: 100% 35%;
+  background-position: 0 88%;
+}
+
+/* ============================================================================
+   152. ADVANCED BADGE & TAG STYLES
+   ============================================================================ */
+
+/* Glowing badge effect */
+.badge-glow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.badge-glow::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.2 260),
+    oklch(0.65 0.18 240),
+    oklch(0.58 0.24 27)
+  );
+  opacity: 0;
+  z-index: -1;
+  filter: blur(6px);
+  transition: opacity 0.3s ease;
+}
+
+.badge-glow:hover::after {
+  opacity: 0.6;
+}
+
+.dark .badge-glow::after {
+  filter: blur(8px);
+}
+
+.dark .badge-glow:hover::after {
+  opacity: 0.5;
+}
+
+/* Animated pill-shaped badges */
+@keyframes pill-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.badge-pill-animated {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(
+    90deg,
+    oklch(0.55 0.2 260) 0%,
+    oklch(0.65 0.18 240) 25%,
+    oklch(0.55 0.2 260) 50%,
+    oklch(0.65 0.18 240) 75%,
+    oklch(0.55 0.2 260) 100%
+  );
+  background-size: 200% 100%;
+  color: oklch(1 0 0);
+  animation: pill-shimmer 3s linear infinite;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.badge-pill-animated:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px oklch(0.55 0.2 260 / 30%);
+}
+
+.badge-pill-animated:active {
+  transform: scale(0.97);
+}
+
+.dark .badge-pill-animated {
+  background: linear-gradient(
+    90deg,
+    oklch(0.65 0.22 260) 0%,
+    oklch(0.70 0.18 240) 25%,
+    oklch(0.65 0.22 260) 50%,
+    oklch(0.70 0.18 240) 75%,
+    oklch(0.65 0.22 260) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Tag cloud layout */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.tag-cloud-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: oklch(0.96 0.005 260 / 70%);
+  border: 1px solid oklch(0.9 0.005 260 / 60%);
+  color: oklch(0.45 0.02 260);
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.tag-cloud-item:hover {
+  background: oklch(0.55 0.2 260 / 8%);
+  border-color: oklch(0.55 0.2 260 / 20%);
+  color: oklch(0.55 0.2 260);
+  transform: translateY(-1px);
+}
+
+.tag-cloud-item.tag-lg {
+  font-size: 0.9375rem;
+  padding: 0.375rem 0.875rem;
+  font-weight: 600;
+}
+
+.tag-cloud-item.tag-sm {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+}
+
+.tag-cloud-item.tag-primary {
+  background: oklch(0.55 0.2 260 / 8%);
+  border-color: oklch(0.55 0.2 260 / 20%);
+  color: oklch(0.55 0.2 260);
+}
+
+.tag-cloud-item.tag-danger {
+  background: oklch(0.58 0.24 27 / 8%);
+  border-color: oklch(0.58 0.24 27 / 20%);
+  color: oklch(0.58 0.24 27);
+}
+
+.tag-cloud-item.tag-success {
+  background: oklch(0.65 0.2 145 / 8%);
+  border-color: oklch(0.65 0.2 145 / 20%);
+  color: oklch(0.50 0.16 145);
+}
+
+.dark .tag-cloud-item {
+  background: oklch(0.25 0.02 260 / 70%);
+  border-color: oklch(0.35 0.02 260 / 60%);
+  color: oklch(0.65 0.01 260);
+}
+
+.dark .tag-cloud-item:hover {
+  background: oklch(0.65 0.22 260 / 10%);
+  border-color: oklch(0.65 0.22 260 / 25%);
+  color: oklch(0.65 0.22 260);
+}
+
+.dark .tag-cloud-item.tag-primary {
+  background: oklch(0.65 0.22 260 / 10%);
+  border-color: oklch(0.65 0.22 260 / 25%);
+  color: oklch(0.65 0.22 260);
+}
+
+.dark .tag-cloud-item.tag-danger {
+  background: oklch(0.65 0.24 27 / 10%);
+  border-color: oklch(0.65 0.24 27 / 25%);
+  color: oklch(0.65 0.24 27);
+}
+
+.dark .tag-cloud-item.tag-success {
+  background: oklch(0.65 0.2 145 / 10%);
+  border-color: oklch(0.65 0.2 145 / 25%);
+  color: oklch(0.65 0.2 145);
+}
+
+/* ============================================================================
+   153. SCROLL & OVERFLOW ENHANCEMENTS
+   ============================================================================ */
+
+/* Scroll snap containers */
+.scroll-snap-x {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scroll-snap-x::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-snap-x > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+.scroll-snap-y {
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scroll-snap-y::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-snap-y > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Fading edges on scrollable containers */
+.scroll-fade-edges {
+  position: relative;
+}
+
+.scroll-fade-edges::before,
+.scroll-fade-edges::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.scroll-fade-edges::before {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    oklch(1 0 0 / 80%),
+    transparent
+  );
+}
+
+.scroll-fade-edges::after {
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    oklch(1 0 0 / 80%),
+    transparent
+  );
+}
+
+.dark .scroll-fade-edges::before {
+  background: linear-gradient(
+    to bottom,
+    oklch(0.15 0.01 260 / 80%),
+    transparent
+  );
+}
+
+.dark .scroll-fade-edges::after {
+  background: linear-gradient(
+    to top,
+    oklch(0.15 0.01 260 / 80%),
+    transparent
+  );
+}
+
+/* Multi-line text ellipsis */
+.overflow-ellipsis-multiline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overflow-ellipsis-multiline.line-clamp-1 {
+  -webkit-line-clamp: 1;
+}
+
+.overflow-ellipsis-multiline.line-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.overflow-ellipsis-multiline.line-clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
+.overflow-ellipsis-multiline.line-clamp-4 {
+  -webkit-line-clamp: 4;
+}
+
+.overflow-ellipsis-multiline.line-clamp-5 {
+  -webkit-line-clamp: 5;
+}
+
+/* ============================================================================
+   154. PRINT ENHANCEMENT STYLES
+   ============================================================================ */
+
+/* Screen-only: hidden during print */
+.screen-only {
+  display: block;
+}
+
+@media print {
+  .screen-only {
+    display: none !important;
+  }
+}
+
+/* Print-specific header styling */
+.print-header {
+  display: none;
+}
+
+@media print {
+  .print-header {
+    display: block;
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid oklch(0.3 0 0);
+    margin-bottom: 1rem;
+  }
+
+  .print-header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: oklch(0.15 0 0);
+    margin-bottom: 0.25rem;
+  }
+
+  .print-header p {
+    font-size: 0.75rem;
+    color: oklch(0.4 0 0);
+  }
+}
+
+/* Print-specific footer styling */
+.print-footer {
+  display: none;
+}
+
+@media print {
+  .print-footer {
+    display: block;
+    text-align: center;
+    padding-top: 1rem;
+    border-top: 1px solid oklch(0.8 0 0);
+    margin-top: 1.5rem;
+    font-size: 0.6875rem;
+    color: oklch(0.5 0 0);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+}
+
+/* Enhanced print table styling */
+.print-table {
+  display: none;
+}
+
+@media print {
+  .print-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+  }
+
+  .print-table thead th {
+    background: oklch(0.94 0 0);
+    font-weight: 600;
+    text-align: right;
+    padding: 0.5rem 0.5rem;
+    border-bottom: 2px solid oklch(0.3 0 0);
+    color: oklch(0.2 0 0);
+    font-size: 0.6875rem;
+  }
+
+  .print-table tbody td {
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid oklch(0.88 0 0);
+    vertical-align: middle;
+  }
+
+  .print-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .print-table tfoot td {
+    padding: 0.5rem 0.5rem;
+    border-top: 2px solid oklch(0.3 0 0);
+    font-weight: 700;
+  }
+
+  [dir="rtl"] .print-table thead th {
+    text-align: right;
+  }
+}
+
+/* Print-safe divider lines */
+.print-divider {
+  display: none;
+}
+
+@media print {
+  .print-divider {
+    display: block;
+    border: none;
+    height: 1px;
+    background: oklch(0.8 0 0);
+    margin: 0.75rem 0;
+  }
+
+  .print-divider.print-divider-double {
+    height: 3px;
+    background: oklch(0.5 0 0);
+    border-top: 1px solid oklch(0.5 0 0);
+    border-bottom: 1px solid oklch(0.5 0 0);
+    background: transparent;
+  }
+
+  .print-divider.print-divider-dashed {
+    background: none;
+    border-top: 1px dashed oklch(0.6 0 0);
+  }
+}
+
+/* ============================================================================
+   155. SECTIONS 146-154: REDUCED MOTION SUPPORT
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Section 146: Chart Visualization */
+  .chart-container-glass {
+    transition: none;
+  }
+  .chart-container-glass::before {
+    display: none;
+  }
+  .legend-enhanced-item,
+  .legend-enhanced-dot {
+    transition: none;
+  }
+  .data-label-float {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* Section 147: Enhanced Form */
+  .form-group-float input,
+  .form-group-float textarea,
+  .form-group-float select,
+  .form-group-float label,
+  .checkbox-custom .checkmark,
+  .checkbox-custom .checkmark::after,
+  .radio-custom .radiomark,
+  .radio-custom .radiomark::after {
+    transition: none;
+  }
+
+  /* Section 148: Advanced Cards */
+  .card-3d-tilt,
+  .card-3d-tilt > *,
+  .card-gradient-border,
+  .card-spotlight-hover::before {
+    transition: none;
+    animation: none;
+  }
+  .card-3d-tilt:hover {
+    transform: none;
+  }
+  .card-gradient-border:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .card-spotlight-hover::before {
+    display: none;
+  }
+
+  /* Section 149: Navigation & Menu */
+  .nav-dropdown-enhanced {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .nav-dropdown-enhanced-item,
+  .breadcrumb-enhanced-item,
+  .tab-group-vertical-item,
+  .menu-collapsible-trigger,
+  .menu-collapsible-arrow {
+    transition: none;
+  }
+  .menu-collapsible {
+    transition: none;
+  }
+  .menu-collapsible-arrow {
+    transform: none;
+  }
+
+  /* Section 150: Animation Utilities */
+  .animate-stagger > *,
+  .animate-slide-in-left,
+  .animate-slide-in-right-alt,
+  .animate-scale-in,
+  .animate-scale-out,
+  .animate-flip-in,
+  .animate-morph {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .animate-draw-line::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  /* Section 151: Typography */
+  .heading-decoration::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+  .text-typewriter {
+    animation: none;
+    border-left: none;
+  }
+
+  /* Section 152: Badge & Tag */
+  .badge-glow,
+  .badge-glow::after,
+  .badge-pill-animated,
+  .tag-cloud-item {
+    transition: none;
+  }
+  .badge-pill-animated {
+    animation: none;
+  }
+  .badge-glow:hover::after,
+  .tag-cloud-item:hover {
+    transform: none;
+  }
+
+  /* Section 153: Scroll */
+  .scroll-snap-x,
+  .scroll-snap-y {
+    scroll-snap-type: none;
+  }
+}

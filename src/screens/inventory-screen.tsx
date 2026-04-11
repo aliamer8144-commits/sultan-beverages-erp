@@ -972,7 +972,7 @@ export function InventoryScreen() {
             <Package className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-foreground">إدارة المخزون</h2>
+            <h2 className="text-lg font-bold text-foreground heading-decoration">إدارة المخزون</h2>
             <p className="text-xs text-muted-foreground">
               {products.length} منتج
               {lowStockCount > 0 && (
