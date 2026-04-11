@@ -337,3 +337,45 @@ Stage Summary:
 - All userId values sourced from JWT via getRequestUser(request)
 - All mutations log actions via logAction()
 - TypeScript: 0 errors, ESLint: 0 errors, 0 server errors
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Phase 5 — Frontend Foundation (Shared Hooks + Components)
+
+Work Log:
+- Created src/hooks/use-api.ts — Centralized API client hook
+  - Auto-includes Authorization Bearer token from Zustand store
+  - Methods: get(), post(), put(), patch(), del(), request()
+  - Auto error handling with toast notifications (sonner)
+  - TypeScript generic support: get<ProductType>('/api/products')
+  - Options: showErrorToast, showSuccessToast, successMessage, errorMessage
+  - Also exports apiClient() for non-hook contexts
+- Created src/hooks/use-data-table.ts — Table state management hook
+  - Manages: data, loading, page, totalPages, total, search
+  - Debounced search (150ms) with auto page reset
+  - Supports extra params and filter dependencies
+  - Custom parseResponse() for non-standard API responses
+  - Refetch capability for manual refresh
+- Created src/components/confirm-dialog.tsx — Reusable confirmation dialog
+  - Built on shadcn/ui AlertDialog
+  - Props: title, description, onConfirm, confirmText, cancelText, variant, loading
+  - useConfirm() hook helper for managing confirm state
+  - Destructive variant for delete/dangerous actions
+- Created src/components/empty-state.tsx — Reusable UI states
+  - EmptyState: icon, title, description, action slot, compact mode
+  - LoadingState: spinner + message
+  - Pagination: page navigation with RTL Arabic labels
+
+Verified:
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- All new files follow existing code conventions
+
+Stage Summary:
+- 4 new files created (use-api.ts, use-data-table.ts, confirm-dialog.tsx, empty-state.tsx)
+- useApi hook eliminates manual fetch/try/catch/toast boilerplate across all screens
+- useDataTable hook eliminates pagination/search/loading state management boilerplate
+- ConfirmDialog replaces window.confirm() with accessible AlertDialog
+- EmptyState/LoadingState/Pagination provide consistent UI across screens
+- All hooks are 'use client' and use existing dependencies (zustand, sonner, lucide, shadcn)
