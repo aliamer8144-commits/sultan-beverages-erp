@@ -54,6 +54,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
+import { formatDate, formatTime, formatShortDate, formatDateFull } from '@/lib/date-utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -94,38 +95,8 @@ interface AdjustmentStats {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('ar-SA', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-}
-
-function getDateKey(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  })
-}
+// formatDate, formatTime, formatShortDate imported from @/lib/date-utils
+// formatDateFull replaces local getDateKey
 
 // Type badge configuration
 const typeConfig: Record<string, {
@@ -378,7 +349,7 @@ export function StockAdjustmentsScreen() {
 
   const groupedAdjustments: Record<string, StockAdjustmentItem[]> = {}
   for (const adj of adjustments) {
-    const dateKey = getDateKey(adj.createdAt)
+    const dateKey = formatDateFull(adj.createdAt)
     if (!groupedAdjustments[dateKey]) {
       groupedAdjustments[dateKey] = []
     }

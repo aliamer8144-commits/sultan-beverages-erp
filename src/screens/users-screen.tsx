@@ -32,6 +32,7 @@ import { Switch } from '@/components/ui/switch'
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, UserCog, Shield, ShieldCheck } from 'lucide-react'
+import { formatDateShortMonth } from '@/lib/date-utils'
 
 interface UserRow {
   id: string
@@ -228,13 +229,7 @@ export function UsersScreen() {
   }
 
   // ─── Render helpers ────────────────────────────────────────────
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
+  // formatDateShortMonth imported from @/lib/date-utils
 
   // ─── Skeleton loader ──────────────────────────────────────────
   if (loading) {
@@ -440,7 +435,7 @@ export function UsersScreen() {
                         {/* Created At */}
                         <TableCell className="hidden md:table-cell">
                           <span className="text-xs text-muted-foreground">
-                            {formatDate(user.createdAt)}
+                            {formatDateShortMonth(user.createdAt)}
                           </span>
                         </TableCell>
 

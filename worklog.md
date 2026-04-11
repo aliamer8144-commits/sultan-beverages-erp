@@ -481,3 +481,117 @@ Stage Summary:
 
 **Result**: File reduced from 821 lines to ~629 lines (~192 lines removed). TypeScript check passes with 0 errors.
 
+---
+
+## Task 6d-customers: Refactor customers-screen.tsx to use shared utilities
+
+**File**: `src/screens/customers-screen.tsx`
+
+### Changes Summary
+
+**Added imports:**
+- `Skeleton` from `@/components/ui/skeleton`
+- `formatShortDate`, `formatDateShortMonth` from `@/lib/date-utils`
+
+**Removed redundant constants (~14 lines):**
+- `CATEGORY_ICONS` Record — duplicated data already in `CUSTOMER_CATEGORIES`
+- `CATEGORY_CHIP_CLASSES` Record — duplicated data already in `CUSTOMER_CATEGORIES`
+
+**Simplified helper functions:**
+- `getCategoryIcon()` — now uses `CUSTOMER_CATEGORIES.find(c => c.value === category)?.icon` instead of `CATEGORY_ICONS[category]`
+- `getCategoryChipClass()` — now uses `CUSTOMER_CATEGORIES.find(c => c.value === category)?.chipClass` instead of `CATEGORY_CHIP_CLASSES[category]`
+
+**Replaced raw date formatting (4 occurrences):**
+- Payment history date (line ~1311): `new Date(payment.createdAt).toLocaleDateString('ar-SA')` → `formatShortDate(payment.createdAt)`
+- Loyalty history date (line ~1395): `new Date(tx.createdAt).toLocaleDateString('ar-SA')` → `formatShortDate(tx.createdAt)`
+- Purchase history last visit (line ~1556): `new Date(purchaseCustomer.lastVisit).toLocaleDateString('ar-SA')` → `formatShortDate(purchaseCustomer.lastVisit)`
+- Invoice date with options (line ~1630): `new Date(invoice.createdAt).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })` → `formatDateShortMonth(invoice.createdAt)`
+
+**Replaced inline skeleton (table loading state):**
+- `<div className="h-4 w-full animate-pulse rounded bg-muted" />` → `<Skeleton className="h-4 w-full bg-muted" />` (inside table loading loop)
+
+**Result**: File reduced from 1685 lines to 1668 lines (17 lines net reduction). Zero business logic changes. TypeScript: 0 errors, ESLint: 0 errors.
+
+---
+
+## Task 6f-purchases: Refactor purchases-screen.tsx to use shared utilities
+
+**File**: `src/screens/purchases-screen.tsx`
+
+### Changes Summary
+
+**Replaced local StarRating component** (lines 62-102, ~41 lines) with shared import:
+- Removed local `StarRating` function component
+- Added `import { StarRating } from '@/components/star-rating'`
+- No usage changes needed — shared component has compatible props
+
+**Replaced raw date formatting** with shared utility:
+- Added `import { formatShortDate } from '@/lib/date-utils'`
+- Replaced `new Date(payment.createdAt).toLocaleDateString('ar-SA')` → `formatShortDate(payment.createdAt)`
+
+**Removed dead/unused code** (5 items):
+- Removed `invoiceLoading` state variable (declared but never read)
+- Removed `symbol` from `useCurrency` destructuring (unused in JSX)
+- Removed `Loader2` from lucide-react import (unused in JSX)
+- Removed `Tooltip, TooltipContent, TooltipProvider, TooltipTrigger` import (unused in JSX)
+
+**Replaced hardcoded currency formatting** with `formatCurrency` (3 locations):
+- Line 836: `(balance).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س` → `formatCurrency(balance)`
+- Line 943: `(quantity * costPrice).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س` → `formatCurrency(quantity * costPrice)`
+- Line 998: `totalAmount.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س` → `formatCurrency(totalAmount)`
+
+**Verification**:
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- ESLint: 0 errors (`bun run lint`)
+- Final line count: 1453 lines (reduced from ~1497, net ~44 lines removed)
+
+---
+Task ID: 6b
+Agent: Full-Stack Developer Agent
+Task: Restructure inventory-screen.tsx — extract types, constants, apply shared utilities
+
+Work Log:
+- Created src/screens/inventory/types.ts — all interfaces (Product, Category, ProductFormData, StockAdjustment, AdjustmentFormData, ProductVariant, VariantFormData) and form defaults
+- Created src/screens/inventory/constants.ts — adjustmentTypeConfig, movementTypeConfig
+- Updated src/screens/inventory-screen.tsx:
+  - Replaced 4 inline AlertDialogs with shared ConfirmDialog (product delete, batch delete, batch status, category delete)
+  - Replaced inline empty state with shared EmptyState component
+  - Replaced raw toLocaleTimeString with shared formatTime from date-utils
+  - Removed unused AlertDialog imports; removed 8 unused lucide icon imports (RotateCcw, PenLine, FileInput, TrendingUp, TrendingDown, etc.)
+  - Added missing `ar` locale import from date-fns/locale for Calendar components
+- Verified: npx tsc --noEmit = 0 errors
+- Verified: bun run lint = 0 errors
+
+Stage Summary:
+- inventory-screen.tsx reduced from 2,851 to 2,590 lines (261 lines removed)
+- types.ts: 110 lines, constants.ts: 41 lines
+- 4 AlertDialog replacements → shared ConfirmDialog
+- 1 EmptyState replacement
+- 1 formatTime replacement
+- Types and constants extracted to separate files for maintainability
+
+---
+Task ID: 6c
+Agent: Main Agent
+Task: Phase 6c — Replace remaining raw date formatting + ConfirmDialog + formatWithSettings across all screens
+
+Work Log:
+- stock-adjustments-screen.tsx: Removed 4 local date/time helper functions, imported from @/lib/date-utils (formatDate, formatTime, formatShortDate, formatDateFull)
+- settings-screen.tsx: Replaced inline toLocaleDateString with formatShortDate from date-utils
+- sales-targets-screen.tsx: Removed local formatDate function, imported formatDateShortMonth from date-utils
+- users-screen.tsx: Removed local formatDate arrow function, imported formatDateShortMonth from date-utils
+- backup-screen.tsx: Replaced 2 inline toLocaleDateString blocks with formatDateTime from date-utils
+- product-variants-screen.tsx: Replaced AlertDialog delete confirmation with shared ConfirmDialog; removed unused AlertDialog imports and AlertTriangle icon (884→861 lines, 23 lines removed)
+- analytics-screen.tsx: Replaced formatWithSettings with formatCurrency from chart-utils (12 occurrences); removed local CHART_COLORS constant, imported from chart-utils (879→873 lines, 6 lines removed)
+- pos-screen.tsx: Replaced inline toLocaleDateString with formatShortDate from date-utils
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- All changes are backward compatible
+
+Stage Summary:
+- Phase 6 complete: All 20 screen files have been refactored
+- Total screens: 21,566 → 21,489 lines (77 lines net reduction from this sub-phase)
+- Remaining acceptable raw date formatting: 4 instances (2 in CSV filenames, 2 in print templates where hooks don't work)
+- Remaining formatWithSettings: 3 instances in invoices-screen.tsx (intentionally kept for print templates)
+- Remaining AlertDialog: 1 instance in daily-close-screen.tsx (trigger-based pattern, not replaceable with ConfirmDialog)

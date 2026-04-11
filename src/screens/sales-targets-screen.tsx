@@ -32,6 +32,7 @@ import {
   DollarSign,
   HourglassIcon,
 } from 'lucide-react'
+import { formatDateShortMonth } from '@/lib/date-utils'
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -74,13 +75,7 @@ function formatCurrency(amount: number): string {
   })
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ar-SA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+// formatDateShortMonth imported from @/lib/date-utils
 
 function getProgressColor(percent: number): string {
   if (percent >= 80) return 'bg-green-500'
@@ -454,7 +449,7 @@ export function SalesTargetsScreen() {
                           </h4>
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <CalendarDays className="w-3 h-3" />
-                            منذ {formatDate(target.startDate)}
+                            منذ {formatDateShortMonth(target.startDate)}
                           </p>
                         </div>
                       </div>
@@ -588,7 +583,7 @@ export function SalesTargetsScreen() {
 
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>{formatCurrency(target.currentAmount)} / {formatCurrency(target.targetAmount)} ر.س</span>
-                      <span>{formatDate(target.createdAt)}</span>
+                      <span>{formatDateShortMonth(target.createdAt)}</span>
                     </div>
 
                     {/* Actions */}

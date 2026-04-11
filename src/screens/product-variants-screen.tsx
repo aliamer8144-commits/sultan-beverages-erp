@@ -7,16 +7,7 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Collapsible,
   CollapsibleContent,
@@ -25,7 +16,7 @@ import {
 import { toast } from 'sonner'
 import {
   Layers, Search, Plus, Pencil, Trash2, ChevronDown, ChevronLeft,
-  Loader2, Package, PackagePlus, RotateCcw, AlertTriangle, RefreshCw,
+  Loader2, Package, PackagePlus, RotateCcw, RefreshCw,
   BarChart3, Archive,
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/use-currency'
@@ -782,28 +773,15 @@ export function ProductVariantsScreen() {
       </Dialog>
 
       {/* ─── Delete Confirmation Dialog ────────────────────────────── */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-              حذف المتغير
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف المتغير &quot;{deletingVariant?.name}&quot;؟ لا يمكن التراجع عن هذا الإجراء.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="تأكيد حذف المتغير"
+        description={`هل أنت متأكد من حذف المتغير "${deletingVariant?.name}"؟ لا يمكن التراجع عن هذا الإجراء.`}
+        onConfirm={handleDelete}
+        confirmText="حذف المتغير"
+        variant="destructive"
+      />
 
       {/* ─── Quick Stock Adjustment Dialog ─────────────────────────── */}
       <Dialog open={quickAdjustOpen} onOpenChange={setQuickAdjustOpen}>

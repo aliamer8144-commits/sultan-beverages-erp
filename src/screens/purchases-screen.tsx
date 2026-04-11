@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown, Loader2 } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
+import { StarRating } from '@/components/star-rating'
+import { formatShortDate } from '@/lib/date-utils'
 
 // Types
 interface Supplier {
@@ -58,49 +59,6 @@ interface SupplierPayment {
   createdAt: string
 }
 
-// ── Star Rating Component ──
-function StarRating({
-  rating,
-  onRate,
-  size = 'sm',
-  interactive = false,
-}: {
-  rating: number
-  onRate?: (val: number) => void
-  size?: 'sm' | 'md'
-  interactive?: boolean
-}) {
-  const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5'
-  const [hovered, setHovered] = useState(0)
-
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => {
-        const filled = star <= (hovered || rating)
-        return (
-          <button
-            key={star}
-            type="button"
-            className={`${interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'} transition-transform`}
-            onMouseEnter={() => interactive && setHovered(star)}
-            onMouseLeave={() => interactive && setHovered(0)}
-            onClick={() => interactive && onRate?.(star)}
-            disabled={!interactive}
-          >
-            <Star
-              className={`${sizeClass} ${
-                filled
-                  ? 'fill-amber-400 text-amber-400'
-                  : 'fill-transparent text-muted-foreground/30'
-              }`}
-            />
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Payment Terms Labels ──
 const PAYMENT_TERMS = [
   { value: 'نقدي', label: 'نقدي' },
@@ -111,7 +69,7 @@ const PAYMENT_TERMS = [
 
 export function PurchasesScreen() {
   const { user } = useAppStore()
-  const { formatCurrency, symbol } = useCurrency()
+  const { formatCurrency } = useCurrency()
 
   // ==================== Suppliers State ====================
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -152,7 +110,6 @@ export function PurchasesScreen() {
   const [itemQuantity, setItemQuantity] = useState<number>(1)
   const [itemCostPrice, setItemCostPrice] = useState<number>(0)
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
-  const [invoiceLoading, setInvoiceLoading] = useState(false)
 
   // ==================== Load Data ====================
   const fetchSuppliers = useCallback(async (search = '', sortBy = 'createdAt') => {
@@ -833,7 +790,7 @@ export function PurchasesScreen() {
                           (suppliers.find(s => s.id === selectedSupplierId)?.remainingBalance ?? 0) > 0
                             ? 'text-destructive' : 'text-emerald-600'
                         }`}>
-                          {(suppliers.find(s => s.id === selectedSupplierId)?.remainingBalance ?? 0).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                          {formatCurrency(suppliers.find(s => s.id === selectedSupplierId)?.remainingBalance ?? 0)}
                         </span>
                       </div>
                     )}
@@ -940,7 +897,7 @@ export function PurchasesScreen() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{item.productName}</p>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                المجموع: {(item.quantity * item.costPrice).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                                المجموع: {formatCurrency(item.quantity * item.costPrice)}
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -995,7 +952,7 @@ export function PurchasesScreen() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-muted-foreground">المجموع الكلي</span>
                       <span className="text-xl font-bold text-primary tabular-nums">
-                        {totalAmount.toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ر.س
+                        {formatCurrency(totalAmount)}
                       </span>
                     </div>
                     <Button
@@ -1374,7 +1331,7 @@ export function PurchasesScreen() {
                             </p>
                           </div>
                           <p className="text-[10px] text-muted-foreground">
-                            {new Date(payment.createdAt).toLocaleDateString('ar-SA')}
+                            {formatShortDate(payment.createdAt)}
                           </p>
                         </div>
                         {payment.notes && (

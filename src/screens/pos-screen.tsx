@@ -21,19 +21,7 @@ import {
   Printer,
   ShoppingCart,
   X,
-  Sparkles,
   CupSoda,
-  Beer,
-  Wine,
-  Coffee,
-  Droplets,
-  IceCreamCone,
-  GlassWater,
-  Citrus,
-  Flame,
-  Leaf,
-  LucideIcon,
-  type LucideProps,
   ScanBarcode,
   RotateCcw,
   FileText,
@@ -49,6 +37,9 @@ import {
   ReceiptText,
   Percent,
 } from 'lucide-react'
+import { getCategoryIcon, getCategoryColor } from '@/lib/category-utils'
+import { getNextReceiptNumber, peekNextReceiptNumber } from '@/lib/receipt-utils'
+import { getRelativeTime, formatShortDate } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
 import { useCurrency } from '@/hooks/use-currency'
@@ -111,82 +102,6 @@ interface SalesTargetCompact {
   targetAmount: number
   currentAmount: number
   type: string
-}
-
-// ─── Receipt number helper ─────────────────────────────────────────────
-
-function getNextReceiptNumber(): string {
-  const today = new Date()
-  const dateStr = today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    String(today.getDate()).padStart(2, '0')
-  const key = `sultan-receipt-counter-${dateStr}`
-  const stored = localStorage.getItem(key)
-  let seq = 1
-  if (stored) {
-    seq = parseInt(stored, 10) + 1
-  }
-  localStorage.setItem(key, seq.toString())
-  return `INV-${dateStr}-${String(seq).padStart(4, '0')}`
-}
-
-function peekNextReceiptNumber(): string {
-  const today = new Date()
-  const dateStr = today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    String(today.getDate()).padStart(2, '0')
-  const key = `sultan-receipt-counter-${dateStr}`
-  const stored = localStorage.getItem(key)
-  const seq = stored ? parseInt(stored, 10) + 1 : 1
-  return `INV-${dateStr}-${String(seq).padStart(4, '0')}`
-}
-
-// ─── Icon mapping ────────────────────────────────────────────────────────────
-
-const iconMap: Record<string, LucideIcon> = {
-  CupSoda,
-  Beer,
-  Wine,
-  Coffee,
-  Droplets,
-  IceCreamCone,
-  GlassWater,
-  Citrus,
-  Flame,
-  Leaf,
-  Sparkles,
-}
-
-function getCategoryIcon(iconName: string, props: LucideProps) {
-  const Icon = iconMap[iconName] || CupSoda
-  return <Icon {...props} />
-}
-
-// ─── Category color palette ──────────────────────────────────────────────────
-
-const categoryColors: Record<string, { bg: string; text: string; hover: string }> = {
-  default: { bg: 'bg-primary/10', text: 'text-primary', hover: 'group-hover:bg-primary/20' },
-}
-
-const colorPalette = [
-  { bg: 'bg-emerald-500/10', text: 'text-emerald-600', hover: 'group-hover:bg-emerald-500/20' },
-  { bg: 'bg-amber-500/10', text: 'text-amber-600', hover: 'group-hover:bg-amber-500/20' },
-  { bg: 'bg-rose-500/10', text: 'text-rose-600', hover: 'group-hover:bg-rose-500/20' },
-  { bg: 'bg-violet-500/10', text: 'text-violet-600', hover: 'group-hover:bg-violet-500/20' },
-  { bg: 'bg-cyan-500/10', text: 'text-cyan-600', hover: 'group-hover:bg-cyan-500/20' },
-  { bg: 'bg-orange-500/10', text: 'text-orange-600', hover: 'group-hover:bg-orange-500/20' },
-  { bg: 'bg-teal-500/10', text: 'text-teal-600', hover: 'group-hover:bg-teal-500/20' },
-  { bg: 'bg-pink-500/10', text: 'text-pink-600', hover: 'group-hover:bg-pink-500/20' },
-  { bg: 'bg-lime-500/10', text: 'text-lime-600', hover: 'group-hover:bg-lime-500/20' },
-  { bg: 'bg-sky-500/10', text: 'text-sky-600', hover: 'group-hover:bg-sky-500/20' },
-]
-
-function getCategoryColor(categoryId: string) {
-  let hash = 0
-  for (let i = 0; i < categoryId.length; i++) {
-    hash = categoryId.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colorPalette[Math.abs(hash) % colorPalette.length]
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -817,21 +732,6 @@ export function POSScreen() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [cart.length, paymentDialogOpen, clearCartDialogOpen, holdDialogOpen, deleteHeldOrderId, quickViewProduct, variantSelectorOpen, handleOpenPayment])
 
-  // ── Relative time in Arabic ──
-  const formatRelativeTime = useCallback((isoDate: string) => {
-    const now = Date.now()
-    const then = new Date(isoDate).getTime()
-    const diffMs = now - then
-    const diffMin = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMin < 1) return 'الآن'
-    if (diffMin < 60) return `منذ ${diffMin} دقائق`
-    if (diffHours < 24) return `منذ ${diffHours} ساعات`
-    return `منذ ${diffDays} أيام`
-  }, [])
-
   // ── Compute held order total ──
   const getHeldOrderTotal = useCallback((order: typeof heldOrders[number]) => {
     const subtotal = order.cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -989,7 +889,7 @@ export function POSScreen() {
                               {inv.customer?.name || 'عميل نقدي'}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
-                              {new Date(inv.createdAt).toLocaleDateString('ar-SA')}
+                              {formatShortDate(inv.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -1217,7 +1117,7 @@ export function POSScreen() {
                                   #{order.id.slice(-5).toUpperCase()}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
-                                  {formatRelativeTime(order.heldAt)}
+                                  {getRelativeTime(order.heldAt)}
                                 </span>
                               </div>
                               <span className="text-xs font-bold text-primary tabular-nums">

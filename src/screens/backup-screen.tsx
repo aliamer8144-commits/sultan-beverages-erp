@@ -33,6 +33,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatDateTime } from '@/lib/date-utils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -323,13 +324,7 @@ export function BackupScreen() {
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">تاريخ النسخة:</span>
                   <Badge variant="secondary" className="rounded-lg">
-                    {new Date(lastBackupInfo.date).toLocaleDateString('ar-SA', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTime(lastBackupInfo.date)}
                   </Badge>
                 </div>
                 <Separator />
@@ -458,13 +453,7 @@ export function BackupScreen() {
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">تاريخ النسخة:</span>
                           <span className="font-medium text-xs">
-                            {new Date(previewData.backupDate).toLocaleDateString('ar-SA', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {formatDateTime(previewData.backupDate)}
                           </span>
                         </div>
                       </div>

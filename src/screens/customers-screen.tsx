@@ -35,6 +35,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
+import { Skeleton } from '@/components/ui/skeleton'
+import { formatShortDate, formatDateShortMonth } from '@/lib/date-utils'
 import {
   Search,
   Plus,
@@ -117,20 +119,6 @@ const CUSTOMER_CATEGORIES = [
   { value: 'موظف', label: 'موظف', icon: BadgeCheck, chipClass: 'chip-info' },
   { value: 'تاجر', label: 'تاجر', icon: Store, chipClass: 'chip-primary' },
 ]
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  'عادي': Users,
-  'VIP': Crown,
-  'موظف': BadgeCheck,
-  'تاجر': Store,
-}
-
-const CATEGORY_CHIP_CLASSES: Record<string, string> = {
-  'عادي': 'chip-outline',
-  'VIP': 'chip-warning',
-  'موظف': 'chip-info',
-  'تاجر': 'chip-primary',
-}
 
 const emptyForm: CustomerFormData = { name: '', phone: '', debt: '0', category: 'عادي', notes: '' }
 
@@ -217,11 +205,11 @@ export function CustomersScreen() {
   }
 
   const getCategoryIcon = (category: string) => {
-    return CATEGORY_ICONS[category] || Users
+    return CUSTOMER_CATEGORIES.find((c) => c.value === category)?.icon || Users
   }
 
   const getCategoryChipClass = (category: string) => {
-    return CATEGORY_CHIP_CLASSES[category] || 'chip-outline'
+    return CUSTOMER_CATEGORIES.find((c) => c.value === category)?.chipClass || 'chip-outline'
   }
 
   // ─── Create Customer ──────────────────────────────────────────────
@@ -665,7 +653,7 @@ export function CustomersScreen() {
                     <TableRow key={i}>
                       {Array.from({ length: 7 }).map((_, j) => (
                         <TableCell key={j}>
-                          <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                          <Skeleton className="h-4 w-full bg-muted" />
                         </TableCell>
                       ))}
                     </TableRow>
@@ -1308,7 +1296,7 @@ export function CustomersScreen() {
                         </div>
                         <div className="text-left">
                           <p className="text-[11px] text-muted-foreground">
-                            {new Date(payment.createdAt).toLocaleDateString('ar-SA')}
+                            {formatShortDate(payment.createdAt)}
                           </p>
                           {payment.notes && (
                             <p className="text-[10px] text-muted-foreground mt-0.5">{payment.notes}</p>
@@ -1392,7 +1380,7 @@ export function CustomersScreen() {
                           </div>
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                          {new Date(tx.createdAt).toLocaleDateString('ar-SA')}
+                          {formatShortDate(tx.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -1553,7 +1541,7 @@ export function CustomersScreen() {
                     <p className="text-[10px] text-muted-foreground">آخر زيارة</p>
                     <p className="text-sm font-bold">
                       {purchaseCustomer.lastVisit
-                        ? new Date(purchaseCustomer.lastVisit).toLocaleDateString('ar-SA')
+                        ? formatShortDate(purchaseCustomer.lastVisit)
                         : '—'}
                     </p>
                   </div>
@@ -1627,11 +1615,7 @@ export function CustomersScreen() {
                                     {invoice.invoiceNo}
                                   </p>
                                   <p className="text-[11px] text-muted-foreground">
-                                    {new Date(invoice.createdAt).toLocaleDateString('ar-SA', {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric',
-                                    })}
+                                    {formatDateShortMonth(invoice.createdAt)}
                                   </p>
                                 </div>
                               </div>

@@ -49,6 +49,7 @@ import {
   Star,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { formatShortDate } from '@/lib/date-utils'
 
 // ─── Hydration-safe mounted hook ─────────────────────────────────
 const emptySubscribe = () => () => {}
@@ -427,7 +428,7 @@ function SalesTargetsSection() {
                       {typeLabels[target.type] || target.type}
                     </Badge>
                     <span className="text-[10px] text-muted-foreground">
-                      {new Date(target.createdAt).toLocaleDateString('ar-SA')}
+                      {formatShortDate(target.createdAt)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">

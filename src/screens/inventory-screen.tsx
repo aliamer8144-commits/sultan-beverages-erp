@@ -9,16 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { EmptyState } from '@/components/empty-state'
 import { Switch } from '@/components/ui/switch'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -28,134 +20,26 @@ import { toast } from 'sonner'
 import {
   Search, Plus, Pencil, Trash2, AlertTriangle, Package, Filter, Loader2,
   PackageX, ImagePlus, X, History, PackagePlus, Download, ChevronLeft,
-  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RotateCcw, PenLine,
-  FileInput, ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
-  TrendingUp, TrendingDown, Clock, Activity, Layers, Save, Upload,
+  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
+  ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
+  Clock, Activity, Layers, Save, Upload,
 } from 'lucide-react'
 import { CsvImportDialog } from '@/components/csv-import-dialog'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
 import { compressImage } from '@/lib/image-utils'
+import { exportToCSV } from '@/lib/export-csv'
+import { formatDateTime, formatShortDate, formatTime } from '@/lib/date-utils'
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 
-// Types
-interface Product {
-  id: string
-  name: string
-  price: number
-  costPrice: number
-  quantity: number
-  minQuantity: number
-  categoryId: string
-  category: { id: string; name: string; icon: string }
-  image?: string
-  barcode?: string
-  isActive: boolean
-}
-
-interface Category {
-  id: string
-  name: string
-  icon: string
-  _count?: { products: number }
-}
-
-interface ProductFormData {
-  name: string
-  categoryId: string
-  price: string
-  costPrice: string
-  quantity: string
-  minQuantity: string
-  barcode: string
-  image: string
-}
-
-interface StockAdjustment {
-  id: string
-  productId: string
-  type: string
-  quantity: number
-  previousQty: number
-  newQty: number
-  reason: string
-  userId: string
-  userName: string | null
-  reference: string | null
-  createdAt: string
-  product: { id: string; name: string; category: { name: string } }
-}
-
-interface AdjustmentFormData {
-  type: 'addition' | 'subtraction' | 'correction'
-  quantity: string
-  reason: string
-  reference: string
-}
-
-const emptyForm: ProductFormData = {
-  name: '',
-  categoryId: '',
-  price: '',
-  costPrice: '',
-  quantity: '0',
-  minQuantity: '5',
-  barcode: '',
-  image: '',
-}
-
-const emptyAdjustmentForm: AdjustmentFormData = {
-  type: 'addition',
-  quantity: '',
-  reason: '',
-  reference: '',
-}
-
-// Variant types
-interface ProductVariant {
-  id: string
-  productId: string
-  name: string
-  sku?: string
-  barcode?: string
-  costPrice: number
-  sellPrice: number
-  stock: number
-  isActive: boolean
-  createdAt: string
-}
-
-interface VariantFormData {
-  name: string
-  sku: string
-  barcode: string
-  costPrice: string
-  sellPrice: string
-  stock: string
-}
-
-const emptyVariantForm: VariantFormData = {
-  name: '',
-  sku: '',
-  barcode: '',
-  costPrice: '',
-  sellPrice: '',
-  stock: '0',
-}
-
-// Adjustment type config
-const adjustmentTypeConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
-  addition: { label: 'إضافة', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30', icon: ArrowUp },
-  subtraction: { label: 'خصم', color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900/30', icon: ArrowDown },
-  correction: { label: 'تصحيح', color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-900/30', icon: PenLine },
-  return: { label: 'إرجاع', color: 'text-amber-700 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30', icon: RotateCcw },
-  initial: { label: 'رصيد أولي', color: 'text-purple-700 dark:text-purple-400', bgColor: 'bg-purple-100 dark:bg-purple-900/30', icon: FileInput },
-}
+import type { Product, Category, ProductFormData, StockAdjustment, AdjustmentFormData, ProductVariant, VariantFormData } from './inventory/types'
+import { emptyForm, emptyAdjustmentForm, emptyVariantForm } from './inventory/types'
+import { adjustmentTypeConfig, movementTypeConfig } from './inventory/constants'
 
 export function InventoryScreen() {
   // Currency
-  const { symbol } = useCurrency()
+  const { symbol, formatCurrency } = useCurrency()
   const user = useAppStore((s) => s.user)
 
   // Data state
@@ -369,18 +253,7 @@ export function InventoryScreen() {
     }
   }, [])
 
-  // Stock movement type config for mini timeline
-  const movementTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-    in: { label: 'إضافة', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-    purchase: { label: 'شراء', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-    return: { label: 'إرجاع', icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    out: { label: 'خصم', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    sale: { label: 'بيع', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    adjustment: { label: 'تعديل', icon: ArrowUpDown, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-    addition: { label: 'إضافة', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-    subtraction: { label: 'خصم', icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    correction: { label: 'تصحيح', icon: ArrowUpDown, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-  }
+
 
   // Image upload handler with compression
   const handleImageUpload = useCallback(async (file: File) => {
@@ -676,26 +549,20 @@ export function InventoryScreen() {
     }
 
     const headers = ['المنتج', 'التصنيف', 'النوع', 'الكمية', 'السابق', 'الجديد', 'السبب', 'المستخدم', 'المرجع', 'التاريخ']
-    const rows = adjustments.map((a) => [
-      a.product.name,
-      a.product.category.name,
-      adjustmentTypeConfig[a.type]?.label || a.type,
-      a.quantity,
-      a.previousQty,
-      a.newQty,
-      `"${a.reason}"`,
-      a.userName || a.userId,
-      a.reference || '',
-      new Date(a.createdAt).toLocaleString('ar-SA'),
-    ])
+    const rows = adjustments.map((a) => ({
+      'المنتج': a.product.name,
+      'التصنيف': a.product.category.name,
+      'النوع': adjustmentTypeConfig[a.type]?.label || a.type,
+      'الكمية': a.quantity,
+      'السابق': a.previousQty,
+      'الجديد': a.newQty,
+      'السبب': a.reason,
+      'المستخدم': a.userName || a.userId,
+      'المرجع': a.reference || '',
+      'التاريخ': formatDateTime(a.createdAt),
+    }))
 
-    const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `stock-adjustments-${format(new Date(), 'yyyy-MM-dd')}.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    exportToCSV(rows, `stock-adjustments-${format(new Date(), 'yyyy-MM-dd')}`, headers)
     toast.success('تم تصدير البيانات بنجاح')
   }
 
@@ -1077,13 +944,12 @@ export function InventoryScreen() {
             <p className="loading-text">جاري تحميل المنتجات...</p>
           </div>
         ) : products.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <PackageX className="w-12 h-12 opacity-30" />
-              <p className="text-sm font-medium">لا توجد منتجات</p>
-              <p className="text-xs">أضف منتج جديد أو عدّل عوامل التصفية</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={PackageX}
+            title="لا توجد منتجات"
+            description="أضف منتج جديد أو عدّل عوامل التصفية"
+            compact
+          />
         ) : (
           <ScrollArea className="flex-1">
             <Table>
@@ -1179,14 +1045,14 @@ export function InventoryScreen() {
                       {/* Cost Price */}
                       <TableCell className="text-center">
                         <span className="text-sm text-muted-foreground tabular-nums">
-                          {product.costPrice.toLocaleString('ar-SA')} {symbol}
+                          {formatCurrency(product.costPrice)}
                         </span>
                       </TableCell>
 
                       {/* Selling Price */}
                       <TableCell className="text-center">
                         <span className="text-sm font-semibold text-foreground tabular-nums">
-                          {product.price.toLocaleString('ar-SA')} {symbol}
+                          {formatCurrency(product.price)}
                         </span>
                       </TableCell>
 
@@ -1259,7 +1125,7 @@ export function InventoryScreen() {
                                               <span className={`text-[10px] font-semibold ${cfg.color}`}>{cfg.label}</span>
                                               <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
                                                 <Clock className="w-2.5 h-2.5" />
-                                                {new Date(mov.createdAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                                                {formatTime(mov.createdAt)}
                                               </span>
                                             </div>
                                             {/* Quantities */}
@@ -1668,35 +1534,15 @@ export function InventoryScreen() {
       </Dialog>
 
       {/* ─── Delete Confirmation Dialog ──────────────────────────── */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              تأكيد الحذف
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              هل أنت متأكد من حذف المنتج{' '}
-              <span className="font-bold text-foreground">{deletingProduct?.name}</span>
-              ؟
-              <br />
-              <span className="text-destructive font-medium">
-                لا يمكن التراجع عن هذا الإجراء.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-lg">إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90 rounded-lg gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              حذف المنتج
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="تأكيد حذف المنتج"
+        description={`هل أنت متأكد من حذف المنتج "${deletingProduct?.name}"؟ لا يمكن التراجع عن هذا الإجراء.`}
+        onConfirm={handleDelete}
+        confirmText="حذف المنتج"
+        variant="destructive"
+      />
 
       {/* ─── Stock Adjustment Dialog ────────────────────────────── */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
@@ -2019,12 +1865,7 @@ export function InventoryScreen() {
                           </TableCell>
                           <TableCell className="text-center">
                             <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                              {new Date(adj.createdAt).toLocaleDateString('ar-SA', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatDateTime(adj.createdAt)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
@@ -2341,114 +2182,27 @@ export function InventoryScreen() {
       </Dialog>
 
       {/* ─── Batch Status Toggle Dialog ───────────────────────── */}
-      <AlertDialog open={batchStatusOpen} onOpenChange={setBatchStatusOpen}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${batchNewStatus ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                <Tags className={`w-5 h-5 ${batchNewStatus ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`} />
-              </div>
-              <span>{batchNewStatus ? 'تفعيل' : 'تعطيل'} المنتجات المحددة</span>
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              هل تريد {batchNewStatus ? 'تفعيل' : 'تعطيل'}{' '}
-              <span className="font-bold text-foreground">{selectedIds.size}</span> منتج محدد؟
-              <br />
-              <span className="text-muted-foreground text-sm">
-                {batchNewStatus ? 'سيصبح بإمكان بيع هذه المنتجات في نقطة البيع' : 'لن تظهر هذه المنتجات في نقطة البيع'}
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-2 my-2">
-            <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-              batchNewStatus
-                ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                : 'border-border hover:border-muted-foreground/30'
-            }`}>
-              <input
-                type="radio"
-                name="batch-status"
-                checked={batchNewStatus}
-                onChange={() => setBatchNewStatus(true)}
-                className="sr-only"
-              />
-              <ArrowUp className="w-4 h-4" />
-              <span className="text-sm font-semibold">تفعيل</span>
-            </label>
-            <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-              !batchNewStatus
-                ? 'bg-red-100 dark:bg-red-900/30 border-red-500 text-red-700 dark:text-red-400'
-                : 'border-border hover:border-muted-foreground/30'
-            }`}>
-              <input
-                type="radio"
-                name="batch-status"
-                checked={!batchNewStatus}
-                onChange={() => setBatchNewStatus(false)}
-                className="sr-only"
-              />
-              <ArrowDown className="w-4 h-4" />
-              <span className="text-sm font-semibold">تعطيل</span>
-            </label>
-          </div>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel disabled={batchSubmitting} className="rounded-lg">إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBatchStatusToggle}
-              disabled={batchSubmitting}
-              className={`rounded-lg gap-2 ${
-                batchNewStatus
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-red-600 hover:bg-red-700 text-white'
-              }`}
-            >
-              {batchSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              تأكيد {batchNewStatus ? 'التفعيل' : 'التعطيل'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={batchStatusOpen}
+        onOpenChange={setBatchStatusOpen}
+        title={batchNewStatus ? 'تفعيل المنتجات المحددة' : 'تعطيل المنتجات المحددة'}
+        description={`هل تريد ${batchNewStatus ? 'تفعيل' : 'تعطيل'} ${selectedIds.size} منتج؟`}
+        onConfirm={handleBatchStatusToggle}
+        confirmText={batchNewStatus ? 'تفعيل' : 'تعطيل'}
+        loading={batchSubmitting}
+      />
 
       {/* ─── Batch Delete Confirmation Dialog ─────────────────── */}
-      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              تأكيد الحذف الجماعي
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              هل أنت متأكد من حذف{' '}
-              <span className="font-bold text-foreground">{selectedIds.size}</span> منتج محدد؟
-              <br />
-              <span className="text-destructive font-medium">
-                لا يمكن التراجع عن هذا الإجراء.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="glass-card rounded-xl p-3 max-h-32 overflow-y-auto mt-2">
-            <div className="flex flex-wrap gap-1">
-              {selectedProducts.map((p) => (
-                <Badge key={p.id} variant="secondary" className="text-[10px]">
-                  {p.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel disabled={batchSubmitting} className="rounded-lg">إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBatchDelete}
-              disabled={batchSubmitting}
-              className="bg-destructive text-white hover:bg-destructive/90 rounded-lg gap-2"
-            >
-              {batchSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              <Trash2 className="w-4 h-4" />
-              حذف {selectedIds.size} منتج
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        title="تأكيد حذف المنتجات المحددة"
+        description={`هل أنت متأكد من حذف ${selectedIds.size} منتج؟ لا يمكن التراجع عن هذا الإجراء.`}
+        onConfirm={handleBatchDelete}
+        confirmText="حذف الكل"
+        variant="destructive"
+        loading={batchSubmitting}
+      />
 
       {/* ─── Product Variants Dialog ────────────────────────────── */}
       <Dialog open={variantsOpen} onOpenChange={(open) => { setVariantsOpen(open); if (!open) { setVariantFormOpen(false); setEditingVariant(null) } }}>
@@ -2814,39 +2568,15 @@ export function InventoryScreen() {
       </Dialog>
 
       {/* ─── Category Delete Confirmation Dialog ─────────────────── */}
-      <AlertDialog open={catDeleteOpen} onOpenChange={setCatDeleteOpen}>
-        <AlertDialogContent dir="rtl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              حذف التصنيف
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              هل أنت متأكد من حذف تصنيف{' '}
-              <span className="font-bold text-foreground">"{deletingCat?.name}"</span>؟
-              {deletingCat && (deletingCat._count?.products ?? 0) > 0 && (
-                <>
-                  <br />
-                  <span className="text-amber-600 dark:text-amber-400 font-medium mt-2 block">
-                    ⚠️ هذا التصنيف يحتوي على {deletingCat._count?.products} منتج. لا يمكن حذفه قبل نقل أو حذف جميع المنتجات.
-                  </span>
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-lg">إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCatDelete}
-              disabled={!!deletingCat && (deletingCat._count?.products ?? 0) > 0}
-              className="bg-destructive text-white hover:bg-destructive/90 rounded-lg gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              حذف التصنيف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={catDeleteOpen}
+        onOpenChange={setCatDeleteOpen}
+        title="تأكيد حذف التصنيف"
+        description={`هل أنت متأكد من حذف التصنيف "${deletingCat?.name}"؟`}
+        onConfirm={handleCatDelete}
+        confirmText="حذف التصنيف"
+        variant="destructive"
+      />
 
       {/* ─── CSV Import Dialog ── */}
       <CsvImportDialog

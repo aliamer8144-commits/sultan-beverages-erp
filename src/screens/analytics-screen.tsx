@@ -46,13 +46,7 @@ import {
   Medal,
   ArrowUpDown,
 } from 'lucide-react'
-import { formatWithSettings } from '@/lib/currency'
-
-// ─── Chart color palette ──────────────────────────────────────────
-const CHART_COLORS = [
-  '#3b5bdb', '#0ca678', '#f08c00', '#e03131', '#9c36b5',
-  '#1c7ed6', '#e8590c', '#364fc7', '#5c7cfa', '#c92a2a',
-]
+import { formatCurrency, CHART_COLORS } from '@/components/chart-utils'
 
 const EXPENSE_COLORS = ['#e03131', '#f08c00', '#9c36b5', '#e8590c', '#1c7ed6', '#c92a2a', '#364fc7']
 
@@ -165,7 +159,7 @@ function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: A
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{formatWithSettings(payload[0].value)}</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)}</p>
     </div>
   )
 }
@@ -176,7 +170,7 @@ function BarTooltip({ active, payload }: { active?: boolean; payload?: Array<{ v
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload?.category}</p>
-      <p className="text-sm font-bold text-foreground">{formatWithSettings(item.value)}</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
     </div>
   )
 }
@@ -187,7 +181,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
   return (
     <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
       <p className="text-xs font-medium text-muted-foreground mb-1">{item.name}</p>
-      <p className="text-sm font-bold text-foreground">{formatWithSettings(item.value)}</p>
+      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
     </div>
   )
 }
@@ -419,7 +413,7 @@ export function AnalyticsScreen() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">إجمالي المبيعات</p>
-                      <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums">{formatWithSettings(data.totalSales)}</p>
+                      <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums">{formatCurrency(data.totalSales)}</p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                       <DollarSign className="w-5 h-5 text-primary" />
@@ -434,7 +428,7 @@ export function AnalyticsScreen() {
                     <div>
                       <p className="text-xs text-muted-foreground">صافي الربح</p>
                       <p className={`text-lg md:text-xl font-bold mt-1 tabular-nums ${data.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {formatWithSettings(data.netProfit)}
+                        {formatCurrency(data.netProfit)}
                       </p>
                     </div>
                     <div className={`w-10 h-10 rounded-xl ${data.netProfit >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'} flex items-center justify-center`}>
@@ -467,7 +461,7 @@ export function AnalyticsScreen() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">متوسط الفاتورة</p>
-                      <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums">{formatWithSettings(data.averageInvoice)}</p>
+                      <p className="text-lg md:text-xl font-bold text-foreground mt-1 tabular-nums">{formatCurrency(data.averageInvoice)}</p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                       <Receipt className="w-5 h-5 text-amber-600" />
@@ -481,7 +475,7 @@ export function AnalyticsScreen() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">إجمالي المصروفات</p>
-                      <p className="text-lg md:text-xl font-bold text-red-500 mt-1 tabular-nums">{formatWithSettings(data.totalExpenses)}</p>
+                      <p className="text-lg md:text-xl font-bold text-red-500 mt-1 tabular-nums">{formatCurrency(data.totalExpenses)}</p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
                       <ShoppingCart className="w-5 h-5 text-red-500" />
@@ -669,7 +663,7 @@ export function AnalyticsScreen() {
                     <p className="text-xs text-muted-foreground mt-1">المصروفات حسب الفئة</p>
                   </div>
                   <Badge variant="secondary" className="rounded-lg text-xs">
-                    {formatWithSettings(data.totalExpenses)}
+                    {formatCurrency(data.totalExpenses)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -768,11 +762,11 @@ export function AnalyticsScreen() {
                               <span className="text-sm font-semibold text-foreground tabular-nums">{product.quantity.toLocaleString('ar-SA')}</span>
                             </TableCell>
                             <TableCell className="py-2.5 px-3 text-left">
-                              <span className="text-sm font-bold text-foreground">{formatWithSettings(product.revenue)}</span>
+                              <span className="text-sm font-bold text-foreground">{formatCurrency(product.revenue)}</span>
                             </TableCell>
                             <TableCell className="py-2.5 px-3 text-left">
                               <span className={`text-sm font-bold ${product.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                {formatWithSettings(product.profit)}
+                                {formatCurrency(product.profit)}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -837,7 +831,7 @@ export function AnalyticsScreen() {
                               <span className="text-sm font-medium text-foreground">{customer.name}</span>
                             </TableCell>
                             <TableCell className="py-2.5 px-3 text-left">
-                              <span className="text-sm font-bold text-foreground">{formatWithSettings(customer.totalSpent)}</span>
+                              <span className="text-sm font-bold text-foreground">{formatCurrency(customer.totalSpent)}</span>
                             </TableCell>
                             <TableCell className="py-2.5 px-3 text-center">
                               <Badge variant="secondary" className="text-[10px] px-2 rounded-lg">
