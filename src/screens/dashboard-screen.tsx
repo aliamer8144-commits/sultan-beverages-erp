@@ -230,7 +230,7 @@ function StatCard({ label, value, suffix, icon: Icon, iconBg, statClass, isInteg
   const dual = dualFormat(value)
 
   return (
-    <Card className={`rounded-2xl border-0 shadow-sm card-elevated stat-card-gradient data-card-micro ${statClass}`}>
+    <Card className={`rounded-2xl border-0 shadow-sm card-elevated stat-card-gradient data-card-micro stat-card-v2 ${statClass}`}>
       <CardContent className="p-6 relative z-10">
         <div className="flex items-center justify-between">
           <div>
@@ -488,7 +488,7 @@ export function DashboardScreen() {
       ) : data ? (
         <div className="relative">
           <div className="glow-orb-blue" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+          <div className="data-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
           {/* Today's Sales */}
           <StatCard
             label="مبيعات اليوم"

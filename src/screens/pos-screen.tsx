@@ -1105,7 +1105,7 @@ export function POSScreen() {
                     >
                       {/* In-cart badge */}
                       {inCart > 0 && (
-                        <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center shadow-lg shadow-primary/30 z-10">
+                        <div className="absolute -top-2 -left-2 badge-count shadow-lg shadow-primary/30 z-10">
                           {inCart}
                         </div>
                       )}
@@ -1296,16 +1296,16 @@ export function POSScreen() {
         {/* Cart items */}
         <div className="flex-1 overflow-hidden">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center px-6">
-              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-3 animate-pulse-glow">
+            <div className="empty-state-v2 h-full flex flex-col items-center justify-center text-center px-6">
+              <div className="empty-state-v2-icon w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-3 animate-pulse-glow">
                 <ShoppingCart className="w-7 h-7 text-muted-foreground/30" />
               </div>
-              <p className="text-sm text-muted-foreground">السلة فارغة</p>
-              <p className="text-xs text-muted-foreground/50 mt-1">اضغط على منتج لإضافته</p>
+              <p className="empty-state-v2-title text-sm">السلة فارغة</p>
+              <p className="empty-state-v2-description text-xs mt-1">اضغط على منتج لإضافته</p>
             </div>
           ) : (
             <ScrollArea className="h-full">
-              <div className="p-3 space-y-2">
+              <div className="scrollable-list p-3 space-y-0">
                 {cart.map((item) => (
                   <div
                     key={item.productId}
@@ -1445,6 +1445,25 @@ export function POSScreen() {
                     <Percent className="w-2.5 h-2.5" />
                     مخصص
                   </button>
+                </div>
+                {/* Quick amount buttons */}
+                <div className="flex gap-1.5 flex-wrap pt-1">
+                  {[50, 100, 200, 500, 1000].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setCartDiscount(Math.min(amt, subtotal))}
+                      disabled={amt > subtotal}
+                      className={`px-2 py-1 rounded-md text-[10px] font-medium tabular-nums transition-all duration-150 ${
+                        cartDiscount === amt
+                          ? 'bg-primary text-white shadow-sm'
+                          : amt > subtotal
+                            ? 'bg-muted/30 text-muted-foreground/40 cursor-not-allowed'
+                            : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {amt} {symbol}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

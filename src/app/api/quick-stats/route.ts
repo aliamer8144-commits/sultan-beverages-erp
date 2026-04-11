@@ -26,6 +26,8 @@ export async function GET() {
       topProductGroups,
       recentLogs,
       activeTargets,
+      topCustomerToday,
+      itemsSoldTodayAgg,
     ] = await Promise.all([
       // 1. Today's total sales (sale invoices)
       db.invoice.aggregate({
@@ -112,6 +114,21 @@ export async function GET() {
         },
         orderBy: { createdAt: 'desc' },
       }),
+
+      // 16. Top customer today (by total sales)
+      db.invoice.groupBy({
+        by: ['customerId'],
+        where: { type: 'sale', createdAt: { gte: startOfDay }, customerId: { not: null } },
+        _sum: { totalAmount: true },
+        orderBy: { _sum: { totalAmount: 'desc' } },
+        take: 1,
+      }),
+
+      // 17. Total items sold today
+      db.invoiceItem.aggregate({
+        where: { invoice: { type: 'sale', createdAt: { gte: startOfDay } } },
+        _sum: { quantity: true },
+      }),
     ])
 
     // ── Derived values ─────────────────────────────────────────────
@@ -184,6 +201,21 @@ export async function GET() {
           : 0
     }
 
+    // ── New stats ────────────────────────────────────────────────
+    const itemsSoldToday = itemsSoldTodayAgg._sum.quantity ?? 0
+
+    const averageSaleToday = invoicesCountToday > 0 ? Math.round((totalSalesToday / invoicesCountToday) * 100) / 100 : 0
+
+    // Resolve top customer name
+    let topCustomerTodayName: string | null = null
+    if (topCustomerToday.length > 0 && topCustomerToday[0].customerId) {
+      const topCustomer = await db.customer.findUnique({
+        where: { id: topCustomerToday[0].customerId },
+        select: { name: true },
+      })
+      topCustomerTodayName = topCustomer?.name ?? null
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -205,6 +237,11 @@ export async function GET() {
         totalDebt,
         monthlySales,
         totalExpenses,
+
+        // Task 12-b stats
+        topCustomerTodayName,
+        itemsSoldToday,
+        averageSaleToday,
       },
     })
   } catch (error) {

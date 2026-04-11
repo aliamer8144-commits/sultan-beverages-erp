@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// ── Default seed categories ───────────────────────────────────────
 const DEFAULT_CATEGORIES = [
   { name: 'إيجار', icon: 'Home', color: '#3b82f6', monthlyBudget: 500000 },
   { name: 'رواتب', icon: 'Users', color: '#22c55e', monthlyBudget: 2000000 },
@@ -12,28 +11,12 @@ const DEFAULT_CATEGORIES = [
   { name: 'متنوع', icon: 'MoreHorizontal', color: '#6b7280', monthlyBudget: 100000 },
 ]
 
-// ── GET: List all expense categories ───────────────────────────────
 export async function GET() {
   try {
-    let categories = await db.expenseCategory.findMany({
-      include: {
-        _count: { select: { expenses: true } },
-      },
+    const categories = await db.expenseCategory.findMany({
+      include: { _count: { select: { expenses: true } } },
       orderBy: { createdAt: 'asc' },
     })
-
-    // Auto-seed if no categories exist
-    if (categories.length === 0) {
-      await db.expenseCategory.createMany({
-        data: DEFAULT_CATEGORIES,
-      })
-      categories = await db.expenseCategory.findMany({
-        include: {
-          _count: { select: { expenses: true } },
-        },
-        orderBy: { createdAt: 'asc' },
-      })
-    }
 
     return NextResponse.json({ success: true, data: categories })
   } catch (error) {
@@ -42,17 +25,13 @@ export async function GET() {
   }
 }
 
-// ── POST: Create new category ─────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { name, description, icon, color, monthlyBudget, isActive } = body
 
     if (!name || !name.trim()) {
-      return NextResponse.json(
-        { success: false, error: 'يرجى إدخال اسم الفئة' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'يرجى إدخال اسم الفئة' }, { status: 400 })
     }
 
     const category = await db.expenseCategory.create({
@@ -64,35 +43,26 @@ export async function POST(request: NextRequest) {
         monthlyBudget: monthlyBudget ? Number(monthlyBudget) : null,
         isActive: isActive !== undefined ? isActive : true,
       },
-      include: {
-        _count: { select: { expenses: true } },
-      },
+      include: { _count: { select: { expenses: true } } },
     })
 
     return NextResponse.json({ success: true, data: category }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create expense category'
     if (message.includes('Unique constraint')) {
-      return NextResponse.json(
-        { success: false, error: 'هذه الفئة موجودة بالفعل' },
-        { status: 409 }
-      )
+      return NextResponse.json({ success: false, error: 'هذه الفئة موجودة بالفعل' }, { status: 409 })
     }
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
 
-// ── PUT: Update category ──────────────────────────────────────────
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, name, description, icon, color, monthlyBudget, isActive } = body
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف الفئة مطلوب' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'معرف الفئة مطلوب' }, { status: 400 })
     }
 
     const data: Record<string, unknown> = {}
@@ -106,42 +76,29 @@ export async function PUT(request: NextRequest) {
     const category = await db.expenseCategory.update({
       where: { id },
       data,
-      include: {
-        _count: { select: { expenses: true } },
-      },
+      include: { _count: { select: { expenses: true } } },
     })
 
     return NextResponse.json({ success: true, data: category })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update expense category'
     if (message.includes('Unique constraint')) {
-      return NextResponse.json(
-        { success: false, error: 'هذه الفئة موجودة بالفعل' },
-        { status: 409 }
-      )
+      return NextResponse.json({ success: false, error: 'هذه الفئة موجودة بالفعل' }, { status: 409 })
     }
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
 
-// ── DELETE: Delete category (only if no expenses use it) ───────────
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
     const { id } = body
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف الفئة مطلوب' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'معرف الفئة مطلوب' }, { status: 400 })
     }
 
-    // Check if category has expenses
-    const expenseCount = await db.expense.count({
-      where: { categoryId: id },
-    })
-
+    const expenseCount = await db.expense.count({ where: { categoryId: id } })
     if (expenseCount > 0) {
       return NextResponse.json(
         { success: false, error: `لا يمكن حذف هذه الفئة لأنها مرتبطة بـ ${expenseCount} مصروف` },
@@ -150,7 +107,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     await db.expenseCategory.delete({ where: { id } })
-
     return NextResponse.json({ success: true, message: 'تم حذف الفئة بنجاح' })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete expense category'

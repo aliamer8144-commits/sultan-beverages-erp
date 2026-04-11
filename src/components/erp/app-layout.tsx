@@ -415,9 +415,14 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
       <div className="p-3">
         {!collapsed && user && (
           <div className="mb-2 px-3 py-2 rounded-xl bg-muted/50 sidebar-user-card">
-            <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {user.role === 'admin' ? t('common.admin') : t('common.cashier')}
+            <div className="flex items-center gap-2">
+              <span className="badge-dot bg-primary mt-0.5" aria-hidden="true"></span>
+              <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              <span className={`badge-status ${user.role === 'admin' ? 'badge-status-success' : 'badge-status-info'}`}>
+                {user.role === 'admin' ? t('common.admin') : t('common.cashier')}
+              </span>
             </p>
           </div>
         )}

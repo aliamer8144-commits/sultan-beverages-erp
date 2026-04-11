@@ -30,8 +30,9 @@ import {
   PackageX, ImagePlus, X, History, PackagePlus, Download, ChevronLeft,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RotateCcw, PenLine,
   FileInput, ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
-  TrendingUp, TrendingDown, Clock, Activity, Layers, Save,
+  TrendingUp, TrendingDown, Clock, Activity, Layers, Save, Upload,
 } from 'lucide-react'
+import { CsvImportDialog } from '@/components/csv-import-dialog'
 import { useCurrency } from '@/hooks/use-currency'
 import { useAppStore } from '@/store/app-store'
 import { compressImage } from '@/lib/image-utils'
@@ -868,6 +869,9 @@ export function InventoryScreen() {
     }
   }
 
+  // ─── CSV Import State ────────────────────────────────────────
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
+
   // ─── Category Management State ─────────────────────────────────
   const [catMgmtOpen, setCatMgmtOpen] = useState(false)
   const [catFormOpen, setCatFormOpen] = useState(false)
@@ -997,6 +1001,14 @@ export function InventoryScreen() {
             <History className="w-4 h-4" />
             سجل التعديلات
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setCsvImportOpen(true)}
+            className="gap-2 rounded-lg"
+          >
+            <Upload className="w-4 h-4" />
+            استيراد CSV
+          </Button>
           <Button onClick={openAddDialog} className="gap-2 shadow-md shadow-primary/20">
             <Plus className="w-4 h-4" />
             إضافة منتج
@@ -1005,8 +1017,8 @@ export function InventoryScreen() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card rounded-xl border shadow-sm p-4 card-hover glass-card-subtle">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="bg-card rounded-xl border shadow-sm p-4 card-hover glass-card-subtle filter-bar">
+        <div className="flex items-center gap-2 mb-3 filter-group">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">تصفية وبحث</span>
         </div>
@@ -1107,7 +1119,7 @@ export function InventoryScreen() {
                   return (
                     <TableRow
                       key={product.id}
-                      className={`pricing-row group transition-colors ${isSelected ? 'bg-primary/5' : ''} ${isLowStock && !isSelected ? 'bg-destructive/[0.03] hover:bg-destructive/[0.06]' : ''}`}
+                      className={`scrollable-list-item pricing-row group transition-colors ${isSelected ? 'bg-primary/5' : ''} ${isLowStock && !isSelected ? 'bg-destructive/[0.03] hover:bg-destructive/[0.06]' : ''}`}
                     >
                       {/* Checkbox */}
                       <TableCell className="w-10 text-center">
@@ -1182,7 +1194,7 @@ export function InventoryScreen() {
 
                       {/* Actions */}
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="action-menu flex items-center justify-center gap-1">
                           {/* Per-product stock history button */}
                           <Popover
                             open={productHistoryId === product.id}
@@ -2837,6 +2849,14 @@ export function InventoryScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── CSV Import Dialog ── */}
+      <CsvImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        onImportComplete={() => { fetchProducts(); fetchCategories() }}
+      />
     </div>
   )
 }

@@ -47,6 +47,80 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // ── Bulk import variant ──
+    if (body.action === 'bulk-import' && Array.isArray(body.products)) {
+      const { products } = body;
+
+      if (products.length === 0) {
+        return NextResponse.json({ success: false, error: 'لا توجد منتجات للاستيراد' }, { status: 400 });
+      }
+
+      if (products.length > 500) {
+        return NextResponse.json({ success: false, error: 'الحد الأقصى 500 منتج لكل عملية استيراد' }, { status: 400 });
+      }
+
+      let created = 0;
+      let skipped = 0;
+
+      // Get existing product names to skip duplicates
+      const existingProducts = await db.product.findMany({
+        select: { name: true },
+      });
+      const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
+
+      for (const item of products) {
+        const name = (item.name || '').toString().trim();
+        if (!name) {
+          skipped++;
+          continue;
+        }
+
+        // Skip duplicate by name
+        if (existingNames.has(name.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+
+        const price = Number(item.price) || 0;
+        if (price <= 0) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          await db.product.create({
+            data: {
+              name,
+              categoryId: item.categoryId || undefined,
+              price,
+              costPrice: Number(item.costPrice) || 0,
+              quantity: Number(item.quantity) || 0,
+              minQuantity: 5,
+              barcode: (item.barcode || '').toString().trim() || null,
+            },
+          });
+          existingNames.add(name.toLowerCase());
+          created++;
+        } catch {
+          skipped++;
+        }
+      }
+
+      // Log bulk import
+      logAction({
+        action: 'bulk_import',
+        entity: 'Product',
+        details: { created, skipped, total: products.length },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: { created, skipped },
+      }, { status: 201 });
+    }
+
+    // ── Single product creation ──
     const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = body;
 
     // Validate image size (max 2MB raw, ~2.7MB base64) and type

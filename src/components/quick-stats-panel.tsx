@@ -26,6 +26,9 @@ import {
   Wallet,
   CalendarDays,
   CheckCircle2,
+  Crown,
+  ShoppingCart,
+  BarChart,
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -60,6 +63,10 @@ interface StatsData {
   totalDebt: number
   monthlySales: number
   totalExpenses: number
+  // Task 12-b stats
+  topCustomerTodayName: string | null
+  itemsSoldToday: number
+  averageSaleToday: number
 }
 
 // ─── Relative Arabic time ───────────────────────────────────────────
@@ -580,6 +587,45 @@ export function QuickStatsPanel() {
                     trendBg={stats.totalDebt > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}
                     trendColor={stats.totalDebt > 0 ? 'text-red-500' : 'text-green-500'}
                     trendLabel={stats.totalDebt > 0 ? 'مديونية' : 'لا ديون'}
+                  />
+
+                  <MetricRow
+                    label="أفضل عميل اليوم"
+                    value={stats.topCustomerTodayName || '—'}
+                    icon={Crown}
+                    iconBg="bg-amber-50 dark:bg-amber-500/10"
+                    iconColor="text-amber-500"
+                    valueColor="text-amber-600 dark:text-amber-400"
+                    trendIcon={Crown}
+                    trendBg="bg-amber-50 dark:bg-amber-500/10"
+                    trendColor="text-amber-500"
+                    trendLabel="اليوم"
+                  />
+
+                  <MetricRow
+                    label="المنتجات المباعة اليوم"
+                    value={stats.itemsSoldToday.toLocaleString('ar-SA')}
+                    icon={ShoppingCart}
+                    iconBg="bg-cyan-50 dark:bg-cyan-500/10"
+                    iconColor="text-cyan-500"
+                    valueColor="text-cyan-600 dark:text-cyan-400"
+                    trendIcon={ShoppingCart}
+                    trendBg="bg-cyan-50 dark:bg-cyan-500/10"
+                    trendColor="text-cyan-400"
+                    trendLabel="وحدة"
+                  />
+
+                  <MetricRow
+                    label="متوسط الفاتورة اليوم"
+                    value={`${formatCurrency(stats.averageSaleToday)} ${symbol}`}
+                    icon={BarChart}
+                    iconBg="bg-violet-50 dark:bg-violet-500/10"
+                    iconColor="text-violet-500"
+                    valueColor="text-violet-600 dark:text-violet-400"
+                    trendIcon={TrendingUp}
+                    trendBg={stats.averageSaleToday > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-muted'}
+                    trendColor={stats.averageSaleToday > 0 ? 'text-emerald-500' : 'text-muted-foreground'}
+                    trendLabel="متوسط"
                   />
                 </div>
 
