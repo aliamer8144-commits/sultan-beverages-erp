@@ -18,56 +18,11 @@ import { useApi } from '@/hooks/use-api'
 import { EmptyState } from '@/components/empty-state'
 import { StarRating } from '@/components/star-rating'
 import { formatShortDate } from '@/lib/date-utils'
+import type { Supplier, Product, PurchaseItem, SupplierPayment } from './purchases/types'
+import { PAYMENT_TERMS } from './purchases/types'
 
-// Types
-interface Supplier {
-  id: string
-  name: string
-  phone: string | null
-  phone2: string | null
-  address: string | null
-  website: string | null
-  paymentTerms: string
-  rating: number
-  ratingCount: number
-  notes: string | null
-  isActive: boolean
-  totalPurchases: number
-  totalPaid: number
-  remainingBalance: number
-}
+// Types imported from ./purchases/types
 
-interface Product {
-  id: string
-  name: string
-  costPrice: number
-  quantity: number
-  category: { id: string; name: string }
-}
-
-interface PurchaseItem {
-  productId: string
-  productName: string
-  quantity: number
-  costPrice: number
-}
-
-interface SupplierPayment {
-  id: string
-  supplierId: string
-  amount: number
-  method: string
-  notes: string | null
-  createdAt: string
-}
-
-// ── Payment Terms Labels ──
-const PAYMENT_TERMS = [
-  { value: 'نقدي', label: 'نقدي' },
-  { value: '30 يوم', label: '30 يوم' },
-  { value: '60 يوم', label: '60 يوم' },
-  { value: '90 يوم', label: '90 يوم' },
-]
 
 export function PurchasesScreen() {
   const { user } = useAppStore()

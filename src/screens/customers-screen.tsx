@@ -61,67 +61,10 @@ import {
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
-// ─── Types ──────────────────────────────────────────────────────
-interface Customer {
-  id: string
-  name: string
-  phone: string | null
-  debt: number
-  loyaltyPoints: number
-  isActive: boolean
-  category: string
-  notes: string | null
-  totalPurchases: number
-  visitCount: number
-  lastVisit: string | null
-}
-
-interface CustomerFormData {
-  name: string
-  phone: string
-  debt: string
-  category: string
-  notes: string
-}
-
-interface Payment {
-  id: string
-  customerId: string
-  amount: number
-  method: string
-  notes: string | null
-  createdAt: string
-}
-
-interface LoyaltyTransaction {
-  id: string
-  customerId: string
-  points: number
-  transactionType: string
-  description: string
-  createdAt: string
-}
-
-interface CustomerInvoice {
-  id: string
-  invoiceNo: string
-  type: string
-  totalAmount: number
-  discount: number
-  paidAmount: number
-  createdAt: string
-}
-
-// ─── Constants ──────────────────────────────────────────────────
-const CUSTOMER_CATEGORIES = [
-  { value: 'عادي', label: 'عادي', icon: Users, chipClass: 'chip-outline' },
-  { value: 'VIP', label: 'VIP', icon: Crown, chipClass: 'chip-warning' },
-  { value: 'موظف', label: 'موظف', icon: BadgeCheck, chipClass: 'chip-info' },
-  { value: 'تاجر', label: 'تاجر', icon: Store, chipClass: 'chip-primary' },
-]
-
-const emptyForm: CustomerFormData = { name: '', phone: '', debt: '0', category: 'عادي', notes: '' }
+import type { Customer, CustomerFormData, Payment, LoyaltyTransaction, CustomerInvoice } from './customers/types'
+import { CUSTOMER_CATEGORIES, emptyForm } from './customers/types'
 
 export function CustomersScreen() {
   const { formatCurrency, symbol } = useCurrency()

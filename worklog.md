@@ -718,6 +718,38 @@ Stage Summary:
 ---
 Task ID: 8b-1
 Agent: Sub-agent (audit-log + daily-close migration)
+---
+Task ID: 12b
+Agent: General-Purpose Agent
+Task: Extract types from remaining large screen files
+
+Work Log:
+- Created src/screens/purchases/types.ts — extracted Supplier, Product, PurchaseItem, SupplierPayment interfaces + PAYMENT_TERMS constant
+- Updated src/screens/purchases-screen.tsx — added import from ./purchases/types, removed inline type definitions
+- Created src/screens/settings/types.ts — extracted Customer, SalesTarget interfaces
+- Updated src/screens/settings-screen.tsx — added import from ./settings/types, removed inline type definitions
+- Created src/screens/expense/types.ts — extracted CategoryDef interface + EXPENSE_CATEGORIES, DATE_RANGE_OPTIONS, RECURRING_PERIODS constants + ExpenseItem, CategorySummary, DailyTrend, RecurringItem, ExpenseSummary, ExpenseFetchResponse interfaces
+- Updated src/screens/expense-screen.tsx — added imports from ./expense/types, removed 7 inline interfaces + 3 constants (~150 lines), removed unused LucideIcon type import and 6 unused lucide icon imports
+- Created src/screens/invoices/types.ts — extracted InvoiceItem, Invoice interfaces
+- Updated src/screens/invoices-screen.tsx — added import from ./invoices/types, removed inline type definitions
+- Created src/screens/stock-adjustments/types.ts — extracted StockAdjustmentItem, ProductItem, AdjustmentStats, StockAdjustmentsResponse interfaces + typeConfig constant
+- Updated src/screens/stock-adjustments-screen.tsx — added imports from ./stock-adjustments/types, removed inline type definitions + typeConfig (~95 lines), removed 3 unused lucide icon imports (ShoppingCart, Truck, RotateCcw)
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit) — checked after each screen extraction
+- ESLint: 0 errors (bun run lint)
+
+Stage Summary:
+- 5 new type files created (purchases/types.ts, settings/types.ts, expense/types.ts, invoices/types.ts, stock-adjustments/types.ts)
+- 5 screen files updated with imports from their respective type files
+- ~250+ lines of type definitions and constants moved to dedicated files
+- No functions or components were extracted — only interfaces, type aliases, and type constants
+- All screen subdirectories now follow the same pattern established by inventory/types.ts, pos/types.ts, customers/types.ts
+
+---
+
+Task ID: 8b-1
+Agent: Sub-agent (audit-log + daily-close migration)
 Task: Migrate audit-log-screen.tsx and daily-close-screen.tsx to use useApi hook
 
 Work Log:
@@ -1123,3 +1155,44 @@ Stage Summary:
 - expense-screen.tsx: Removed redundant JSX props that duplicated hook-managed values
 - All 3 remaining custom confirm dialogs now use shared ConfirmDialog consistently
 - Zero remaining inline Dialog-based confirmations across all screens
+
+---
+Task ID: 10a
+Agent: Main Agent
+Task: Phase 10a — POS Screen Refactoring (extract types and dialog components)
+
+Work Log:
+- Created src/screens/pos/ directory
+- Created src/screens/pos/types.ts (58 lines) — Extracted 6 interfaces: Product, Category, Customer, ProductVariant, LastInvoice, SalesTargetCompact
+- Created src/screens/pos/payment-dialog.tsx (343 lines) — Payment dialog with full/split payment tabs, receipt number preview, change calculation
+- Created src/screens/pos/loyalty-redeem-dialog.tsx (156 lines) — Loyalty points redemption dialog with customer info, quick points buttons, discount preview
+- Created src/screens/pos/custom-discount-dialog.tsx (132 lines) — Custom discount dialog with percent/amount tabs and discount preview
+- Created src/screens/pos/hold-order-dialog.tsx (99 lines) — Hold order dialog with product count, total summary, and note suggestions
+- Created src/screens/pos/product-quick-view-dialog.tsx (139 lines) — Product quick view with image, price/stock info, and quantity selector
+- Created src/screens/pos/variant-selector-dialog.tsx (98 lines) — Variant selector dialog with scrollable list of product variants
+- Updated src/screens/pos-screen.tsx:
+  - Replaced inline type definitions (59 lines) with imports from ./pos/types
+  - Replaced inline Payment Dialog (~270 lines) with <PaymentDialog /> component call (~30 lines)
+  - Replaced inline Loyalty Redeem Dialog (~115 lines) with <LoyaltyRedeemDialog /> component call (~15 lines)
+  - Replaced inline Clear Cart Confirmation Dialog (~38 lines) with shared <ConfirmDialog /> from @/components/confirm-dialog
+  - Replaced inline Product Quick View Dialog (~106 lines) with <ProductQuickViewDialog /> component call (~15 lines)
+  - Replaced inline Variant Selector Dialog (~69 lines) with <VariantSelectorDialog /> component call (~15 lines)
+  - Replaced inline Hold Order Dialog (~69 lines) with <HoldOrderDialog /> component call (~15 lines)
+  - Replaced inline Delete Held Order Confirmation Dialog (~38 lines) with shared <ConfirmDialog />
+  - Replaced inline Custom Discount Dialog (~95 lines) with <CustomDiscountDialog /> component call (~15 lines)
+  - Cleaned up unused imports: removed Dialog, Tabs, Label, Printer, CupSoda, Zap, Banknote, ReceiptText, Percent, peekNextReceiptNumber
+  - Removed unused isDualActive destructuring and Zap import
+  - Fixed TypeScript: selectedCustomer null-coalescing (?? null), renamed shadowed subtotal variable
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- ESLint: 0 errors (bun run lint)
+- pos-screen.tsx reduced from 2209 → 1440 lines (769 lines removed, ~35% reduction)
+- Total extracted code: 1025 lines across 6 dialog files + 58 lines types
+- All existing functionality preserved — zero behavior changes
+
+Stage Summary:
+- Phase 10a complete: 7 new files created in src/screens/pos/
+- pos-screen.tsx reduced by ~35% (2209 → 1440 lines)
+- 2 inline AlertDialogs replaced with shared ConfirmDialog component
+- All TypeScript and ESLint checks pass with zero errors

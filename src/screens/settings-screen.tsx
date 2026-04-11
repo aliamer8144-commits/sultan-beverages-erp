@@ -52,35 +52,12 @@ import {
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { formatShortDate } from '@/lib/date-utils'
+import type { Customer, SalesTarget } from './settings/types'
 
 // ─── Hydration-safe mounted hook ─────────────────────────────────
 const emptySubscribe = () => () => {}
 function useHasMounted() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
-// ─── Customer type for default customer select ─────────────────────
-interface Customer {
-  id: string
-  name: string
-  phone: string
-}
-
-// ─── Sales Target type ──────────────────────────────────────────
-interface SalesTarget {
-  id: string
-  type: string
-  targetAmount: number
-  startDate: string
-  endDate: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-  currentAmount: number
-  progressPercent: number
-  remainingAmount: number
-  daysRemaining: number
-  hoursRemaining: number
 }
 
 // ─── SettingsCard Component ───────────────────────────────────────

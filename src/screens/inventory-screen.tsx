@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,32 +19,32 @@ import { Calendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
 import {
   Search, Plus, Pencil, Trash2, AlertTriangle, Package, Filter, Loader2,
-  PackageX, ImagePlus, X, History, PackagePlus, Download, ChevronLeft,
+  PackageX, X, History, PackagePlus, Download, ChevronLeft,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
   ArrowLeft, CheckSquare, DollarSign, Tags, ListFilter,
-  Clock, Activity, Layers, Save, Upload,
+  Clock, Activity, Layers, Upload,
 } from 'lucide-react'
 import { CsvImportDialog } from '@/components/csv-import-dialog'
 import { useApi } from '@/hooks/use-api'
 import { useCurrency } from '@/hooks/use-currency'
-import { useAppStore } from '@/store/app-store'
-import { compressImage } from '@/lib/image-utils'
 import { exportToCSV } from '@/lib/export-csv'
-import { formatDateTime, formatShortDate, formatTime } from '@/lib/date-utils'
+import { formatDateTime, formatTime } from '@/lib/date-utils'
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 
-import type { Product, Category, ProductFormData, StockAdjustment, AdjustmentFormData, ProductVariant, VariantFormData } from './inventory/types'
-import { emptyForm, emptyAdjustmentForm, emptyVariantForm } from './inventory/types'
+import type { Product, Category, StockAdjustment } from './inventory/types'
 import { adjustmentTypeConfig, movementTypeConfig } from './inventory/constants'
+import { ProductFormDialog } from './inventory/product-form-dialog'
+import { StockAdjustmentDialog } from './inventory/stock-adjustment-dialog'
+import { ProductVariantsDialog } from './inventory/product-variants-dialog'
+import { CategoryManager } from './inventory/category-manager'
 
 export function InventoryScreen() {
   // API hook
-  const { get, post, put, patch, del, request } = useApi()
+  const { get, patch, del, request } = useApi()
 
   // Currency
   const { symbol, formatCurrency } = useCurrency()
-  const user = useAppStore((s) => s.user)
 
   // Data state
   const [products, setProducts] = useState<Product[]>([])
@@ -61,15 +61,10 @@ export function InventoryScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
-  const [form, setForm] = useState<ProductFormData>(emptyForm)
-  const [submitting, setSubmitting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Stock adjustment dialog state
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
   const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
-  const [adjustForm, setAdjustForm] = useState<AdjustmentFormData>(emptyAdjustmentForm)
-  const [adjustSubmitting, setAdjustSubmitting] = useState(false)
 
   // ─── Batch Operations State ──────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -114,104 +109,12 @@ export function InventoryScreen() {
   // ─── Variants Dialog State ────────────────────────────────────
   const [variantsOpen, setVariantsOpen] = useState(false)
   const [variantsProduct, setVariantsProduct] = useState<Product | null>(null)
-  const [variants, setVariants] = useState<ProductVariant[]>([])
-  const [variantsLoading, setVariantsLoading] = useState(false)
-  const [variantFormOpen, setVariantFormOpen] = useState(false)
-  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
-  const [variantForm, setVariantForm] = useState<VariantFormData>(emptyVariantForm)
-  const [variantSubmitting, setVariantSubmitting] = useState(false)
 
-  // ─── Variants Handlers ────────────────────────────────────────
-  const openVariantsDialog = useCallback(async (product: Product) => {
-    setVariantsProduct(product)
-    setVariantsOpen(true)
-    setVariantFormOpen(false)
-    setEditingVariant(null)
-    setVariantsLoading(true)
-    try {
-      const result = await get<ProductVariant[]>(
-        '/api/product-variants',
-        { productId: product.id },
-        { showErrorToast: false },
-      )
-      if (result) {
-        setVariants(result)
-      }
-    } catch {
-      // handled by useApi
-    } finally {
-      setVariantsLoading(false)
-    }
-  }, [get])
+  // ─── CSV Import State ────────────────────────────────────────
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
 
-  const openAddVariantDialog = () => {
-    setEditingVariant(null)
-    setVariantForm(emptyVariantForm)
-    setVariantFormOpen(true)
-  }
-
-  const openEditVariantDialog = (variant: ProductVariant) => {
-    setEditingVariant(variant)
-    setVariantForm({
-      name: variant.name,
-      sku: variant.sku || '',
-      barcode: variant.barcode || '',
-      costPrice: String(variant.costPrice),
-      sellPrice: String(variant.sellPrice),
-      stock: String(variant.stock),
-    })
-    setVariantFormOpen(true)
-  }
-
-  const handleVariantSubmit = async () => {
-    if (!variantsProduct) return
-    if (!variantForm.name.trim()) {
-      toast.error('يرجى إدخال اسم المتغير')
-      return
-    }
-
-    setVariantSubmitting(true)
-    try {
-      const payload = {
-        name: variantForm.name.trim(),
-        sku: variantForm.sku.trim() || null,
-        barcode: variantForm.barcode.trim() || null,
-        costPrice: Number(variantForm.costPrice) || 0,
-        sellPrice: Number(variantForm.sellPrice) || 0,
-        stock: Number(variantForm.stock) || 0,
-      }
-      let result: ProductVariant | null
-      if (editingVariant) {
-        result = await put<ProductVariant>(
-          `/api/product-variants?id=${editingVariant.id}`,
-          payload,
-          { showSuccessToast: true, successMessage: 'تم تحديث المتغير بنجاح' },
-        )
-      } else {
-        result = await post<ProductVariant>(
-          '/api/product-variants',
-          { productId: variantsProduct.id, ...payload },
-          { showSuccessToast: true, successMessage: 'تم إضافة المتغير بنجاح' },
-        )
-      }
-
-      if (!result) return
-
-      setVariantFormOpen(false)
-      openVariantsDialog(variantsProduct)
-    } catch {
-      // handled by useApi
-    } finally {
-      setVariantSubmitting(false)
-    }
-  }
-
-  const handleDeleteVariant = async (variantId: string) => {
-    const ok = await del(`/api/product-variants?id=${variantId}`)
-    if (ok && variantsProduct) {
-      openVariantsDialog(variantsProduct)
-    }
-  }
+  // ─── Category Management State ─────────────────────────────────
+  const [catMgmtOpen, setCatMgmtOpen] = useState(false)
 
   // ─── Per-product stock history fetch ─────────────────────────
   const fetchProductMovements = useCallback(async (productId: string) => {
@@ -229,28 +132,6 @@ export function InventoryScreen() {
       setProductMovementsLoading(false)
     }
   }, [get])
-
-
-
-  // Image upload handler with compression
-  const handleImageUpload = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('يرجى اختيار ملف صورة فقط')
-      return
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('حجم الصورة يجب أن يكون أقل من 2 ميجابايت')
-      return
-    }
-    try {
-      toast.loading('جاري ضغط الصورة...', { id: 'image-compress' })
-      const compressed = await compressImage(file, 400, 0.75)
-      setForm((prev) => ({ ...prev, image: compressed }))
-      toast.success('تم تحميل الصورة بنجاح', { id: 'image-compress' })
-    } catch {
-      toast.error('فشل في تحميل الصورة', { id: 'image-compress' })
-    }
-  }, [])
 
   // Fetch categories
   const fetchCategories = useCallback(async () => {
@@ -302,84 +183,20 @@ export function InventoryScreen() {
     setSearchTimer(timer)
   }
 
-  // Form handlers
+  // Form open handlers
   const openAddDialog = () => {
     setEditingProduct(null)
-    setForm(emptyForm)
     setFormOpen(true)
   }
 
   const openEditDialog = (product: Product) => {
     setEditingProduct(product)
-    setForm({
-      name: product.name,
-      categoryId: product.categoryId,
-      price: String(product.price),
-      costPrice: String(product.costPrice),
-      quantity: String(product.quantity),
-      minQuantity: String(product.minQuantity),
-      barcode: product.barcode || '',
-      image: product.image || '',
-    })
     setFormOpen(true)
   }
 
   const openDeleteDialog = (product: Product) => {
     setDeletingProduct(product)
     setDeleteOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      toast.error('يرجى إدخال اسم المنتج')
-      return
-    }
-    if (!form.categoryId) {
-      toast.error('يرجى اختيار التصنيف')
-      return
-    }
-    if (!form.price || Number(form.price) <= 0) {
-      toast.error('يرجى إدخال سعر البيع')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const payload = {
-        name: form.name.trim(),
-        categoryId: form.categoryId,
-        price: Number(form.price),
-        costPrice: Number(form.costPrice) || 0,
-        quantity: Number(form.quantity) || 0,
-        minQuantity: Number(form.minQuantity) || 5,
-        barcode: form.barcode.trim() || null,
-        image: form.image.trim() || null,
-      }
-
-      let result: Product | null
-      if (editingProduct) {
-        result = await put<Product>(
-          `/api/products/${editingProduct.id}`,
-          payload,
-          { showSuccessToast: true, successMessage: 'تم تحديث المنتج بنجاح' },
-        )
-      } else {
-        result = await post<Product>(
-          '/api/products',
-          payload,
-          { showSuccessToast: true, successMessage: 'تم إضافة المنتج بنجاح' },
-        )
-      }
-
-      if (!result) return
-
-      setFormOpen(false)
-      fetchProducts()
-    } catch {
-      // handled by useApi
-    } finally {
-      setSubmitting(false)
-    }
   }
 
   const handleDelete = async () => {
@@ -390,52 +207,6 @@ export function InventoryScreen() {
       setDeleteOpen(false)
       setDeletingProduct(null)
       fetchProducts()
-    }
-  }
-
-  // ─── Stock Adjustment Handlers ───────────────────────────────────
-  const openAdjustDialog = (product: Product) => {
-    setAdjustProduct(product)
-    setAdjustForm(emptyAdjustmentForm)
-    setAdjustDialogOpen(true)
-  }
-
-  const handleAdjustSubmit = async () => {
-    if (!adjustProduct) return
-    if (!adjustForm.quantity || Number(adjustForm.quantity) <= 0) {
-      toast.error('يرجى إدخال الكمية')
-      return
-    }
-    if (!adjustForm.reason.trim()) {
-      toast.error('يرجى إدخال سبب التعديل')
-      return
-    }
-
-    setAdjustSubmitting(true)
-    try {
-      const result = await post<StockAdjustment & { message?: string }>(
-        '/api/stock-adjustments',
-        {
-          productId: adjustProduct.id,
-          type: adjustForm.type,
-          quantity: Number(adjustForm.quantity),
-          reason: adjustForm.reason.trim(),
-          userId: user?.id || 'unknown',
-          userName: user?.name || null,
-          reference: adjustForm.reference.trim() || null,
-        },
-        { showSuccessToast: true, successMessage: 'تم تعديل المخزون بنجاح' },
-      )
-      if (!result) return
-
-      setAdjustDialogOpen(false)
-      setAdjustProduct(null)
-      setAdjustForm(emptyAdjustmentForm)
-      fetchProducts()
-    } catch {
-      // handled by useApi
-    } finally {
-      setAdjustSubmitting(false)
     }
   }
 
@@ -651,77 +422,6 @@ export function InventoryScreen() {
       // handled by useApi
     } finally {
       setBatchSubmitting(false)
-    }
-  }
-
-  // ─── CSV Import State ────────────────────────────────────────
-  const [csvImportOpen, setCsvImportOpen] = useState(false)
-
-  // ─── Category Management State ─────────────────────────────────
-  const [catMgmtOpen, setCatMgmtOpen] = useState(false)
-  const [catFormOpen, setCatFormOpen] = useState(false)
-  const [editingCat, setEditingCat] = useState<Category | null>(null)
-  const [catName, setCatName] = useState('')
-  const [catSubmitting, setCatSubmitting] = useState(false)
-  const [catDeleteOpen, setCatDeleteOpen] = useState(false)
-  const [deletingCat, setDeletingCat] = useState<Category | null>(null)
-
-  // ─── Category Management Handlers ─────────────────────────────
-  const openAddCatDialog = () => {
-    setEditingCat(null)
-    setCatName('')
-    setCatFormOpen(true)
-  }
-
-  const openEditCatDialog = (cat: Category) => {
-    setEditingCat(cat)
-    setCatName(cat.name)
-    setCatFormOpen(true)
-  }
-
-  const handleCatSubmit = async () => {
-    if (!catName.trim()) {
-      toast.error('يرجى إدخال اسم التصنيف')
-      return
-    }
-
-    setCatSubmitting(true)
-    try {
-      if (editingCat) {
-        const result = await put<Category>(
-          `/api/categories/${editingCat.id}`,
-          { name: catName.trim(), icon: editingCat.icon },
-          { showSuccessToast: true, successMessage: 'تم تحديث التصنيف بنجاح' },
-        )
-        if (result) {
-          setCatFormOpen(false)
-          fetchCategories()
-        }
-      } else {
-        const result = await post<Category>(
-          '/api/categories',
-          { name: catName.trim() },
-          { showSuccessToast: true, successMessage: 'تم إضافة التصنيف بنجاح' },
-        )
-        if (result) {
-          setCatFormOpen(false)
-          fetchCategories()
-        }
-      }
-    } catch {
-      // handled by useApi
-    } finally {
-      setCatSubmitting(false)
-    }
-  }
-
-  const handleCatDelete = async () => {
-    if (!deletingCat) return
-    const ok = await del(`/api/categories/${deletingCat.id}`)
-    if (ok) {
-      setCatDeleteOpen(false)
-      setDeletingCat(null)
-      fetchCategories()
     }
   }
 
@@ -1080,7 +780,7 @@ export function InventoryScreen() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => openVariantsDialog(product)}
+                            onClick={() => { setVariantsProduct(product); setVariantsOpen(true) }}
                             className="h-8 w-8 p-0 hover:bg-violet-100 dark:hover:bg-violet-900/30 text-muted-foreground hover:text-violet-700 dark:hover:text-violet-400"
                             title="المتغيرات"
                           >
@@ -1091,7 +791,7 @@ export function InventoryScreen() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => openAdjustDialog(product)}
+                            onClick={() => { setAdjustProduct(product); setAdjustDialogOpen(true) }}
                             className="h-8 w-8 p-0 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-400"
                             title="تعديل المخزون"
                           >
@@ -1205,233 +905,14 @@ export function InventoryScreen() {
         </div>
       )}
 
-      {/* ─── Add/Edit Dialog ────────────────────────────────────── */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingProduct ? 'قم بتعديل بيانات المنتج' : 'أدخل بيانات المنتج الجديد'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="grid gap-4 py-2 glass-card rounded-xl p-4">
-              {/* Product Name */}
-              <div className="form-group">
-                <label htmlFor="product-name" className="form-label-enhanced">
-                  اسم المنتج <span className="required-asterisk">*</span>
-                </label>
-                <Input
-                  id="product-name"
-                  placeholder="مثال: بيبسي 330مل"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="h-10 rounded-lg"
-                  autoFocus
-                />
-              </div>
-
-              {/* Category */}
-              <div className="form-group">
-                <label className="form-label-enhanced">
-                  التصنيف <span className="required-asterisk">*</span>
-                </label>
-                <Select
-                  value={form.categoryId}
-                  onValueChange={(val) => setForm({ ...form, categoryId: val })}
-                >
-                  <SelectTrigger className="h-10 rounded-lg">
-                    <SelectValue placeholder="اختر التصنيف" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Price & Cost - side by side */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="form-group">
-                  <label htmlFor="cost-price" className="form-label-enhanced">
-                    سعر الشراء
-                  </label>
-                  <Input
-                    id="cost-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={form.costPrice}
-                    onChange={(e) => setForm({ ...form, costPrice: e.target.value })}
-                    className="h-10 rounded-lg text-left"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="sell-price" className="form-label-enhanced">
-                    سعر البيع <span className="required-asterisk">*</span>
-                  </label>
-                  <Input
-                    id="sell-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
-                    className="h-10 rounded-lg text-left"
-                  />
-                </div>
-              </div>
-
-              {/* Quantity & Min Quantity - side by side */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="quantity" className="text-sm font-medium">
-                    الكمية
-                  </Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={form.quantity}
-                    onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    className="h-10 rounded-lg text-left"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="min-quantity" className="text-sm font-medium">
-                    الحد الأدنى للمخزون
-                  </Label>
-                  <Input
-                    id="min-quantity"
-                    type="number"
-                    min="0"
-                    placeholder="5"
-                    value={form.minQuantity}
-                    onChange={(e) => setForm({ ...form, minQuantity: e.target.value })}
-                    className="h-10 rounded-lg text-left"
-                  />
-                </div>
-              </div>
-
-              {/* Barcode */}
-              <div className="space-y-2">
-                <Label htmlFor="barcode" className="text-sm font-medium">
-                  باركود <span className="text-muted-foreground text-xs">(اختياري)</span>
-                </Label>
-                <Input
-                  id="barcode"
-                  placeholder="أدخل رقم الباركود"
-                  value={form.barcode}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                  className="h-10 rounded-lg font-mono"
-                  dir="ltr"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  صورة المنتج <span className="text-muted-foreground text-xs">(اختياري)</span>
-                </Label>
-                <div
-                  onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleImageUpload(file) }}
-                  onDragOver={(e) => e.preventDefault()}
-                  className={`image-upload-zone relative rounded-xl border-2 border-dashed ${
-                    form.image
-                      ? 'border-primary/30 bg-primary/5'
-                      : 'border-border'
-                  }`}
-                >
-                  {form.image ? (
-                    <div className="relative p-3">
-                      <div className="product-image-lg w-full h-32 mx-auto">
-                        <img
-                          src={form.image}
-                          alt="صورة المنتج"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex justify-center mt-2">
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, image: '' })}
-                          className="image-remove-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          حذف الصورة
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors mr-2"
-                        >
-                          <ImagePlus className="w-3.5 h-3.5" />
-                          تغيير الصورة
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className="flex flex-col items-center justify-center py-8 cursor-pointer gap-2"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-muted/80 flex items-center justify-center">
-                        <ImagePlus className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                      <p className="text-xs text-muted-foreground text-center">
-                        <span className="font-medium text-primary">اضغط لاختيار صورة</span>
-                        {' '}
-                        أو اسحبها هنا
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/60">PNG, JPG, WEBP — حد أقصى 2 ميجابايت</p>
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleImageUpload(file)
-                      // Reset input so same file can be selected again
-                      e.target.value = ''
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-
-          <DialogFooter className="pt-4 border-t gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setFormOpen(false)}
-              disabled={submitting}
-              className="rounded-lg"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="gap-2 rounded-lg shadow-md shadow-primary/20"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingProduct ? 'تحديث المنتج' : 'إضافة المنتج'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ─── Extracted: Product Form Dialog ─────────────────────── */}
+      <ProductFormDialog
+        open={formOpen}
+        onOpenChange={(open) => { setFormOpen(open); if (!open) setEditingProduct(null) }}
+        editingProduct={editingProduct}
+        categories={categories}
+        onSaved={fetchProducts}
+      />
 
       {/* ─── Delete Confirmation Dialog ──────────────────────────── */}
       <ConfirmDialog
@@ -1444,167 +925,13 @@ export function InventoryScreen() {
         variant="destructive"
       />
 
-      {/* ─── Stock Adjustment Dialog ────────────────────────────── */}
-      <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                <PackagePlus className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
-              </div>
-              تعديل المخزون
-            </DialogTitle>
-            <DialogDescription>
-              قم بتعديل كمية المنتج في المخزون
-            </DialogDescription>
-          </DialogHeader>
-
-          {adjustProduct && (
-            <div className="space-y-5 mt-2">
-              {/* Product Info */}
-              <div className="glass-card rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  {adjustProduct.image ? (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={adjustProduct.image} alt={adjustProduct.name} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Package className="w-5 h-5 text-primary" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{adjustProduct.name}</p>
-                    <p className="text-xs text-muted-foreground">{adjustProduct.category.name}</p>
-                  </div>
-                  <div className="text-left flex-shrink-0">
-                    <p className="text-xs text-muted-foreground">المخزون الحالي</p>
-                    <p className={`text-lg font-bold tabular-nums ${adjustProduct.quantity <= adjustProduct.minQuantity ? 'text-destructive' : 'text-foreground'}`}>
-                      {adjustProduct.quantity}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Adjustment Type */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">نوع التعديل</Label>
-                <RadioGroup
-                  value={adjustForm.type}
-                  onValueChange={(val) => setAdjustForm({ ...adjustForm, type: val as AdjustmentFormData['type'] })}
-                  className="grid grid-cols-3 gap-2"
-                >
-                  {(['addition', 'subtraction', 'correction'] as const).map((type) => {
-                    const config = adjustmentTypeConfig[type]
-                    const Icon = config.icon
-                    return (
-                      <label
-                        key={type}
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                          adjustForm.type === type
-                            ? `${config.bgColor} ${config.color} border-current`
-                            : 'border-border hover:border-muted-foreground/30'
-                        }`}
-                      >
-                        <RadioGroupItem value={type} className="sr-only" />
-                        <Icon className="w-5 h-5" />
-                        <span className="text-xs font-semibold">{config.label}</span>
-                      </label>
-                    )
-                  })}
-                </RadioGroup>
-                {adjustForm.type === 'correction' && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <ArrowUpDown className="w-3 h-3" />
-                    عند اختيار التصحيح، سيتم تعيين الكمية المدخلة كرصيد جديد
-                  </p>
-                )}
-              </div>
-
-              {/* Quantity */}
-              <div className="space-y-2">
-                <Label htmlFor="adjust-qty" className="text-sm font-medium">
-                  الكمية <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="adjust-qty"
-                  type="number"
-                  min="1"
-                  placeholder={adjustForm.type === 'correction' ? 'الكمية الجديدة المطلوبة' : 'عدد الوحدات'}
-                  value={adjustForm.quantity}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
-                  className="h-10 rounded-lg text-left tabular-nums"
-                  dir="ltr"
-                />
-                {/* Preview */}
-                {adjustForm.quantity && Number(adjustForm.quantity) > 0 && (
-                  <div className="flex items-center justify-center gap-2 p-2 rounded-lg bg-muted/50 text-xs">
-                    <span className="text-muted-foreground">النتيجة:</span>
-                    <span className="font-semibold tabular-nums">{adjustProduct.quantity}</span>
-                    <ArrowLeft className="w-3 h-3 text-muted-foreground" />
-                    <span className="font-bold tabular-nums text-primary">
-                      {adjustForm.type === 'addition'
-                        ? adjustProduct.quantity + Number(adjustForm.quantity)
-                        : adjustForm.type === 'subtraction'
-                          ? Math.max(0, adjustProduct.quantity - Number(adjustForm.quantity))
-                          : Number(adjustForm.quantity)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Reason */}
-              <div className="space-y-2">
-                <Label htmlFor="adjust-reason" className="text-sm font-medium">
-                  سبب التعديل <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="adjust-reason"
-                  placeholder="مثال: تزويد مخزون جديد، تالف، جرد..."
-                  value={adjustForm.reason}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
-                  className="h-10 rounded-lg"
-                />
-              </div>
-
-              {/* Reference */}
-              <div className="space-y-2">
-                <Label htmlFor="adjust-ref" className="text-sm font-medium">
-                  رقم المرجع <span className="text-muted-foreground text-xs">(اختياري)</span>
-                </Label>
-                <Input
-                  id="adjust-ref"
-                  placeholder="مثال: رقم فاتورة الشراء"
-                  value={adjustForm.reference}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, reference: e.target.value })}
-                  className="h-10 rounded-lg"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="pt-4 border-t gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setAdjustDialogOpen(false)}
-              disabled={adjustSubmitting}
-              className="rounded-lg"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleAdjustSubmit}
-              disabled={adjustSubmitting || !adjustProduct}
-              className="gap-2 rounded-lg shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {adjustSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              <PackagePlus className="w-4 h-4" />
-              تطبيق التعديل
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ─── Extracted: Stock Adjustment Dialog ──────────────────── */}
+      <StockAdjustmentDialog
+        open={adjustDialogOpen}
+        onOpenChange={(open) => { setAdjustDialogOpen(open); if (!open) setAdjustProduct(null) }}
+        product={adjustProduct}
+        onSaved={fetchProducts}
+      />
 
       {/* ─── Stock History Dialog ────────────────────────────────── */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -2104,378 +1431,19 @@ export function InventoryScreen() {
         loading={batchSubmitting}
       />
 
-      {/* ─── Product Variants Dialog ────────────────────────────── */}
-      <Dialog open={variantsOpen} onOpenChange={(open) => { setVariantsOpen(open); if (!open) { setVariantFormOpen(false); setEditingVariant(null) } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <Layers className="w-5 h-5 text-violet-700 dark:text-violet-400" />
-              </div>
-              متغيرات المنتج
-            </DialogTitle>
-            <DialogDescription>
-              {variantsProduct?.name} — إدارة الأحجام والنكهات والتعبئات
-            </DialogDescription>
-          </DialogHeader>
+      {/* ─── Extracted: Product Variants Dialog ──────────────────── */}
+      <ProductVariantsDialog
+        open={variantsOpen}
+        onOpenChange={(open) => { setVariantsOpen(open); if (!open) setVariantsProduct(null) }}
+        product={variantsProduct}
+      />
 
-          {variantsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-            </div>
-          ) : (
-            <>
-              {/* Variants list */}
-              {variants.length === 0 && !variantFormOpen ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <Layers className="w-12 h-12 opacity-20 mb-3" />
-                  <p className="text-sm font-medium">لا توجد متغيرات</p>
-                  <p className="text-xs mt-1">أضف متغيراً جديداً لتحديد الأحجام أو النكهات</p>
-                </div>
-              ) : (
-                <ScrollArea className="flex-1 max-h-[40vh]">
-                  <div className="space-y-2 p-1">
-                    {variants.map((variant) => (
-                      <div
-                        key={variant.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                          variant.isActive
-                            ? 'bg-card hover:bg-muted/50'
-                            : 'bg-muted/30 opacity-60'
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0 grid grid-cols-5 gap-3">
-                          {/* Name */}
-                          <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground mb-0.5">الاسم</p>
-                            <p className="text-sm font-semibold text-foreground truncate">{variant.name}</p>
-                          </div>
-                          {/* SKU */}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">SKU</p>
-                            <p className="text-xs font-mono text-foreground">{variant.sku || '—'}</p>
-                          </div>
-                          {/* Cost Price */}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">التكلفة</p>
-                            <p className="text-xs text-muted-foreground tabular-nums">{variant.costPrice.toLocaleString('ar-SA')} {symbol}</p>
-                          </div>
-                          {/* Sell Price */}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">البيع</p>
-                            <p className="text-xs font-semibold text-foreground tabular-nums">{variant.sellPrice.toLocaleString('ar-SA')} {symbol}</p>
-                          </div>
-                          {/* Stock */}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">المخزون</p>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              variant.stock <= 0
-                                ? 'bg-destructive/10 text-destructive chip-danger'
-                                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 chip-success'
-                            }`}>
-                              {variant.stock <= 0 ? (
-                                <AlertTriangle className="w-2.5 h-2.5" />
-                              ) : null}
-                              {variant.stock}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditVariantDialog(variant)}
-                            className="h-7 w-7 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteVariant(variant.id)}
-                            className="h-7 w-7 p-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-
-              {/* Add/Edit variant form */}
-              {variantFormOpen && (
-                <div className="border-t pt-4 mt-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                      <Save className="w-3.5 h-3.5 text-violet-700 dark:text-violet-400" />
-                    </div>
-                    <p className="text-sm font-bold text-foreground">
-                      {editingVariant ? 'تعديل المتغير' : 'إضافة متغير جديد'}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div className="col-span-2 sm:col-span-1 space-y-1.5">
-                      <Label className="text-xs font-medium">اسم المتغير <span className="text-destructive">*</span></Label>
-                      <Input
-                        placeholder="مثال: صغير، كبير، نكهة مانجو"
-                        value={variantForm.name}
-                        onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
-                        className="h-9 rounded-lg text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">SKU</Label>
-                      <Input
-                        placeholder="رمز SKU"
-                        value={variantForm.sku}
-                        onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
-                        className="h-9 rounded-lg text-sm font-mono"
-                        dir="ltr"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">باركود</Label>
-                      <Input
-                        placeholder="باركود"
-                        value={variantForm.barcode}
-                        onChange={(e) => setVariantForm({ ...variantForm, barcode: e.target.value })}
-                        className="h-9 rounded-lg text-sm font-mono"
-                        dir="ltr"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">سعر التكلفة</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={variantForm.costPrice}
-                        onChange={(e) => setVariantForm({ ...variantForm, costPrice: e.target.value })}
-                        className="h-9 rounded-lg text-sm text-left tabular-nums"
-                        dir="ltr"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">سعر البيع</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={variantForm.sellPrice}
-                        onChange={(e) => setVariantForm({ ...variantForm, sellPrice: e.target.value })}
-                        className="h-9 rounded-lg text-sm text-left tabular-nums"
-                        dir="ltr"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">المخزون</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={variantForm.stock}
-                        onChange={(e) => setVariantForm({ ...variantForm, stock: e.target.value })}
-                        className="h-9 rounded-lg text-sm text-left tabular-nums"
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 mt-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setVariantFormOpen(false); setEditingVariant(null) }}
-                      className="text-xs rounded-lg"
-                    >
-                      إلغاء
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleVariantSubmit}
-                      disabled={variantSubmitting || !variantForm.name.trim()}
-                      className="gap-1.5 text-xs rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20"
-                    >
-                      {variantSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <Save className="w-3.5 h-3.5" />
-                      {editingVariant ? 'حفظ التعديلات' : 'إضافة المتغير'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Add variant button (when form not open) */}
-              {!variantFormOpen && (
-                <div className="border-t pt-3 mt-2">
-                  <Button
-                    variant="outline"
-                    onClick={openAddVariantDialog}
-                    className="gap-2 w-full rounded-lg border-dashed border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-800 dark:hover:text-violet-300"
-                  >
-                    <Plus className="w-4 h-4" />
-                    إضافة متغير
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Category Management Dialog ──────────────────────────── */}
-      <Dialog open={catMgmtOpen} onOpenChange={setCatMgmtOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Tags className="w-4 h-4 text-primary" />
-              </div>
-              إدارة التصنيفات
-            </DialogTitle>
-            <DialogDescription>
-              أضف أو عدّل أو احذف تصنيفات المنتجات
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto -mx-6 px-6">
-            <div className="space-y-2 py-2">
-              {categories.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
-                  <PackageX className="w-10 h-10 opacity-30" />
-                  <p className="text-sm">لا توجد تصنيفات</p>
-                  <p className="text-xs">أضف تصنيف جديد لتنظيم المنتجات</p>
-                </div>
-              ) : (
-                categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Package className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{cat.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {cat._count?.products || 0} منتج
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditCatDialog(cat)}
-                        className="h-8 w-8 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setDeletingCat(cat)
-                          setCatDeleteOpen(true)
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                        disabled={(cat._count?.products ?? 0) > 0}
-                        title={(cat._count?.products ?? 0) > 0 ? 'لا يمكن حذف تصنيف يحتوي على منتجات' : 'حذف التصنيف'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="mt-2 gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setCatMgmtOpen(false)}
-              className="rounded-lg"
-            >
-              إغلاق
-            </Button>
-            <Button
-              onClick={openAddCatDialog}
-              className="gap-2 rounded-lg shadow-md shadow-primary/20"
-            >
-              <Plus className="w-4 h-4" />
-              إضافة تصنيف
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Category Add/Edit Dialog ────────────────────────────── */}
-      <Dialog open={catFormOpen} onOpenChange={setCatFormOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {editingCat ? 'تعديل التصنيف' : 'إضافة تصنيف جديد'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingCat ? 'قم بتعديل اسم التصنيف' : 'أدخل اسم التصنيف الجديد'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="glass-card rounded-xl p-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cat-name" className="text-sm font-medium">
-                اسم التصنيف <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="cat-name"
-                placeholder="مثال: مشروبات غازية"
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-                className="h-10 rounded-lg"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCatSubmit()
-                }}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setCatFormOpen(false)}
-              disabled={catSubmitting}
-              className="rounded-lg"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleCatSubmit}
-              disabled={catSubmitting}
-              className="gap-2 rounded-lg shadow-md shadow-primary/20"
-            >
-              {catSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingCat ? 'حفظ التعديلات' : 'إضافة التصنيف'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Category Delete Confirmation Dialog ─────────────────── */}
-      <ConfirmDialog
-        open={catDeleteOpen}
-        onOpenChange={setCatDeleteOpen}
-        title="تأكيد حذف التصنيف"
-        description={`هل أنت متأكد من حذف التصنيف "${deletingCat?.name}"؟`}
-        onConfirm={handleCatDelete}
-        confirmText="حذف التصنيف"
-        variant="destructive"
+      {/* ─── Extracted: Category Manager ────────────────────────── */}
+      <CategoryManager
+        open={catMgmtOpen}
+        onOpenChange={setCatMgmtOpen}
+        categories={categories}
+        onUpdated={fetchCategories}
       />
 
       {/* ─── CSV Import Dialog ── */}

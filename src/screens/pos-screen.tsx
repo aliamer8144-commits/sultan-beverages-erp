@@ -8,24 +8,18 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Label } from '@/components/ui/label'
 import {
   Search,
   Plus,
   Minus,
   Trash2,
   CreditCard,
-  Printer,
   ShoppingCart,
   X,
-  CupSoda,
   ScanBarcode,
   RotateCcw,
   FileText,
-  Zap,
   Package,
   Calculator,
   PauseCircle,
@@ -33,78 +27,24 @@ import {
   Play,
   Target,
   Star,
-  Banknote,
-  ReceiptText,
-  Percent,
 } from 'lucide-react'
 import { getCategoryIcon, getCategoryColor } from '@/lib/category-utils'
-import { getNextReceiptNumber, peekNextReceiptNumber } from '@/lib/receipt-utils'
+import { getNextReceiptNumber } from '@/lib/receipt-utils'
 import { getRelativeTime, formatShortDate } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
 import { EmptyState } from '@/components/empty-state'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Product {
-  id: string
-  name: string
-  price: number
-  costPrice: number
-  quantity: number
-  minQuantity: number
-  categoryId: string
-  category: { id: string; name: string; icon: string }
-  image?: string
-  barcode?: string
-  isActive: boolean
-  _count?: { variants: number }
-}
-
-interface Category {
-  id: string
-  name: string
-  icon: string
-  _count?: { products: number }
-}
-
-interface Customer {
-  id: string
-  name: string
-  phone?: string
-  debt: number
-  loyaltyPoints?: number
-}
-
-interface ProductVariant {
-  id: string
-  productId: string
-  name: string
-  sku?: string
-  barcode?: string
-  costPrice: number
-  sellPrice: number
-  stock: number
-  isActive: boolean
-}
-
-interface LastInvoice {
-  id: string
-  invoiceNo: string
-  totalAmount: number
-  createdAt: string
-  customer: { name: string } | null
-}
-
-// ─── Sales Target compact data ─────────────────────────────────
-interface SalesTargetCompact {
-  progressPercent: number
-  targetAmount: number
-  currentAmount: number
-  type: string
-}
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import type { CartItem } from '@/types'
+import type { Product, Category, Customer, ProductVariant, LastInvoice, SalesTargetCompact } from './pos/types'
+import { PaymentDialog } from './pos/payment-dialog'
+import { LoyaltyRedeemDialog } from './pos/loyalty-redeem-dialog'
+import { CustomDiscountDialog } from './pos/custom-discount-dialog'
+import { HoldOrderDialog } from './pos/hold-order-dialog'
+import { ProductQuickViewDialog } from './pos/product-quick-view-dialog'
+import { VariantSelectorDialog } from './pos/variant-selector-dialog'
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -127,7 +67,7 @@ export function POSScreen() {
     recallOrder,
     deleteHeldOrder,
   } = useAppStore()
-  const { symbol, formatDual, isDualActive } = useCurrency()
+  const { symbol, formatDual } = useCurrency()
 
   // ── Data state ──
   const [products, setProducts] = useState<Product[]>([])
@@ -151,7 +91,7 @@ export function POSScreen() {
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
 
   // ── Compute selected customer ──
-  const selectedCustomer = cartCustomerId ? customers.find((c) => c.id === cartCustomerId) : null
+  const selectedCustomer = cartCustomerId ? (customers.find((c) => c.id === cartCustomerId) ?? null) : null
   const customerPoints = selectedCustomer?.loyaltyPoints || 0
   const loyaltySettings = settings
   const isLoyaltyActive = loyaltySettings.loyaltyEnabled && !!cartCustomerId && customerPoints >= (loyaltySettings.loyaltyMinPointsToRedeem || 0)
@@ -343,14 +283,11 @@ export function POSScreen() {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const effectiveTotal = Math.max(0, cartTotal() - loyaltyDiscount)
   const grandTotal = effectiveTotal
-  const change = parseFloat(paidAmount) - grandTotal
 
-  // ── Split payment computed values ──
+  // ── Split payment computed values (needed for handleConfirmPayment) ──
   const splitCashNum = parseFloat(splitCash) || 0
   const splitCardNum = parseFloat(splitCard) || 0
-  const splitTotal = splitCashNum + splitCardNum
-  const splitRemaining = Math.max(0, grandTotal - splitTotal)
-  const isSplitValid = splitTotal >= grandTotal && splitCashNum >= 0 && splitCardNum >= 0
+  const isSplitValid = (splitCashNum + splitCardNum) >= grandTotal && splitCashNum >= 0 && splitCardNum >= 0
 
   // ── Payment ──
   const handleOpenPayment = useCallback(() => {
@@ -389,14 +326,12 @@ export function POSScreen() {
 
     // Compute the actual paid amount based on payment mode
     let paid: number
-    let paymentMethod: string = 'cash'
     if (paymentTab === 'split') {
       if (!isSplitValid) {
         toast.error('المبلغ غير كافٍ لتغطية الإجمالي')
         return
       }
       paid = splitCashNum + splitCardNum
-      paymentMethod = 'split'
     } else {
       paid = parseFloat(paidAmount)
       if (isNaN(paid) || paid < 0) {
@@ -685,8 +620,8 @@ export function POSScreen() {
 
   // ── Compute held order total ──
   const getHeldOrderTotal = useCallback((order: typeof heldOrders[number]) => {
-    const subtotal = order.cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    return Math.max(0, subtotal - order.discount)
+    const orderSubtotal = order.cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    return Math.max(0, orderSubtotal - order.discount)
   }, [])
 
   // ── Get customer name from held order ──
@@ -1292,7 +1227,6 @@ export function POSScreen() {
                     onClick={handleOpenCustomDiscount}
                     className="px-2 py-1 rounded-md text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-150 flex items-center gap-0.5"
                   >
-                    <Percent className="w-2.5 h-2.5" />
                     مخصص
                   </button>
                 </div>
@@ -1396,814 +1330,111 @@ export function POSScreen() {
         }}
       />
 
-      {/* ── Payment Dialog ── */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="sm:max-w-lg animated-border-gradient dialog-slide-up" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-primary" />
-              </div>
-              تأكيد الدفع
-            </DialogTitle>
-          </DialogHeader>
+      {/* ── Extracted Dialog Components ── */}
 
-          <div className="space-y-4 py-2">
-            {/* Receipt number */}
-            <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-4 py-2.5">
-              <ReceiptText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">رقم الفاتورة:</span>
-              <span className="text-sm font-bold font-mono text-primary">{peekNextReceiptNumber()}</span>
-            </div>
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        subtotal={subtotal}
+        cartDiscount={cartDiscount}
+        loyaltyDiscount={loyaltyDiscount}
+        grandTotal={grandTotal}
+        cart={cart}
+        paymentTab={paymentTab}
+        paidAmount={paidAmount}
+        processingPayment={processingPayment}
+        setPaymentTab={setPaymentTab}
+        setPaidAmount={setPaidAmount}
+        splitCash={splitCash}
+        splitCard={splitCard}
+        setSplitCash={setSplitCash}
+        setSplitCard={setSplitCard}
+        onConfirmPayment={handleConfirmPayment}
+        symbol={symbol}
+        formatDual={formatDual}
+      />
 
-            {/* Summary */}
-            <div className="rounded-xl bg-muted/40 p-4 space-y-2.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">المجموع الفرعي</span>
-                <span className="font-medium tabular-nums">{formatDual(subtotal).display}</span>
-              </div>
-              {cartDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">الخصم</span>
-                  <span className="font-medium text-destructive tabular-nums">-{formatDual(cartDiscount).display}</span>
-                </div>
-              )}
-              {loyaltyDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500" />
-                    خصم النقاط
-                  </span>
-                  <span className="font-medium text-amber-600 tabular-nums">-{formatDual(loyaltyDiscount).display}</span>
-                </div>
-              )}
-              <Separator />
-              <div className="flex justify-between items-center">
-                <span className="font-bold">الإجمالي المطلوب</span>
-                <span className="text-lg font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
-              </div>
-            </div>
+      <LoyaltyRedeemDialog
+        open={loyaltyRedeemDialogOpen}
+        onOpenChange={setLoyaltyRedeemDialogOpen}
+        selectedCustomer={selectedCustomer}
+        customerPoints={customerPoints}
+        redeemPoints={redeemPoints}
+        setRedeemPoints={setRedeemPoints}
+        redeemingPoints={redeemingPoints}
+        loyaltySettings={loyaltySettings}
+        onConfirmRedeem={handleConfirmLoyaltyRedeem}
+        formatDual={formatDual}
+        symbol={symbol}
+      />
 
-            {/* Items count */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ShoppingCart className="w-4 h-4" />
-              <span>
-                {cart.reduce((s, i) => s + i.quantity, 0)} منتج — {cart.length} صنف
-              </span>
-            </div>
+      <ConfirmDialog
+        open={clearCartDialogOpen}
+        onOpenChange={setClearCartDialogOpen}
+        title="إلغاء العملية"
+        description={`سيتم مسح جميع المنتجات من السلة (${cart.reduce((s, i) => s + i.quantity, 0)} منتج)`}
+        onConfirm={confirmClearCart}
+        confirmText="إلغاء العملية"
+        cancelText="تراجع"
+        variant="destructive"
+      />
 
-            {/* Payment method tabs */}
-            <Tabs value={paymentTab} onValueChange={(v) => setPaymentTab(v as 'full' | 'split')} className="w-full">
-              <TabsList className="w-full h-10">
-                <TabsTrigger value="full" className="flex-1 gap-1.5 text-xs">
-                  <Banknote className="w-3.5 h-3.5" />
-                  دفع كامل
-                </TabsTrigger>
-                <TabsTrigger value="split" className="flex-1 gap-1.5 text-xs">
-                  <CreditCard className="w-3.5 h-3.5" />
-                  دفع مجزأ
-                </TabsTrigger>
-              </TabsList>
+      <ProductQuickViewDialog
+        open={!!quickViewProduct}
+        onOpenChange={(open) => !open && setQuickViewProduct(null)}
+        product={quickViewProduct}
+        quickViewQuantity={quickViewQuantity}
+        setQuickViewQuantity={setQuickViewQuantity}
+        onAddToCart={handleQuickViewAdd}
+        formatDual={formatDual}
+        getCategoryIcon={getCategoryIcon}
+        getCategoryColor={getCategoryColor}
+      />
 
-              {/* Full payment tab */}
-              <TabsContent value="full" className="space-y-4 mt-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">المبلغ المدفوع</Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={paidAmount}
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
-                      autoFocus
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
-                  </div>
-                </div>
+      <VariantSelectorDialog
+        open={variantSelectorOpen}
+        onOpenChange={(open) => { setVariantSelectorOpen(open); if (!open) { setVariantSelectorProduct(null); setVariantSelectorVariants([]) } }}
+        product={variantSelectorProduct}
+        variants={variantSelectorVariants}
+        loading={variantSelectorLoading}
+        onSelectVariant={handleVariantSelect}
+        formatDual={formatDual}
+      />
 
-                {/* Quick amount buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  {[10, 20, 50, 100, 200, 500].map((amt) => (
-                    <button
-                      key={amt}
-                      onClick={() => setPaidAmount(amt.toString())}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                        parseFloat(paidAmount) === amt
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {amt}
-                    </button>
-                  ))}
-                </div>
+      <HoldOrderDialog
+        open={holdDialogOpen}
+        onOpenChange={setHoldDialogOpen}
+        holdNote={holdNote}
+        setHoldNote={setHoldNote}
+        grandTotal={grandTotal}
+        formatDual={formatDual}
+        cartItemCount={cart.reduce((s, i) => s + i.quantity, 0)}
+        onConfirmHold={confirmHoldOrder}
+      />
 
-                {/* Change / insufficient */}
-                {paidAmount && parseFloat(paidAmount) >= grandTotal && (
-                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-emerald-700">الباقي</span>
-                    <span className="text-lg font-bold text-emerald-600 tabular-nums">
-                      {change.toFixed(2)} {symbol}
-                    </span>
-                  </div>
-                )}
-                {paidAmount && parseFloat(paidAmount) < grandTotal && parseFloat(paidAmount) > 0 && (
-                  <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-destructive">المبلغ غير كافٍ</span>
-                    <span className="text-lg font-bold text-destructive tabular-nums">
-                      {(grandTotal - parseFloat(paidAmount)).toFixed(2)} {symbol} متبقي
-                    </span>
-                  </div>
-                )}
-              </TabsContent>
+      <ConfirmDialog
+        open={!!deleteHeldOrderId}
+        onOpenChange={(open) => !open && setDeleteHeldOrderId(null)}
+        title="حذف الطلب المجمّد"
+        description="هل أنت متأكد من حذف هذا الطلب المجمّد؟ لا يمكن التراجع عن هذا الإجراء"
+        onConfirm={confirmDeleteHeldOrder}
+        confirmText="حذف"
+        cancelText="تراجع"
+        variant="destructive"
+      />
 
-              {/* Split payment tab */}
-              <TabsContent value="split" className="space-y-4 mt-4">
-                {/* Cash input */}
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium flex items-center gap-1.5">
-                    <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-                    المبلغ النقدي
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={splitCash}
-                      onChange={(e) => setSplitCash(e.target.value)}
-                      placeholder="0.00"
-                      className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
-                      autoFocus
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {[10, 20, 50, 100, 200, 500].filter(a => a <= grandTotal).map((amt) => (
-                      <button
-                        key={`cash-${amt}`}
-                        onClick={() => setSplitCash(amt.toString())}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all duration-150 ${
-                          splitCashNum === amt
-                            ? 'bg-emerald-500 text-white shadow-sm'
-                            : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
-                        }`}
-                      >
-                        {amt}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setSplitCash(grandTotal.toString())}
-                      className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-150"
-                    >
-                      الكامل
-                    </button>
-                  </div>
-                </div>
-
-                {/* Card input */}
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                    المبلغ بالبطاقة
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={splitCard}
-                      onChange={(e) => setSplitCard(e.target.value)}
-                      placeholder="0.00"
-                      className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
-                  </div>
-                  <button
-                    onClick={() => setSplitCard(splitRemaining.toFixed(2))}
-                    className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-all duration-150"
-                  >
-                    المتبقي ({splitRemaining.toFixed(2)})
-                  </button>
-                </div>
-
-                {/* Split summary */}
-                <div className="rounded-xl bg-muted/40 p-3 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">نقدي + بطاقة</span>
-                    <span className="font-medium tabular-nums">
-                      {splitCashNum.toFixed(2)} + {splitCardNum.toFixed(2)} = {splitTotal.toFixed(2)} {symbol}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">المتبقي</span>
-                    <span className={`font-bold tabular-nums ${splitRemaining > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                      {splitRemaining.toFixed(2)} {symbol}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Cash change */}
-                {splitCashNum > 0 && grandTotal > splitCardNum && (
-                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-emerald-700">الباقي (نقدي)</span>
-                    <span className="text-lg font-bold text-emerald-600 tabular-nums">
-                      {Math.max(0, splitCashNum - (grandTotal - splitCardNum)).toFixed(2)} {symbol}
-                    </span>
-                  </div>
-                )}
-
-                {/* Validation messages */}
-                {splitTotal > 0 && splitTotal < grandTotal && (
-                  <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-destructive">المبلغ غير كافٍ</span>
-                    <span className="text-base font-bold text-destructive tabular-nums">
-                      {splitRemaining.toFixed(2)} {symbol} متبقي
-                    </span>
-                  </div>
-                )}
-                {isSplitValid && (
-                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
-                    <span className="text-sm font-medium text-emerald-700">المبلغ مكتمل ✓</span>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setPaymentDialogOpen(false)}
-              className="flex-1 h-11 rounded-xl"
-              disabled={processingPayment}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleConfirmPayment}
-              disabled={
-                processingPayment ||
-                (paymentTab === 'full' ? (!paidAmount || parseFloat(paidAmount) < grandTotal) : !isSplitValid)
-              }
-              className="flex-1 h-11 rounded-xl gap-2 shadow-lg shadow-primary/25"
-            >
-              {processingPayment ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>جاري المعالجة...</span>
-                </>
-              ) : (
-                <>
-                  <Printer className="w-4 h-4" />
-                  <span>تأكيد الدفع</span>
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Loyalty Redeem Dialog ── */}
-      <Dialog open={loyaltyRedeemDialogOpen} onOpenChange={setLoyaltyRedeemDialogOpen}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <Star className="w-5 h-5 text-amber-500" />
-              </div>
-              استبدال النقاط
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Customer info */}
-            {selectedCustomer && (
-              <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold">{selectedCustomer.name}</p>
-                  <p className="text-[10px] text-muted-foreground">رصيد النقاط</p>
-                </div>
-                <div className="text-left">
-                  <p className="text-xl font-bold text-amber-600 tabular-nums">{customerPoints}</p>
-                  <p className="text-[10px] text-muted-foreground">نقطة</p>
-                </div>
-              </div>
-            )}
-
-            {/* Points input */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">عدد النقاط للاستبدال</label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  min={loyaltySettings.loyaltyMinPointsToRedeem || 0}
-                  max={customerPoints}
-                  value={redeemPoints}
-                  onChange={(e) => setRedeemPoints(e.target.value)}
-                  placeholder="0"
-                  className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
-                  autoFocus
-                />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">نقطة</span>
-              </div>
-              {redeemPoints && parseInt(redeemPoints) > customerPoints && (
-                <p className="text-[11px] text-destructive">النقاط المطلوبة أكبر من المتاح ({customerPoints})</p>
-              )}
-            </div>
-
-            {/* Quick points buttons */}
-            <div className="flex gap-2 flex-wrap">
-              {(() => {
-                const minPts = loyaltySettings.loyaltyMinPointsToRedeem || 100
-                const quarterPts = Math.floor(customerPoints / 4)
-                const halfPts = Math.floor(customerPoints / 2)
-                const buttons: Array<{ label: string; value: number }> = []
-                if (quarterPts >= minPts) buttons.push({ label: `١/٤ (${quarterPts})`, value: quarterPts })
-                if (halfPts >= minPts) buttons.push({ label: `نصف (${halfPts})`, value: halfPts })
-                buttons.push({ label: `الكل (${customerPoints})`, value: customerPoints })
-                return buttons.map((btn) => (
-                  <button
-                    key={btn.value}
-                    onClick={() => setRedeemPoints(String(btn.value))}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                      parseInt(redeemPoints) === btn.value
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                    }`}
-                  >
-                    {btn.label}
-                  </button>
-                ))
-              })()}
-            </div>
-
-            {/* Discount preview */}
-            {redeemPoints && parseInt(redeemPoints) > 0 && parseInt(redeemPoints) <= customerPoints && (
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">قيمة الخصم</p>
-                <p className="text-lg font-bold text-emerald-600 tabular-nums">
-                  {formatDual(parseInt(redeemPoints) * (loyaltySettings.loyaltyRedemptionValue || 0)).display}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {redeemPoints} نقطة × {loyaltySettings.loyaltyRedemptionValue || 0} {symbol} = {formatDual(parseInt(redeemPoints) * (loyaltySettings.loyaltyRedemptionValue || 0)).display}
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setLoyaltyRedeemDialogOpen(false)}
-              className="flex-1 h-10 rounded-xl"
-              disabled={redeemingPoints}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleConfirmLoyaltyRedeem}
-              disabled={redeemingPoints || !redeemPoints || parseInt(redeemPoints) <= 0 || parseInt(redeemPoints) > customerPoints}
-              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-amber-500/25 bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              {redeemingPoints ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>جاري المعالجة...</span>
-                </>
-              ) : (
-                <>
-                  <Star className="w-4 h-4" />
-                  <span>تأكيد الاستبدال</span>
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Clear Cart Confirmation Dialog ── */}
-      <Dialog open={clearCartDialogOpen} onOpenChange={setClearCartDialogOpen}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <RotateCcw className="w-5 h-5 text-destructive" />
-              </div>
-              إلغاء العملية
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-2 text-center">
-            <p className="text-sm text-muted-foreground">
-              هل أنت متأكد من إلغاء العملية الحالية؟
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              سيتم مسح جميع المنتجات من السلة ({cart.reduce((s, i) => s + i.quantity, 0)} منتج)
-            </p>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setClearCartDialogOpen(false)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              تراجع
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmClearCart}
-              className="flex-1 h-10 rounded-xl gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              إلغاء العملية
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Product Quick View Dialog (Feature 3) ── */}
-      <Dialog open={!!quickViewProduct} onOpenChange={(open) => !open && setQuickViewProduct(null)}>
-        <DialogContent className="sm:max-w-xs" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-right text-base">
-              تفاصيل المنتج
-            </DialogTitle>
-          </DialogHeader>
-          {quickViewProduct && (
-            <div className="space-y-4">
-              {/* Product image */}
-              {(() => {
-                const colors = getCategoryColor(quickViewProduct.categoryId)
-                return quickViewProduct.image ? (
-                  <div className="product-image-lg w-full h-32">
-                    <img
-                      src={quickViewProduct.image}
-                      alt={quickViewProduct.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="product-placeholder w-full h-32 rounded-xl">
-                    {getCategoryIcon(quickViewProduct.category.icon || 'CupSoda', { className: 'w-12 h-12' })}
-                  </div>
-                )
-              })()}
-              {/* Product info */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold truncate">{quickViewProduct.name}</h3>
-                  <p className="text-[11px] text-muted-foreground">{quickViewProduct.category.name}</p>
-                </div>
-              </div>
-
-              {/* Price & Stock */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">السعر</p>
-                  <p className="text-base font-bold text-primary tabular-nums">
-                    {formatDual(quickViewProduct.price).display}
-                  </p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">المخزون</p>
-                  <p className={`text-base font-bold tabular-nums ${quickViewProduct.quantity <= quickViewProduct.minQuantity ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {quickViewProduct.quantity}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quantity selector */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">الكمية</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setQuickViewQuantity(Math.max(1, quickViewQuantity - 1))}
-                    className="w-9 h-9 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={quickViewProduct.quantity}
-                    value={quickViewQuantity}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1
-                      setQuickViewQuantity(Math.max(1, Math.min(val, quickViewProduct.quantity)))
-                    }}
-                    className="h-9 rounded-xl text-center text-base font-bold tabular-nums"
-                    dir="ltr"
-                  />
-                  <button
-                    onClick={() => setQuickViewQuantity(Math.min(quickViewProduct.quantity, quickViewQuantity + 1))}
-                    className="w-9 h-9 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center hover:bg-muted transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                {quickViewQuantity > 0 && (
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    الإجمالي: {formatDual(quickViewProduct.price * quickViewQuantity).display}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setQuickViewProduct(null)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              إغلاق
-            </Button>
-            <Button
-              onClick={handleQuickViewAdd}
-              className="flex-1 h-10 rounded-xl gap-2 btn-ripple"
-            >
-              <Plus className="w-4 h-4" />
-              إضافة للسلة
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Variant Selector Dialog ── */}
-      <Dialog open={variantSelectorOpen} onOpenChange={(open) => { setVariantSelectorOpen(open); if (!open) { setVariantSelectorProduct(null); setVariantSelectorVariants([]) } }}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-right text-base flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <CupSoda className="w-4 h-4 text-violet-700 dark:text-violet-400" />
-              </div>
-              اختر المتغير
-            </DialogTitle>
-            <DialogDescription className="text-right">
-              {variantSelectorProduct?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          {variantSelectorLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            </div>
-          ) : variantSelectorVariants.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">لا توجد متغيرات متاحة</p>
-            </div>
-          ) : (
-            <ScrollArea className="max-h-[50vh]">
-              <div className="space-y-2">
-                {variantSelectorVariants.map((variant) => (
-                  <button
-                    key={variant.id}
-                    onClick={() => variantSelectorProduct && handleVariantSelect(variantSelectorProduct, variant)}
-                    disabled={variant.stock <= 0}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-right ${
-                      variant.stock <= 0
-                        ? 'opacity-50 cursor-not-allowed bg-muted/30'
-                        : 'bg-card hover:bg-muted/50 hover:border-primary/30 cursor-pointer'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{variant.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {variant.sku && <span className="font-mono mr-2">{variant.sku}</span>}
-                        المخزون: {variant.stock}
-                      </p>
-                    </div>
-                    <div className="text-left flex-shrink-0">
-                      <p className="text-sm font-bold text-primary tabular-nums">
-                        {formatDual(variant.sellPrice).display}
-                      </p>
-                      {variant.stock <= 0 && (
-                        <p className="text-[10px] text-destructive font-medium">غير متوفر</p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setVariantSelectorOpen(false)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              إلغاء
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Hold Order Dialog ── */}
-      <Dialog open={holdDialogOpen} onOpenChange={setHoldDialogOpen}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <PauseCircle className="w-5 h-5 text-amber-500" />
-              </div>
-              تجميد الطلب
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Summary */}
-            <div className="rounded-xl bg-muted/40 p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">عدد المنتجات</span>
-                <span className="font-medium">{cart.reduce((s, i) => s + i.quantity, 0)} منتج</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">الإجمالي</span>
-                <span className="font-bold text-primary tabular-nums">{formatDual(grandTotal).display}</span>
-              </div>
-            </div>
-            {/* Note */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">ملاحظة (اختياري)</label>
-              <Input
-                type="text"
-                value={holdNote}
-                onChange={(e) => setHoldNote(e.target.value)}
-                placeholder="مثال: ينتظر العميل"
-                className="h-10 rounded-xl text-sm"
-                autoFocus
-              />
-              <div className="flex gap-1.5 flex-wrap">
-                {['ينتظر العميل', 'سيكمل لاحقاً', 'استفسار عن السعر'].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => setHoldNote(suggestion)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-150 ${
-                      holdNote === suggestion
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setHoldDialogOpen(false)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={confirmHoldOrder}
-              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-amber-500/25 bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              <PauseCircle className="w-4 h-4" />
-              تجميد الطلب
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Delete Held Order Confirmation Dialog ── */}
-      <Dialog open={!!deleteHeldOrderId} onOpenChange={(open) => !open && setDeleteHeldOrderId(null)}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              حذف الطلب المجمّد
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-2 text-center">
-            <p className="text-sm text-muted-foreground">
-              هل أنت متأكد من حذف هذا الطلب المجمّد؟
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              لا يمكن التراجع عن هذا الإجراء
-            </p>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteHeldOrderId(null)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              تراجع
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDeleteHeldOrder}
-              className="flex-1 h-10 rounded-xl gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              حذف
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Custom Discount Dialog ── */}
-      <Dialog open={customDiscountDialogOpen} onOpenChange={setCustomDiscountDialogOpen}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Percent className="w-5 h-5 text-primary" />
-              </div>
-              خصم مخصص
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Discount type tabs */}
-            <Tabs value={customDiscountType} onValueChange={(v) => setCustomDiscountType(v as 'percent' | 'amount')} className="w-full">
-              <TabsList className="w-full h-9">
-                <TabsTrigger value="percent" className="flex-1 text-xs">
-                  نسبة مئوية %
-                </TabsTrigger>
-                <TabsTrigger value="amount" className="flex-1 text-xs">
-                  مبلغ ثابت
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {/* Value input */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">
-                {customDiscountType === 'percent' ? 'نسبة الخصم' : 'مبلغ الخصم'}
-              </Label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  min={0}
-                  max={customDiscountType === 'percent' ? 100 : subtotal}
-                  step={0.5}
-                  value={customDiscountValue}
-                  onChange={(e) => setCustomDiscountValue(e.target.value)}
-                  placeholder={customDiscountType === 'percent' ? '0' : '0.00'}
-                  className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
-                  autoFocus
-                />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
-                  {customDiscountType === 'percent' ? '%' : symbol}
-                </span>
-              </div>
-            </div>
-
-            {/* Discount preview */}
-            {customDiscountValue && parseFloat(customDiscountValue) > 0 && (
-              <div className="rounded-xl bg-muted/40 p-3 space-y-2">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>المجموع الفرعي</span>
-                  <span className="font-medium tabular-nums">{formatDual(subtotal).display}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-destructive">الخصم</span>
-                  <span className="font-bold text-destructive tabular-nums">
-                    -{customDiscountType === 'percent'
-                      ? formatDual((subtotal * parseFloat(customDiscountValue)) / 100).display
-                      : formatDual(parseFloat(customDiscountValue)).display
-                    }
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm font-bold">
-                  <span>الإجمالي بعد الخصم</span>
-                  <span className="text-primary tabular-nums">
-                    {customDiscountType === 'percent'
-                      ? formatDual(subtotal - (subtotal * parseFloat(customDiscountValue)) / 100).display
-                      : formatDual(subtotal - parseFloat(customDiscountValue)).display
-                    }
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setCustomDiscountDialogOpen(false)}
-              className="flex-1 h-10 rounded-xl"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleApplyCustomDiscount}
-              disabled={!customDiscountValue || parseFloat(customDiscountValue) <= 0}
-              className="flex-1 h-10 rounded-xl gap-2 shadow-lg shadow-primary/25"
-            >
-              <Percent className="w-4 h-4" />
-              تطبيق الخصم
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CustomDiscountDialog
+        open={customDiscountDialogOpen}
+        onOpenChange={setCustomDiscountDialogOpen}
+        customDiscountValue={customDiscountValue}
+        setCustomDiscountValue={setCustomDiscountValue}
+        customDiscountType={customDiscountType}
+        setCustomDiscountType={setCustomDiscountType}
+        subtotal={subtotal}
+        symbol={symbol}
+        formatDual={formatDual}
+        onApplyDiscount={handleApplyCustomDiscount}
+      />
     </div>
   )
 }

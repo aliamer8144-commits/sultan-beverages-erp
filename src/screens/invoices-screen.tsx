@@ -26,34 +26,7 @@ import { useApi } from '@/hooks/use-api'
 import { Search, FileText, Printer, ChevronDown, ChevronUp, Calendar, Eye, Loader2, Filter, X, Download, RotateCcw } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatDate, formatShortDate, formatTime } from '@/lib/date-utils'
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface InvoiceItem {
-  id: string
-  productId: string
-  product: { id: string; name: string }
-  quantity: number
-  price: number
-  total: number
-}
-
-interface Invoice {
-  id: string
-  invoiceNo: string
-  type: 'sale' | 'purchase'
-  customerId: string | null
-  customer: { id: string; name: string } | null
-  supplierId: string | null
-  supplier: { id: string; name: string } | null
-  totalAmount: number
-  discount: number
-  paidAmount: number
-  userId: string
-  user: { id: string; name: string }
-  items: InvoiceItem[]
-  createdAt: string
-}
+import type { InvoiceItem, Invoice } from './invoices/types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

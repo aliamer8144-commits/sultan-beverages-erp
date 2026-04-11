@@ -13,7 +13,9 @@ function getDatabaseUrl(): string {
   }
   // Fallback: read from .env file directly
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path')
     const envPath = path.join(process.cwd(), '.env')
     const envContent = fs.readFileSync(envPath, 'utf-8')
