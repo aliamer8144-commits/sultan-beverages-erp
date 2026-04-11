@@ -76,3 +76,30 @@ Work Log:
 
 Stage Summary:
 - Screens partially reviewed through other agents
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Phase 1 — Foundation (Shared Types + API Utils + Constants)
+
+Work Log:
+- Analyzed all 22+ files that import from app-store.ts for backward compatibility
+- Created src/types/index.ts — centralized all shared types (CurrencyCode, CURRENCY_MAP, User, CartItem, HeldOrder, SettingsState, Screen, InvoiceData, TemplateType, Lang, etc.)
+- Created src/types/api.ts — unified API response types (ApiResponse, ApiErrorResponse, PaginatedResponse, type guards, PaginationQuery)
+- Created src/lib/api-response.ts — helper functions (successResponse, errorResponse, notFound, unauthorized, forbidden, serverError, validationError, paginatedResponse, parseBody)
+- Created src/lib/constants.ts — centralized constants (DEFAULT_SETTINGS, ITEMS_PER_PAGE, MAX_HELD_ORDERS, DEBOUNCE_MS, persist keys)
+- Updated store/app-store.ts — removed inline types/constants, imports from @/types and @/lib/constants, re-exports everything for backward compatibility (22+ files still work)
+- Updated lib/print-templates.ts — imports InvoiceData/TemplateType from @/types instead of defining locally
+- Updated lib/translations.ts — imports Lang from @/types, uses LANGUAGE_PERSIST_KEY from constants
+- Updated hooks/use-currency.ts — imports CurrencyDisplayMode from @/types instead of defining locally
+- Fixed TypeScript type error in PaginatedResponse (was extending ApiResponse incorrectly)
+- Verified: npx tsc --noEmit = 0 errors
+- Verified: bun run lint = 0 errors
+- Verified: Dev server starts, Page=200, Login=200, Products=200, Dashboard=200
+
+Stage Summary:
+- 4 new files created (types/index.ts, types/api.ts, lib/api-response.ts, lib/constants.ts)
+- 4 existing files updated (app-store.ts, print-templates.ts, translations.ts, use-currency.ts)
+- Zero breaking changes — all 22+ importers still work via re-exports
+- TypeScript: 0 errors, ESLint: 0 errors
+- All API endpoints functional

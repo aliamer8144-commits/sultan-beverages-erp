@@ -8,33 +8,14 @@
  */
 
 import { formatWithSettings } from '@/lib/currency'
-import type { SettingsState } from '@/store/app-store'
+import type { InvoiceData, TemplateType, SettingsState } from '@/types'
 
-// ── Types ──────────────────────────────────────────────────────────────
-
-export interface InvoiceData {
-  id: string
-  invoiceNo: string
-  type: 'sale' | 'purchase'
-  customer: { id: string; name: string } | null
-  supplier: { id: string; name: string } | null
-  totalAmount: number
-  discount: number
-  paidAmount: number
-  user: { id: string; name: string }
-  items: Array<{
-    id: string
-    product: { id: string; name: string }
-    quantity: number
-    price: number
-    total: number
-  }>
-  createdAt: string
-}
-
-export type TemplateType = 'classic' | 'professional' | 'simple'
+// Re-export types for any direct importers
+export type { InvoiceData, TemplateType }
 
 // ── Helpers ────────────────────────────────────────────────────────────
+//
+// Types (InvoiceData, TemplateType, SettingsState) are now defined in @/types
 
 const fmt = formatWithSettings
 

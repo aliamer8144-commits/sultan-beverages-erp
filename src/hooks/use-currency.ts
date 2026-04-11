@@ -2,9 +2,8 @@
 
 import { useMemo } from 'react'
 import { useAppStore, CURRENCY_MAP, type CurrencyCode } from '@/store/app-store'
+import type { CurrencyDisplayMode } from '@/types'
 import { formatCurrency as fc, getCurrencySymbol, convertCurrency, formatDualCurrency } from '@/lib/currency'
-
-export type CurrencyDisplayMode = 'primary-only' | 'secondary-parentheses' | 'secondary-main'
 
 export function useCurrency() {
   const currency = useAppStore((s) => s.settings.currency)

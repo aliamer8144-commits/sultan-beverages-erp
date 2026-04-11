@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Lang } from '@/types'
+import { LANGUAGE_PERSIST_KEY } from '@/lib/constants'
 
 // ─── Translation Dictionary ──────────────────────────────────────────
 
@@ -593,8 +595,8 @@ const en = {
   },
 } as const
 
-type TranslationDict = typeof ar
-export type Lang = 'ar' | 'en'
+// Re-export Lang from central types for backward compatibility
+export type { Lang } from '@/types'
 export type TranslationKey = string
 
 // ─── Language Store ──────────────────────────────────────────────────
@@ -607,11 +609,11 @@ interface LanguageState {
 export const useLanguageStore = create<LanguageState>()(
   persist(
     (set) => ({
-      lang: 'ar',
+      lang: 'ar' as Lang,
       setLang: (lang) => set({ lang }),
     }),
     {
-      name: 'sultan-erp-language',
+      name: LANGUAGE_PERSIST_KEY,
     }
   )
 )
