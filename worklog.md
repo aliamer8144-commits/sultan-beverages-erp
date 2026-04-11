@@ -1196,3 +1196,87 @@ Stage Summary:
 - pos-screen.tsx reduced by ~35% (2209 → 1440 lines)
 - 2 inline AlertDialogs replaced with shared ConfirmDialog component
 - All TypeScript and ESLint checks pass with zero errors
+
+---
+Task ID: 10b-1
+Agent: Main Agent
+Task: Extract Cart Panel component from pos-screen.tsx
+
+Work Log:
+- Read worklog.md for project context and existing patterns
+- Read pos-screen.tsx (1441 lines) and identified cart section (lines 939-1320)
+- Read pos/types.ts for existing type definitions
+- Created src/screens/pos/cart-panel.tsx (485 lines) as 'use client' component
+- Extracted CartPanelProps interface with all required data, callbacks, and display props
+- Imported CartItem and HeldOrder from @/types, Customer from ./pos/types
+- Used lucide-react icons: Plus, Minus, Trash2, CreditCard, ShoppingCart, X, Package, PauseCircle, Clock, Play, Star
+- Used shadcn/ui components: Button, Input, ScrollArea, Badge, Select, Separator, Popover
+- Used EmptyState from @/components/empty-state and getRelativeTime from @/lib/date-utils
+- Updated pos-screen.tsx:
+  - Added import: CartPanel from ./pos/cart-panel
+  - Replaced lines 939-1320 (cart section JSX) with <CartPanel ...props /> (31 lines)
+  - Removed 10 unused lucide-react icon imports (Plus, Minus, Trash2, CreditCard, Package, PauseCircle, Clock, Play, Star)
+  - Removed Select/SelectContent/SelectItem/SelectTrigger/SelectValue import (moved to cart-panel)
+  - Removed Separator import (moved to cart-panel)
+  - Removed EmptyState import (moved to cart-panel)
+  - Removed CartItem type import (moved to cart-panel)
+  - Removed getRelativeTime from date-utils import (moved to cart-panel)
+- Verified: npx tsc --noEmit = 0 errors
+- Verified: bun run lint = 0 errors
+- Dev server running with no errors
+
+Verified:
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- Dev log: 0 server errors
+
+Stage Summary:
+- pos-screen.tsx reduced from 1441 to 1077 lines (364 lines removed, within expected 350-380 range)
+- New cart-panel.tsx: 485 lines
+- Zero TypeScript errors, zero ESLint errors
+- Zero visual changes — all class names and behavior preserved
+- Named export: CartPanel with CartPanelProps interface
+
+---
+Task ID: 10b
+Agent: Main Agent
+Task: Phase 10b — POS Screen continued refactoring (extract Cart Panel + Product Grid)
+
+Work Log:
+- Extracted CartPanel component (src/screens/pos/cart-panel.tsx, 485 lines)
+  - Cart header with held orders popover
+  - Cart items list with quantity controls
+  - Customer selection dropdown
+  - Loyalty points display
+  - Discount section (input + quick % buttons + amount buttons)
+  - Totals section (subtotal, discount, loyalty, grand total)
+  - Action buttons (pay, clear cart)
+- Extracted ProductGrid component (src/screens/pos/product-grid.tsx, 399 lines)
+  - Search bar with Ctrl+K shortcut
+  - Barcode scanner input with F2 shortcut
+  - Quick Actions panel (search, barcode, cancel, calculator, last invoices)
+  - Last invoices popover
+  - Sales target compact progress bar
+  - Category tabs/pills
+  - Product grid with loading skeleton, empty state, product cards
+- Updated pos-screen.tsx: replaced inline JSX with <ProductGrid /> and <CartPanel /> components
+- Cleaned up unused imports (10 lucide icons, 5 UI components)
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- ESLint: 0 errors (bun run lint)
+- Dev server: running, no errors
+
+Stage Summary:
+- Phase 10b complete: pos-screen.tsx reduced from 1440 → 796 lines (45% total reduction from original 2209 lines)
+- 9 new component files in src/screens/pos/:
+  - types.ts (58 lines)
+  - payment-dialog.tsx (343 lines)
+  - loyalty-redeem-dialog.tsx (156 lines)
+  - custom-discount-dialog.tsx (132 lines)
+  - hold-order-dialog.tsx (99 lines)
+  - product-quick-view-dialog.tsx (139 lines)
+  - variant-selector-dialog.tsx (98 lines)
+  - cart-panel.tsx (485 lines)
+  - product-grid.tsx (399 lines)
+- Total: 1909 lines across 9 focused components + 796 lines orchestrator = clean architecture
