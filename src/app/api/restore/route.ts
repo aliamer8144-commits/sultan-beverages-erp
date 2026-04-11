@@ -1,6 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { hashPassword } from '@/lib/auth'
 
 interface BackupData {
   backupDate: string
@@ -18,17 +22,15 @@ interface BackupData {
   }
 }
 
-// POST /api/restore — Restore database from backup JSON
-export async function POST(request: NextRequest) {
+// POST /api/restore — Restore database from backup JSON (admin only)
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
+    const user = getRequestUser(request)
 
     // Validate backup structure
     if (!body || !body.data || typeof body.data !== 'object') {
-      return NextResponse.json(
-        { success: false, error: 'هيكل النسخة الاحتياطية غير صالح' },
-        { status: 400 }
-      )
+      return errorResponse('هيكل النسخة الاحتياطية غير صالح')
     }
 
     const backup = body as BackupData
@@ -37,10 +39,7 @@ export async function POST(request: NextRequest) {
     // Validate that at least one table exists
     const tables = Object.keys(data)
     if (tables.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'لا توجد بيانات في النسخة الاحتياطية' },
-        { status: 400 }
-      )
+      return errorResponse('لا توجد بيانات في النسخة الاحتياطية')
     }
 
     // Restore within a transaction
@@ -73,10 +72,16 @@ export async function POST(request: NextRequest) {
         await tx.user.deleteMany()
       }
 
-      // 1. Users
+      // 1. Users — SECURITY: Hash plaintext passwords before restoring
       if (data.users && Array.isArray(data.users) && data.users.length > 0) {
-        for (const user of data.users as Record<string, unknown>[]) {
-          const { id, createdAt, updatedAt, invoices, ...userData } = user
+        for (const userRecord of data.users as Record<string, unknown>[]) {
+          const { id, createdAt, updatedAt, invoices, ...userData } = userRecord
+          // Hash password if it's plaintext (not already a bcrypt hash)
+          if (userData.password && typeof userData.password === 'string') {
+            if (!userData.password.startsWith('$2')) {
+              userData.password = await hashPassword(userData.password)
+            }
+          }
           await tx.user.create({
             data: userData as Prisma.UserCreateInput,
           })
@@ -164,16 +169,21 @@ export async function POST(request: NextRequest) {
       return counts
     })
 
-    return NextResponse.json({
-      success: true,
+    logAction({
+      action: 'restore',
+      entity: 'System',
+      userId: user?.userId,
+      userName: user?.username,
+      details: { type: 'manual', counts: result },
+    })
+
+    return successResponse({
       message: 'تم استعادة النسخة الاحتياطية بنجاح',
       data: result,
     })
   } catch (error) {
-    console.error('Error restoring backup:', error)
-    return NextResponse.json(
-      { success: false, error: 'فشل في استعادة النسخة الاحتياطية: ' + (error instanceof Error ? error.message : 'خطأ غير معروف') },
-      { status: 500 }
+    return serverError(
+      'فشل في استعادة النسخة الاحتياطية: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')
     )
   }
-}
+}, { requireAdmin: true })

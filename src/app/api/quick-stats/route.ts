@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
 
 // ─── GET: Aggregated quick-stats for the floating panel ─────────────
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -266,70 +267,67 @@ export async function GET() {
       topCustomerTodayName = topCustomer?.name ?? null
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        // Existing fields (backward compatible)
-        totalSalesToday,
-        totalProfitToday,
-        profitMargin,
-        invoicesCountToday,
-        lowStockProducts,
-        totalCustomers,
-        totalExpensesToday,
-        topProducts,
-        recentActivity,
-        salesTargetProgress,
+    return successResponse({
+      // Existing fields (backward compatible)
+      totalSalesToday,
+      totalProfitToday,
+      profitMargin,
+      invoicesCountToday,
+      lowStockProducts,
+      totalCustomers,
+      totalExpensesToday,
+      topProducts,
+      recentActivity,
+      salesTargetProgress,
 
-        // Additional fields
-        totalProducts,
-        totalSuppliers,
-        totalDebt,
-        monthlySales,
-        totalExpenses,
+      // Additional fields
+      totalProducts,
+      totalSuppliers,
+      totalDebt,
+      monthlySales,
+      totalExpenses,
 
-        // Extra stats
-        topCustomerTodayName,
-        itemsSoldToday,
-        averageSaleToday,
+      // Extra stats
+      topCustomerTodayName,
+      itemsSoldToday,
+      averageSaleToday,
 
-        // ── Trend data (NEW) ────────────────────────────────────
-        trends: {
-          salesToday: {
-            value: totalSalesToday,
-            previous: prevDaySales,
-            change: calcTrend(totalSalesToday, prevDaySales),
-            period: 'يوم أمس',
-          },
-          profitToday: {
-            value: totalProfitToday,
-            previous: prevDayProfit,
-            change: calcTrend(totalProfitToday, prevDayProfit),
-            period: 'يوم أمس',
-          },
-          invoicesToday: {
-            value: invoicesCountToday,
-            previous: prevDayInvoices,
-            change: calcTrend(invoicesCountToday, prevDayInvoices),
-            period: 'يوم أمس',
-          },
-          monthlySales: {
-            value: monthlySales,
-            previous: prevMonthSales,
-            change: calcTrend(monthlySales, prevMonthSales),
-            period: 'الشهر الماضي',
-          },
-          expensesToday: {
-            value: totalExpensesToday,
-            previous: prevDayExpenses,
-            change: calcTrend(totalExpensesToday, prevDayExpenses),
-            period: 'يوم أمس',
-          },
+      // ── Trend data (NEW) ────────────────────────────────────
+      trends: {
+        salesToday: {
+          value: totalSalesToday,
+          previous: prevDaySales,
+          change: calcTrend(totalSalesToday, prevDaySales),
+          period: 'يوم أمس',
+        },
+        profitToday: {
+          value: totalProfitToday,
+          previous: prevDayProfit,
+          change: calcTrend(totalProfitToday, prevDayProfit),
+          period: 'يوم أمس',
+        },
+        invoicesToday: {
+          value: invoicesCountToday,
+          previous: prevDayInvoices,
+          change: calcTrend(invoicesCountToday, prevDayInvoices),
+          period: 'يوم أمس',
+        },
+        monthlySales: {
+          value: monthlySales,
+          previous: prevMonthSales,
+          change: calcTrend(monthlySales, prevMonthSales),
+          period: 'الشهر الماضي',
+        },
+        expensesToday: {
+          value: totalExpensesToday,
+          previous: prevDayExpenses,
+          change: calcTrend(totalExpensesToday, prevDayExpenses),
+          period: 'يوم أمس',
         },
       },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load quick stats'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(message)
   }
-}
+})

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { withAuth } from "@/lib/auth-middleware";
+import { serverError } from "@/lib/api-response";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
 
@@ -143,6 +145,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "فشل في البحث عن المنتجات";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return serverError(message);
   }
-}
+});

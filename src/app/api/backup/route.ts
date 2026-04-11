@@ -1,12 +1,29 @@
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
 
-// GET /api/backup — Export all data as a JSON backup
-export async function GET() {
+// GET /api/backup — Export all data as a JSON backup (admin only)
+export const GET = withAuth(async (request: NextRequest) => {
   try {
+    const user = getRequestUser(request)
+
     const [users, categories, products, customers, suppliers, invoices, invoiceItems, payments] =
       await Promise.all([
-        db.user.findMany({ orderBy: { createdAt: 'asc' } }),
+        // SECURITY: Exclude password field from backup export
+        db.user.findMany({
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
         db.category.findMany({ orderBy: { createdAt: 'asc' } }),
         db.product.findMany({
           orderBy: { createdAt: 'asc' },
@@ -55,12 +72,16 @@ export async function GET() {
       },
     }
 
-    return NextResponse.json({ success: true, data: backup })
-  } catch (error) {
-    console.error('Error creating backup:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create backup' },
-      { status: 500 }
-    )
+    logAction({
+      action: 'backup',
+      entity: 'System',
+      userId: user?.userId,
+      userName: user?.username,
+      details: { type: 'manual', summary: backup.summary },
+    })
+
+    return successResponse(backup)
+  } catch {
+    return serverError('فشل في إنشاء النسخة الاحتياطية')
   }
-}
+}, { requireAdmin: true })

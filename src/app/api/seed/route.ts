@@ -1,20 +1,26 @@
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { NextResponse } from 'next/server'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { hashPassword } from '@/lib/auth'
 
-export async function POST() {
+// POST /api/seed — Seed database with sample data (admin only)
+export const POST = withAuth(async (request: NextRequest) => {
   try {
+    const user = getRequestUser(request)
     console.log('🌱 Seeding database...')
 
-    // Create users
+    // Create users — SECURITY: Hash passwords before storing
     await db.user.upsert({
       where: { username: 'admin' },
       update: {},
-      create: { username: 'admin', password: 'admin123', name: 'مدير النظام', role: 'admin' },
+      create: { username: 'admin', password: await hashPassword('admin123'), name: 'مدير النظام', role: 'admin' },
     })
     await db.user.upsert({
       where: { username: 'cashier' },
       update: {},
-      create: { username: 'cashier', password: 'cashier123', name: 'الكاشير', role: 'cashier' },
+      create: { username: 'cashier', password: await hashPassword('cashier123'), name: 'الكاشير', role: 'cashier' },
     })
 
     // Create categories
@@ -81,11 +87,18 @@ export async function POST() {
       await db.supplier.upsert({ where: { name: s.name }, update: {}, create: s })
     }
 
+    logAction({
+      action: 'seed',
+      entity: 'System',
+      userId: user?.userId,
+      userName: user?.username,
+      details: { productsCount: products.length, categoriesCount: catData.length, customersCount: customers.length, suppliersCount: suppliers.length },
+    })
+
     console.log('🎉 Seeding completed!')
-    return NextResponse.json({ success: true, message: 'تم زراعة البيانات بنجاح' })
+    return successResponse({ message: 'تم زراعة البيانات بنجاح' })
   } catch (error: unknown) {
     console.error('❌ Seeding failed:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(error instanceof Error ? error.message : 'خطأ غير معروف')
   }
-}
+}, { requireAdmin: true })

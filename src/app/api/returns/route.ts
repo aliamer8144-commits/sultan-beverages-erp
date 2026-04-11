@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { validateBody } from '@/lib/validations'
+import { createReturnSchema, updateReturnSchema } from '@/lib/validations'
+import { logAction } from '@/lib/audit-logger'
 
 // GET /api/returns?page=1&limit=20&status=pending&search=RET-001&dateFrom=2024-01-01&dateTo=2024-12-31
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = request.nextUrl
 
@@ -56,41 +61,26 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.ceil(total / limit)
 
-    return NextResponse.json({
-      success: true,
-      data: returns,
-      total,
-      page,
-      totalPages,
-    })
-  } catch (error) {
-    console.error('Error fetching returns:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch returns' },
-      { status: 500 }
-    )
+    return successResponse({ returns, total, page, totalPages })
+  } catch {
+    return serverError('فشل في تحميل المرتجعات')
   }
-}
+})
 
 // POST /api/returns — Create a new return
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { invoiceId, productId, quantity, reason, userId, userName } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!invoiceId || !productId || !quantity || !userId) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: invoiceId, productId, quantity, userId' },
-        { status: 400 }
-      )
+    const validation = validateBody(createReturnSchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
 
-    if (quantity <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Quantity must be greater than 0' },
-        { status: 400 }
-      )
-    }
+    const { invoiceId, productId, quantity, reason } = validation.data
 
     const returnRecord = await db.$transaction(async (tx) => {
       // 1. Get the invoice to find the unit price and verify it's a sale invoice
@@ -217,36 +207,42 @@ export async function POST(request: NextRequest) {
       return createdReturn
     })
 
-    return NextResponse.json({ success: true, data: returnRecord }, { status: 201 })
+    await logAction({
+      action: 'create',
+      entity: 'ProductReturn',
+      entityId: returnRecord.id,
+      userId,
+      userName,
+      details: { returnNo: returnRecord.returnNo, invoiceId, productId, quantity, amount: returnRecord.totalAmount },
+    })
+
+    return successResponse(returnRecord, 201)
   } catch (error) {
-    console.error('Error creating return:', error)
-    const message = error instanceof Error ? error.message : 'Failed to create return'
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    )
+    if (error instanceof Error) {
+      const message = error.message
+      if (message.includes('not found') || message.includes('Invoice') || message.includes('Product')) {
+        return errorResponse(message)
+      }
+      return errorResponse(message)
+    }
+    return serverError('فشل في إنشاء المرتجع')
   }
-}
+})
 
 // PATCH /api/returns — Update return status
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { id, status } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!id || !status) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: id, status' },
-        { status: 400 }
-      )
+    const validation = validateBody(updateReturnSchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return NextResponse.json(
-        { success: false, error: 'Status must be approved or rejected' },
-        { status: 400 }
-      )
-    }
+    const { id, status } = validation.data
 
     const updatedReturn = await db.$transaction(async (tx) => {
       // Get the existing return
@@ -304,13 +300,24 @@ export async function PATCH(request: NextRequest) {
       return updated
     })
 
-    return NextResponse.json({ success: true, data: updatedReturn })
+    await logAction({
+      action: 'update',
+      entity: 'ProductReturn',
+      entityId: id,
+      userId,
+      userName,
+      details: { status, returnNo: updatedReturn.returnNo },
+    })
+
+    return successResponse(updatedReturn)
   } catch (error) {
-    console.error('Error updating return:', error)
-    const message = error instanceof Error ? error.message : 'Failed to update return'
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    )
+    if (error instanceof Error) {
+      const message = error.message
+      if (message.includes('not found')) {
+        return errorResponse(message)
+      }
+      return errorResponse(message)
+    }
+    return serverError('فشل في تحديث المرتجع')
   }
-}
+})

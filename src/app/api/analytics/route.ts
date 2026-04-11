@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const startDateParam = searchParams.get('startDate')
@@ -226,25 +228,22 @@ export async function GET(request: NextRequest) {
     const averageInvoice = invoicesCount > 0 ? Math.round((totalSales / invoicesCount) * 100) / 100 : 0
     const netProfitPercent = totalSales > 0 ? Math.round((netProfit / totalSales) * 10000) / 100 : 0
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalSales: Math.round(totalSales * 100) / 100,
-        totalProfit: Math.round(totalProfit * 100) / 100,
-        totalExpenses: Math.round(totalExpenses * 100) / 100,
-        netProfit: Math.round(netProfit * 100) / 100,
-        invoicesCount,
-        averageInvoice,
-        netProfitPercent,
-        salesByDay,
-        salesByCategory,
-        topProducts,
-        topCustomers,
-        expenseBreakdown,
-      },
+    return successResponse({
+      totalSales: Math.round(totalSales * 100) / 100,
+      totalProfit: Math.round(totalProfit * 100) / 100,
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      netProfit: Math.round(netProfit * 100) / 100,
+      invoicesCount,
+      averageInvoice,
+      netProfitPercent,
+      salesByDay,
+      salesByCategory,
+      topProducts,
+      topCustomers,
+      expenseBreakdown,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load analytics data'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(message)
   }
-}
+})

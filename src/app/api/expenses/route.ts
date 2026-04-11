@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { validateBody } from '@/lib/validations'
+import { createExpenseSchema, updateExpenseSchema } from '@/lib/validations'
+import { logAction } from '@/lib/audit-logger'
 
 // ── GET: List expenses with filters + summary stats ─────────────────
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
@@ -167,55 +172,46 @@ export async function GET(request: NextRequest) {
     const last30Total = dailyTrend.reduce((sum, d) => sum + d.total, 0)
     const averageDailyExpense = Math.round((last30Total / 30) * 100) / 100
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        expenses: expenses.map((e) => ({
-          ...e,
-          amount: Math.round(e.amount * 100) / 100,
-        })),
-        total,
-        totalPages: Math.ceil(total / limit),
-        page,
-        summary: {
-          totalExpenses,
-          todayExpenses,
-          thisWeekExpenses,
-          thisMonthExpenses,
-          topCategory,
-          totalByCategory,
-          monthlyTrend,
-          dailyTrend,
-          recurringSummary,
-          averageDailyExpense,
-        },
+    return successResponse({
+      expenses: expenses.map((e) => ({
+        ...e,
+        amount: Math.round(e.amount * 100) / 100,
+      })),
+      total,
+      totalPages: Math.ceil(total / limit),
+      page,
+      summary: {
+        totalExpenses,
+        todayExpenses,
+        thisWeekExpenses,
+        thisMonthExpenses,
+        topCategory,
+        totalByCategory,
+        monthlyTrend,
+        dailyTrend,
+        recurringSummary,
+        averageDailyExpense,
       },
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load expenses'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  } catch {
+    return serverError('فشل في تحميل المصروفات')
   }
-}
+})
 
 // ── POST: Create new expense ────────────────────────────────────────
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { category, amount, description, date, recurring, recurringPeriod, userId, userName } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!category || !amount || !description || !userId) {
-      return NextResponse.json(
-        { success: false, error: 'الرجاء تعبئة جميع الحقول المطلوبة' },
-        { status: 400 }
-      )
+    const validation = validateBody(createExpenseSchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
 
-    if (amount <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'المبلغ يجب أن يكون أكبر من صفر' },
-        { status: 400 }
-      )
-    }
+    const { category, amount, description, date, recurring, recurringPeriod } = validation.data
 
     const expense = await db.expense.create({
       data: {
@@ -230,31 +226,41 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...expense,
-        amount: Math.round(expense.amount * 100) / 100,
-      },
+    await logAction({
+      action: 'create',
+      entity: 'Expense',
+      entityId: expense.id,
+      userId,
+      userName,
+      details: { category, amount: expense.amount, description, recurring },
     })
+
+    return successResponse({
+      ...expense,
+      amount: Math.round(expense.amount * 100) / 100,
+    }, 201)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create expense'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في إنشاء المصروف')
   }
-}
+})
 
 // ── PATCH: Toggle recurring status ──────────────────────────────────
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { id, recurring, recurringPeriod } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف المصروف مطلوب' },
-        { status: 400 }
-      )
+    const validation = validateBody(updateExpenseSchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
+
+    const { id, recurring, recurringPeriod } = validation.data
 
     const expense = await db.expense.update({
       where: { id },
@@ -264,37 +270,56 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...expense,
-        amount: Math.round(expense.amount * 100) / 100,
-      },
+    await logAction({
+      action: 'update',
+      entity: 'Expense',
+      entityId: id,
+      userId,
+      userName,
+      details: { recurring, recurringPeriod },
+    })
+
+    return successResponse({
+      ...expense,
+      amount: Math.round(expense.amount * 100) / 100,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update expense'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في تحديث المصروف')
   }
-}
+})
 
 // ── DELETE: Delete expense by id ────────────────────────────────────
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAuth(async (request: NextRequest) => {
   try {
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف المصروف مطلوب' },
-        { status: 400 }
-      )
+      return errorResponse('معرف المصروف مطلوب')
     }
 
     await db.expense.delete({ where: { id } })
 
-    return NextResponse.json({ success: true, message: 'تم حذف المصروف بنجاح' })
+    await logAction({
+      action: 'delete',
+      entity: 'Expense',
+      entityId: id,
+      userId,
+      userName,
+    })
+
+    return successResponse({ message: 'تم حذف المصروف بنجاح' })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete expense'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في حذف المصروف')
   }
-}
+})

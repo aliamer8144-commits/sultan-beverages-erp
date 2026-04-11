@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
 
@@ -164,21 +165,18 @@ export async function GET() {
       .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
       .sort((a, b) => b.value - a.value)
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        todaySales,
-        todayProfit,
-        todayInvoiceCount,
-        lowStockCount,
-        topProducts,
-        recentSales: recentSalesData,
-        monthlySales,
-        salesByCategory,
-      },
+    return successResponse({
+      todaySales,
+      todayProfit,
+      todayInvoiceCount,
+      lowStockCount,
+      topProducts,
+      recentSales: recentSalesData,
+      monthlySales,
+      salesByCategory,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load dashboard data'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(message)
   }
-}
+})

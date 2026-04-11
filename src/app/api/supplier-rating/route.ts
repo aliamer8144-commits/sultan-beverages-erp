@@ -1,34 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError, notFound } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { validateBody, createSupplierReviewSchema } from '@/lib/validations'
 
-export async function POST(request: NextRequest) {
+// POST /api/supplier-rating
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { supplierId, rating, review, userName } = body
+    const validation = validateBody(createSupplierReviewSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!supplierId || !rating || rating < 1 || rating > 5) {
-      return NextResponse.json(
-        { success: false, error: 'بيانات التقييم غير صالحة' },
-        { status: 400 }
-      )
-    }
+    const { supplierId, rating, review } = validation.data
+    const user = getRequestUser(request)
 
     // Get current supplier rating
     const supplier = await db.supplier.findUnique({ where: { id: supplierId } })
-    if (!supplier) {
-      return NextResponse.json(
-        { success: false, error: 'المورد غير موجود' },
-        { status: 404 }
-      )
-    }
+    if (!supplier) return notFound('المورد غير موجود')
 
-    // Create review record
+    // Create review record — userName comes from JWT, not body
     await db.supplierReview.create({
       data: {
         supplierId,
         rating,
         review: review?.trim() || null,
-        userName: userName?.trim() || null,
+        userName: user?.username?.trim() || null,
       },
     })
 
@@ -49,29 +46,33 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        rating: updated.rating,
-        ratingCount: updated.ratingCount,
-      },
+    logAction({
+      action: 'create',
+      entity: 'SupplierReview',
+      entityId: supplierId,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { rating, review },
+    })
+
+    return successResponse({
+      rating: updated.rating,
+      ratingCount: updated.ratingCount,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to rate supplier'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error rating supplier:', error)
+    return serverError('فشل في تقييم المورد')
   }
-}
+})
 
-export async function GET(request: NextRequest) {
+// GET /api/supplier-rating?supplierId=xxx
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const supplierId = searchParams.get('supplierId')
 
     if (!supplierId) {
-      return NextResponse.json(
-        { success: false, error: 'يرجى تحديد المورد' },
-        { status: 400 }
-      )
+      return errorResponse('يرجى تحديد المورد')
     }
 
     const reviews = await db.supplierReview.findMany({
@@ -80,9 +81,9 @@ export async function GET(request: NextRequest) {
       take: 20,
     })
 
-    return NextResponse.json({ success: true, data: reviews })
+    return successResponse(reviews)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch reviews'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error fetching reviews:', error)
+    return serverError('فشل في جلب التقييمات')
   }
-}
+})

@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { validateBody, createSupplierPaymentSchema } from '@/lib/validations'
 
 // GET /api/supplier-payments?supplierId=xxx
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const supplierId = searchParams.get('supplierId')
 
     if (!supplierId) {
-      return NextResponse.json(
-        { success: false, error: 'Supplier ID is required' },
-        { status: 400 }
-      )
+      return errorResponse('معرف المورد مطلوب')
     }
 
     const payments = await db.supplierPayment.findMany({
@@ -21,30 +22,22 @@ export async function GET(request: NextRequest) {
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
 
-    return NextResponse.json({
-      success: true,
-      data: payments,
-      totalPaid,
-    })
+    return successResponse({ payments, totalPaid })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to fetch supplier payments'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error fetching supplier payments:', error)
+    return serverError('فشل في جلب مدفوعات المورد')
   }
-}
+})
 
 // POST /api/supplier-payments
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { supplierId, amount, method, notes } = body
+    const validation = validateBody(createSupplierPaymentSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!supplierId || !amount || amount <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Supplier ID and a valid amount are required' },
-        { status: 400 }
-      )
-    }
+    const { supplierId, amount, method, notes } = validation.data
+    const user = getRequestUser(request)
 
     const result = await db.$transaction(async (tx) => {
       // 1. Create the supplier payment record
@@ -88,10 +81,18 @@ export async function POST(request: NextRequest) {
       return createdPayment
     })
 
-    return NextResponse.json({ success: true, data: result }, { status: 201 })
+    logAction({
+      action: 'create',
+      entity: 'SupplierPayment',
+      entityId: result.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { supplierId, amount, method },
+    })
+
+    return successResponse(result, 201)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to record supplier payment'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error recording supplier payment:', error)
+    return serverError('فشل في تسجيل دفعة المورد')
   }
-}
+})

@@ -1,5 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { validateBody } from '@/lib/validations'
+import { createExpenseCategorySchema, updateExpenseCategorySchema } from '@/lib/validations'
+import { logAction } from '@/lib/audit-logger'
 
 const DEFAULT_CATEGORIES = [
   { name: 'إيجار', icon: 'Home', color: '#3b82f6', monthlyBudget: 500000 },
@@ -11,28 +16,32 @@ const DEFAULT_CATEGORIES = [
   { name: 'متنوع', icon: 'MoreHorizontal', color: '#6b7280', monthlyBudget: 100000 },
 ]
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const categories = await db.expenseCategory.findMany({
       include: { _count: { select: { expenses: true } } },
       orderBy: { createdAt: 'asc' },
     })
 
-    return NextResponse.json({ success: true, data: categories })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load expense categories'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return successResponse(categories)
+  } catch {
+    return serverError('فشل في تحميل فئات المصروفات')
   }
-}
+})
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { name, description, icon, color, monthlyBudget, isActive } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!name || !name.trim()) {
-      return NextResponse.json({ success: false, error: 'يرجى إدخال اسم الفئة' }, { status: 400 })
+    const validation = validateBody(createExpenseCategorySchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
+
+    const { name, description, icon, color, monthlyBudget, isActive } = validation.data
 
     const category = await db.expenseCategory.create({
       data: {
@@ -46,24 +55,40 @@ export async function POST(request: NextRequest) {
       include: { _count: { select: { expenses: true } } },
     })
 
-    return NextResponse.json({ success: true, data: category }, { status: 201 })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create expense category'
-    if (message.includes('Unique constraint')) {
-      return NextResponse.json({ success: false, error: 'هذه الفئة موجودة بالفعل' }, { status: 409 })
-    }
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
-  }
-}
+    await logAction({
+      action: 'create',
+      entity: 'ExpenseCategory',
+      entityId: category.id,
+      userId,
+      userName,
+      details: { name: category.name, icon: category.icon, color: category.color },
+    })
 
-export async function PUT(request: NextRequest) {
+    return successResponse(category, 201)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return errorResponse('هذه الفئة موجودة بالفعل', 409)
+    }
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في إنشاء فئة المصروفات')
+  }
+})
+
+export const PUT = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { id, name, description, icon, color, monthlyBudget, isActive } = body
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'معرف الفئة مطلوب' }, { status: 400 })
+    const validation = validateBody(updateExpenseCategorySchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
+
+    const { id, name, description, icon, color, monthlyBudget, isActive } = validation.data
 
     const data: Record<string, unknown> = {}
     if (name !== undefined) data.name = name.trim()
@@ -79,37 +104,60 @@ export async function PUT(request: NextRequest) {
       include: { _count: { select: { expenses: true } } },
     })
 
-    return NextResponse.json({ success: true, data: category })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update expense category'
-    if (message.includes('Unique constraint')) {
-      return NextResponse.json({ success: false, error: 'هذه الفئة موجودة بالفعل' }, { status: 409 })
-    }
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
-  }
-}
+    await logAction({
+      action: 'update',
+      entity: 'ExpenseCategory',
+      entityId: id,
+      userId,
+      userName,
+      details: data,
+    })
 
-export async function DELETE(request: NextRequest) {
+    return successResponse(category)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return errorResponse('هذه الفئة موجودة بالفعل', 409)
+    }
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في تحديث فئة المصروفات')
+  }
+})
+
+export const DELETE = withAuth(async (request: NextRequest) => {
   try {
+    const user = getRequestUser(request)
+    const userId = user?.userId || ''
+    const userName = user?.username
+
     const body = await request.json()
     const { id } = body
 
     if (!id) {
-      return NextResponse.json({ success: false, error: 'معرف الفئة مطلوب' }, { status: 400 })
+      return errorResponse('معرف الفئة مطلوب')
     }
 
     const expenseCount = await db.expense.count({ where: { categoryId: id } })
     if (expenseCount > 0) {
-      return NextResponse.json(
-        { success: false, error: `لا يمكن حذف هذه الفئة لأنها مرتبطة بـ ${expenseCount} مصروف` },
-        { status: 400 }
-      )
+      return errorResponse(`لا يمكن حذف هذه الفئة لأنها مرتبطة بـ ${expenseCount} مصروف`)
     }
 
     await db.expenseCategory.delete({ where: { id } })
-    return NextResponse.json({ success: true, message: 'تم حذف الفئة بنجاح' })
+
+    await logAction({
+      action: 'delete',
+      entity: 'ExpenseCategory',
+      entityId: id,
+      userId,
+      userName,
+    })
+
+    return successResponse({ message: 'تم حذف الفئة بنجاح' })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete expense category'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    if (error instanceof Error) {
+      return errorResponse(error.message)
+    }
+    return serverError('فشل في حذف فئة المصروفات')
   }
-}
+})

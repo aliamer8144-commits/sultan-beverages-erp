@@ -1,65 +1,53 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { logAction } from "@/lib/audit-logger";
+import { NextRequest } from 'next/server'
+import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError, notFound } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { validateBody, createProductVariantSchema, updateProductVariantSchema } from '@/lib/validations'
 
 // GET: List variants for a product (?productId=X)
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const productId = searchParams.get("productId");
+    const { searchParams } = new URL(request.url)
+    const productId = searchParams.get('productId')
 
     if (!productId) {
-      return NextResponse.json(
-        { success: false, error: "يرجى تحديد المنتج" },
-        { status: 400 }
-      );
+      return errorResponse('يرجى تحديد المنتج')
     }
 
     const variants = await db.productVariant.findMany({
       where: { productId },
-      orderBy: { createdAt: "asc" },
-    });
+      orderBy: { createdAt: 'asc' },
+    })
 
-    return NextResponse.json({ success: true, data: variants });
+    return successResponse(variants)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch variants";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error('Error fetching variants:', error)
+    return serverError('فشل في جلب المتغيرات')
   }
-}
+})
 
 // POST: Create variant
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
-    const body = await request.json();
-    const { productId, name, sku, barcode, costPrice, sellPrice, stock } = body;
+    const body = await request.json()
+    const validation = validateBody(createProductVariantSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!productId || !name?.trim()) {
-      return NextResponse.json(
-        { success: false, error: "يرجى إدخال اسم المتغير وتحديد المنتج" },
-        { status: 400 }
-      );
-    }
+    const { productId, name, sku, barcode, costPrice, sellPrice, stock } = validation.data
+    const user = getRequestUser(request)
 
     // Verify product exists
-    const product = await db.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return NextResponse.json(
-        { success: false, error: "المنتج غير موجود" },
-        { status: 404 }
-      );
-    }
+    const product = await db.product.findUnique({ where: { id: productId } })
+    if (!product) return notFound('المنتج غير موجود')
 
     // Check for duplicate SKU
     if (sku?.trim()) {
       const existingSku = await db.productVariant.findUnique({
         where: { sku: sku.trim() },
-      });
+      })
       if (existingSku) {
-        return NextResponse.json(
-          { success: false, error: "رمز SKU موجود مسبقاً" },
-          { status: 400 }
-        );
+        return errorResponse('رمز SKU موجود مسبقاً')
       }
     }
 
@@ -73,49 +61,46 @@ export async function POST(request: NextRequest) {
         sellPrice: Number(sellPrice) || 0,
         stock: Number(stock) || 0,
       },
-    });
+    })
 
     logAction({
-      action: "create",
-      entity: "ProductVariant",
+      action: 'create',
+      entity: 'ProductVariant',
       entityId: variant.id,
+      userId: user?.userId,
+      userName: user?.username,
       details: { productId, name: name.trim(), sellPrice, stock },
-    });
+    })
 
-    return NextResponse.json({ success: true, data: variant }, { status: 201 });
+    return successResponse(variant, 201)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create variant";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error('Error creating variant:', error)
+    return serverError('فشل في إنشاء المتغير')
   }
-}
+})
 
 // PUT: Update variant (?id=X)
-export async function PUT(request: NextRequest) {
+export const PUT = withAuth(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "يرجى تحديد المتغير" },
-        { status: 400 }
-      );
-    }
+    if (!id) return errorResponse('يرجى تحديد المتغير')
 
-    const body = await request.json();
-    const { name, sku, barcode, costPrice, sellPrice, stock, isActive } = body;
+    const body = await request.json()
+    const validation = validateBody(updateProductVariantSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
+
+    const { name, sku, barcode, costPrice, sellPrice, stock, isActive } = validation.data
+    const user = getRequestUser(request)
 
     // Check for duplicate SKU (exclude current variant)
     if (sku?.trim()) {
       const existingSku = await db.productVariant.findUnique({
         where: { sku: sku.trim() },
-      });
+      })
       if (existingSku && existingSku.id !== id) {
-        return NextResponse.json(
-          { success: false, error: "رمز SKU موجود مسبقاً" },
-          { status: 400 }
-        );
+        return errorResponse('رمز SKU موجود مسبقاً')
       }
     }
 
@@ -130,51 +115,49 @@ export async function PUT(request: NextRequest) {
         ...(stock !== undefined ? { stock: Number(stock) || 0 } : {}),
         ...(isActive !== undefined ? { isActive } : {}),
       },
-    });
+    })
 
     logAction({
-      action: "update",
-      entity: "ProductVariant",
+      action: 'update',
+      entity: 'ProductVariant',
       entityId: id,
+      userId: user?.userId,
+      userName: user?.username,
       details: { name, sellPrice, stock, isActive },
-    });
+    })
 
-    return NextResponse.json({ success: true, data: updated });
+    return successResponse(updated)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update variant";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error('Error updating variant:', error)
+    return serverError('فشل في تحديث المتغير')
   }
-}
+})
 
 // DELETE: Delete variant (?id=X)
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAuth(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "يرجى تحديد المتغير" },
-        { status: 400 }
-      );
-    }
+    if (!id) return errorResponse('يرجى تحديد المتغير')
 
     await db.productVariant.delete({
       where: { id },
-    });
+    })
 
+    const user = getRequestUser(request)
     logAction({
-      action: "delete",
-      entity: "ProductVariant",
+      action: 'delete',
+      entity: 'ProductVariant',
       entityId: id,
-      details: { reason: "تم حذف المتغير" },
-    });
+      userId: user?.userId,
+      userName: user?.username,
+      details: { reason: 'تم حذف المتغير' },
+    })
 
-    return NextResponse.json({ success: true });
+    return successResponse({ message: 'تم حذف المتغير بنجاح' })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to delete variant";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error('Error deleting variant:', error)
+    return serverError('فشل في حذف المتغير')
   }
-}
+})

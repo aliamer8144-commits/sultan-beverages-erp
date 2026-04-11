@@ -1,5 +1,9 @@
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { NextRequest, NextResponse } from 'next/server'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError, notFound } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { validateBody, createSalesTargetSchema, updateSalesTargetSchema } from '@/lib/validations'
 
 // ─── Helper: calculate date range based on target type ─────────────────────
 function getDateRange(type: string, startDate: Date, endDate?: Date | null) {
@@ -106,7 +110,7 @@ async function computeTargetData(target: {
 }
 
 // ─── GET: Return active target (with computed fields) or all targets ────────
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const all = searchParams.get('all') === 'true'
@@ -121,7 +125,7 @@ export async function GET(request: NextRequest) {
         targets.map((t) => computeTargetData(t))
       )
 
-      return NextResponse.json({ success: true, data: targetsWithData })
+      return successResponse(targetsWithData)
     }
 
     // Return only the active target(s)
@@ -139,47 +143,27 @@ export async function GET(request: NextRequest) {
     })
 
     if (activeTargets.length === 0) {
-      return NextResponse.json({ success: true, data: null })
+      return successResponse(null)
     }
 
     const targetWithData = await computeTargetData(activeTargets[0])
 
-    return NextResponse.json({ success: true, data: targetWithData })
+    return successResponse(targetWithData)
   } catch (error) {
     console.error('Error fetching sales targets:', error)
-    return NextResponse.json(
-      { success: false, error: 'خطأ في جلب أهداف المبيعات' },
-      { status: 500 }
-    )
+    return serverError('خطأ في جلب أهداف المبيعات')
   }
-}
+})
 
 // ─── POST: Create new sales target ──────────────────────────────────────────
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { type, targetAmount, startDate, endDate } = body
+    const validation = validateBody(createSalesTargetSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!type || !targetAmount) {
-      return NextResponse.json(
-        { success: false, error: 'النوع والمبلغ مطلوبان' },
-        { status: 400 }
-      )
-    }
-
-    if (!['daily', 'weekly', 'monthly'].includes(type)) {
-      return NextResponse.json(
-        { success: false, error: 'نوع الهدف غير صالح (يومي/أسبوعي/شهري)' },
-        { status: 400 }
-      )
-    }
-
-    if (targetAmount <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'مبلغ الهدف يجب أن يكون أكبر من صفر' },
-        { status: 400 }
-      )
-    }
+    const { type, targetAmount, startDate, endDate } = validation.data
+    const user = getRequestUser(request)
 
     // Deactivate any existing active targets of the same type
     await db.salesTarget.updateMany({
@@ -197,38 +181,36 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    logAction({
+      action: 'create',
+      entity: 'SalesTarget',
+      entityId: target.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { type, targetAmount, startDate, endDate },
+    })
+
     const targetWithData = await computeTargetData(target)
 
-    return NextResponse.json({ success: true, data: targetWithData })
+    return successResponse(targetWithData, 201)
   } catch (error) {
     console.error('Error creating sales target:', error)
-    return NextResponse.json(
-      { success: false, error: 'خطأ في إنشاء هدف المبيعات' },
-      { status: 500 }
-    )
+    return serverError('خطأ في إنشاء هدف المبيعات')
   }
-}
+})
 
 // ─── PUT: Update existing sales target ──────────────────────────────────────
-export async function PUT(request: NextRequest) {
+export const PUT = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { id, targetAmount, type, isActive } = body
+    const validation = validateBody(updateSalesTargetSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف الهدف مطلوب' },
-        { status: 400 }
-      )
-    }
+    const { id, targetAmount, type, isActive } = validation.data
+    const user = getRequestUser(request)
 
     const existing = await db.salesTarget.findUnique({ where: { id } })
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'الهدف غير موجود' },
-        { status: 404 }
-      )
-    }
+    if (!existing) return notFound('الهدف غير موجود')
 
     const updateData: Record<string, unknown> = {}
     if (targetAmount !== undefined) updateData.targetAmount = targetAmount
@@ -240,39 +222,47 @@ export async function PUT(request: NextRequest) {
       data: updateData,
     })
 
+    logAction({
+      action: 'update',
+      entity: 'SalesTarget',
+      entityId: id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: updateData,
+    })
+
     const targetWithData = await computeTargetData(target)
 
-    return NextResponse.json({ success: true, data: targetWithData })
+    return successResponse(targetWithData)
   } catch (error) {
     console.error('Error updating sales target:', error)
-    return NextResponse.json(
-      { success: false, error: 'خطأ في تحديث هدف المبيعات' },
-      { status: 500 }
-    )
+    return serverError('خطأ في تحديث هدف المبيعات')
   }
-}
+})
 
 // ─── DELETE: Delete a target ────────────────────────────────────────────────
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const user = getRequestUser(request)
 
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'معرف الهدف مطلوب' },
-        { status: 400 }
-      )
-    }
+    if (!id) return errorResponse('معرف الهدف مطلوب')
 
     await db.salesTarget.delete({ where: { id } })
 
-    return NextResponse.json({ success: true, message: 'تم حذف الهدف بنجاح' })
+    logAction({
+      action: 'delete',
+      entity: 'SalesTarget',
+      entityId: id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { reason: 'تم حذف الهدف' },
+    })
+
+    return successResponse({ message: 'تم حذف الهدف بنجاح' })
   } catch (error) {
     console.error('Error deleting sales target:', error)
-    return NextResponse.json(
-      { success: false, error: 'خطأ في حذف هدف المبيعات' },
-      { status: 500 }
-    )
+    return serverError('خطأ في حذف هدف المبيعات')
   }
-}
+})

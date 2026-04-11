@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, serverError } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
     const endOfDay = new Date(new Date().setHours(23, 59, 59, 999))
@@ -147,28 +148,25 @@ export async function GET() {
       }))
       .sort((a, b) => a.hour - b.hour)
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalSales,
-        totalProfit: Math.round(totalProfit * 100) / 100,
-        totalPurchases,
-        totalExpenses,
-        netProfit: Math.round(netProfit * 100) / 100,
-        invoiceCount,
-        itemsSold,
-        averageInvoice: Math.round(averageInvoice * 100) / 100,
-        topSellingProduct,
-        topSellingProducts,
-        paymentMethods: {
-          cash: { total: Math.round(cashTotal * 100) / 100, count: cashCount },
-          credit: { total: Math.round(creditTotal * 100) / 100, count: creditCount },
-        },
-        hourlyBreakdown,
+    return successResponse({
+      totalSales,
+      totalProfit: Math.round(totalProfit * 100) / 100,
+      totalPurchases,
+      totalExpenses,
+      netProfit: Math.round(netProfit * 100) / 100,
+      invoiceCount,
+      itemsSold,
+      averageInvoice: Math.round(averageInvoice * 100) / 100,
+      topSellingProduct,
+      topSellingProducts,
+      paymentMethods: {
+        cash: { total: Math.round(cashTotal * 100) / 100, count: cashCount },
+        credit: { total: Math.round(creditTotal * 100) / 100, count: creditCount },
       },
+      hourlyBreakdown,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load daily close data'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(message)
   }
-}
+})

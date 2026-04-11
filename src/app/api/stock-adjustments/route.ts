@@ -1,12 +1,13 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
-
-// Valid adjustment types
-const VALID_TYPES = ['in', 'out', 'adjustment', 'sale', 'purchase', 'return']
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError, notFound } from '@/lib/api-response'
+import { validateBody, createStockAdjustmentSchema } from '@/lib/validations'
+import { logAction } from '@/lib/audit-logger'
 
 // GET: Fetch stock adjustments with filters, pagination, and stats
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
@@ -65,33 +66,15 @@ export async function GET(request: NextRequest) {
       db.stockAdjustment.count({ where: { ...todayWhere, type: 'sale' } }),
       db.stockAdjustment.count({ where: { ...todayWhere, type: 'purchase' } }),
       db.stockAdjustment.count({ where: { ...todayWhere, type: 'return' } }),
-      // Net change = sum of (newQty - previousQty) for today
       db.stockAdjustment.aggregate({
         where: todayWhere,
-        _sum: {
-          newQty: true,
-          previousQty: true,
-        },
+        _sum: { newQty: true, previousQty: true },
       }),
     ])
 
     const netChange = (netChangeResult._sum.newQty || 0) - (netChangeResult._sum.previousQty || 0)
 
-    // Count increases vs decreases
-    const [increasesResult, decreasesResult] = await Promise.all([
-      db.stockAdjustment.aggregate({
-        where: { ...todayWhere, newQty: { gt: 0 } },
-        _sum: { quantity: true },
-        _count: true,
-      }),
-      db.stockAdjustment.aggregate({
-        where: { ...todayWhere, newQty: { lt: 0 } },
-        _sum: { quantity: true },
-        _count: true,
-      }),
-    ])
-
-    // More accurate: count where newQty > previousQty (increase) and where newQty < previousQty (decrease)
+    // Group by type for today
     const increaseAgg = await db.stockAdjustment.groupBy({
       by: ['type'],
       where: { ...todayWhere },
@@ -108,10 +91,9 @@ export async function GET(request: NextRequest) {
       } else if (['out', 'sale'].includes(group.type)) {
         totalDecrease += qty
       }
-      // 'adjustment' can be either way - we check newQty vs previousQty
     }
 
-    // Also get adjustment net changes
+    // Adjustment net changes
     const adjustmentAgg = await db.stockAdjustment.findMany({
       where: { ...todayWhere, type: 'adjustment' },
       select: { newQty: true, previousQty: true },
@@ -146,41 +128,19 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching stock adjustments:', error)
-    return NextResponse.json(
-      { success: false, error: 'فشل في تحميل سجل التعديلات' },
-      { status: 500 },
-    )
+    return serverError('فشل في تحميل سجل التعديلات')
   }
-}
+})
 
 // POST: Create stock adjustment and update product quantity atomically
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { productId, type, quantity, reason, reference, referenceType, userId, userName } = body
+    const validation = validateBody(createStockAdjustmentSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    // Validate required fields
-    if (!productId || !type || quantity === undefined || quantity === null) {
-      return NextResponse.json(
-        { success: false, error: 'يرجى تعبئة جميع الحقول المطلوبة' },
-        { status: 400 },
-      )
-    }
-
-    if (quantity < 0) {
-      return NextResponse.json(
-        { success: false, error: 'الكمية يجب أن تكون صفر أو أكبر' },
-        { status: 400 },
-      )
-    }
-
-    if (!VALID_TYPES.includes(type)) {
-      return NextResponse.json(
-        { success: false, error: `نوع التعديل غير صالح. الأنواع: ${VALID_TYPES.join(', ')}` },
-        { status: 400 },
-      )
-    }
+    const { productId, type, quantity, reason, reference, referenceType } = validation.data
+    const user = getRequestUser(request)
 
     // Check product exists
     const product = await db.product.findUnique({
@@ -188,10 +148,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!product) {
-      return NextResponse.json(
-        { success: false, error: 'المنتج غير موجود' },
-        { status: 404 },
-      )
+      return notFound('المنتج غير موجود')
     }
 
     const previousQty = product.quantity
@@ -207,15 +164,12 @@ export async function POST(request: NextRequest) {
       case 'out':
       case 'sale':
         if (quantity > previousQty) {
-          return NextResponse.json(
-            { success: false, error: `الكمية المطلوبة (${quantity}) أكبر من المخزون المتاح (${previousQty})` },
-            { status: 400 },
-          )
+          return errorResponse(`الكمية المطلوبة (${quantity}) أكبر من المخزون المتاح (${previousQty})`)
         }
         newQty = previousQty - quantity
         break
       case 'adjustment':
-        newQty = quantity // For adjustment, quantity IS the new absolute value
+        newQty = quantity
         break
       default:
         newQty = previousQty
@@ -233,8 +187,8 @@ export async function POST(request: NextRequest) {
           reason: reason || '',
           reference: reference || null,
           referenceType: referenceType || null,
-          userId: userId || '',
-          userName: userName || null,
+          userId: user?.userId || '',
+          userName: user?.username || null,
         },
         include: {
           product: {
@@ -251,16 +205,20 @@ export async function POST(request: NextRequest) {
       return adj
     })
 
-    return NextResponse.json({
-      success: true,
-      data: adjustment,
+    logAction({
+      action: 'create',
+      entity: 'StockAdjustment',
+      entityId: adjustment.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { productId, type, quantity, previousQty, newQty },
+    })
+
+    return successResponse({
+      ...adjustment,
       message: `تم تعديل المخزون بنجاح (${previousQty} → ${newQty})`,
     })
   } catch (error) {
-    console.error('Error creating stock adjustment:', error)
-    return NextResponse.json(
-      { success: false, error: 'فشل في تعديل المخزون' },
-      { status: 500 },
-    )
+    return serverError('فشل في تعديل المخزون')
   }
-}
+})

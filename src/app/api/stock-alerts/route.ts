@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { withAuth } from "@/lib/auth-middleware";
+import { serverError } from "@/lib/api-response";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     // Fetch all active products ordered by stock level
     const products = await db.product.findMany({
@@ -135,6 +137,6 @@ export async function GET() {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "فشل في جلب تنبيهات المخزون";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return serverError(message);
   }
-}
+});

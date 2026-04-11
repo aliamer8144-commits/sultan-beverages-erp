@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { logAction } from '@/lib/audit-logger'
+import { validateBody, createCustomerPaymentSchema } from '@/lib/validations'
 
 // GET /api/customer-payments?customerId=xxx
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url)
     const customerId = searchParams.get('customerId')
 
     if (!customerId) {
-      return NextResponse.json(
-        { success: false, error: 'Customer ID is required' },
-        { status: 400 }
-      )
+      return errorResponse('معرف العميل مطلوب')
     }
 
     const payments = await db.payment.findMany({
@@ -19,26 +20,22 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json({ success: true, data: payments })
+    return successResponse(payments)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to fetch payments'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error fetching payments:', error)
+    return serverError('فشل في جلب المدفوعات')
   }
-}
+})
 
 // POST /api/customer-payments
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { customerId, amount, method, notes } = body
+    const validation = validateBody(createCustomerPaymentSchema, body)
+    if (!validation.success) return errorResponse(validation.error)
 
-    if (!customerId || !amount || amount <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Customer ID and a valid amount are required' },
-        { status: 400 }
-      )
-    }
+    const { customerId, amount, method, notes } = validation.data
+    const user = getRequestUser(request)
 
     const payment = await db.$transaction(async (tx) => {
       // 1. Create the payment record
@@ -60,10 +57,18 @@ export async function POST(request: NextRequest) {
       return createdPayment
     })
 
-    return NextResponse.json({ success: true, data: payment }, { status: 201 })
+    logAction({
+      action: 'create',
+      entity: 'CustomerPayment',
+      entityId: payment.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { customerId, amount, method },
+    })
+
+    return successResponse(payment, 201)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to record payment'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('Error recording payment:', error)
+    return serverError('فشل في تسجيل الدفعة')
   }
-}
+})

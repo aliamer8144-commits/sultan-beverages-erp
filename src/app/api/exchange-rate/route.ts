@@ -1,62 +1,46 @@
-import { NextResponse } from 'next/server'
-import { useAppStore } from '@/store/app-store'
+import { NextRequest } from 'next/server'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
 
-// ─── GET: Return current exchange rate settings ──────────────────
-export async function GET() {
+// ─── GET: Return default exchange rate settings ──────────────────
+// Stateless endpoint — the frontend manages exchange rate via Zustand.
+// Previous implementation incorrectly used useAppStore.getState() on the server.
+export const GET = withAuth(async () => {
   try {
-    const settings = useAppStore.getState().settings
-    return NextResponse.json({
-      success: true,
-      data: {
-        primaryCurrency: settings.currency,
-        secondaryCurrencyEnabled: settings.secondaryCurrencyEnabled,
-        secondaryCurrency: settings.secondaryCurrency,
-        exchangeRate: settings.exchangeRate,
-        currencyDisplayMode: settings.currencyDisplayMode,
-      },
+    return successResponse({
+      enabled: false,
+      primaryCurrency: 'YER',
+      secondaryCurrencyEnabled: false,
+      secondaryCurrency: 'USD',
+      exchangeRate: 1,
+      currencyDisplayMode: 'primary',
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch exchange rate'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  } catch {
+    return serverError('فشل في جلب سعر الصرف')
   }
-}
+})
 
-// ─── POST: Save exchange rate to settings ────────────────────────
-export async function POST(request: Request) {
+// ─── POST: Accept exchange rate settings (stateless echo) ────────
+// The frontend persists settings via Zustand/localStorage.
+// This endpoint validates and echoes back the posted data.
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { exchangeRate, secondaryCurrency, currencyDisplayMode } = body
+    const { exchangeRate, secondaryCurrency, currencyDisplayMode, secondaryCurrencyEnabled, secondaryCurrencySymbol } = body
 
     if (exchangeRate !== undefined && (typeof exchangeRate !== 'number' || exchangeRate <= 0)) {
-      return NextResponse.json(
-        { success: false, error: 'يجب أن يكون سعر الصرف رقماً أكبر من صفر' },
-        { status: 400 }
-      )
+      return errorResponse('يجب أن يكون سعر الصرف رقماً أكبر من صفر')
     }
 
-    const updates: Record<string, unknown> = {}
-    if (exchangeRate !== undefined) updates.exchangeRate = exchangeRate
-    if (secondaryCurrency) updates.secondaryCurrency = secondaryCurrency
-    if (currencyDisplayMode) updates.currencyDisplayMode = currencyDisplayMode
-    if (body.secondaryCurrencyEnabled !== undefined) updates.secondaryCurrencyEnabled = body.secondaryCurrencyEnabled
-    if (body.secondaryCurrencySymbol !== undefined) updates.secondaryCurrencySymbol = body.secondaryCurrencySymbol
-
-    const store = useAppStore.getState()
-    store.updateSettings(updates)
-
-    const updatedSettings = useAppStore.getState().settings
-    return NextResponse.json({
-      success: true,
-      data: {
-        primaryCurrency: updatedSettings.currency,
-        secondaryCurrencyEnabled: updatedSettings.secondaryCurrencyEnabled,
-        secondaryCurrency: updatedSettings.secondaryCurrency,
-        exchangeRate: updatedSettings.exchangeRate,
-        currencyDisplayMode: updatedSettings.currencyDisplayMode,
-      },
+    return successResponse({
+      primaryCurrency: 'YER',
+      secondaryCurrencyEnabled: secondaryCurrencyEnabled ?? false,
+      secondaryCurrency: secondaryCurrency ?? 'USD',
+      exchangeRate: exchangeRate ?? 1,
+      currencyDisplayMode: currencyDisplayMode ?? 'primary',
+      secondaryCurrencySymbol: secondaryCurrencySymbol ?? '$',
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to save exchange rate'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  } catch {
+    return serverError('فشل في حفظ سعر الصرف')
   }
-}
+})

@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { withAuth } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, notFound, serverError } from '@/lib/api-response'
 
 // ─── GET: Customer account statement ─────────────────────────────────
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const searchParams = request.nextUrl.searchParams
     const customerId = searchParams.get('customerId')
@@ -11,10 +12,7 @@ export async function GET(request: NextRequest) {
     const endDateStr = searchParams.get('endDate')
 
     if (!customerId) {
-      return NextResponse.json(
-        { success: false, error: 'معرف العميل مطلوب' },
-        { status: 400 },
-      )
+      return errorResponse('معرف العميل مطلوب')
     }
 
     const customer = await db.customer.findUnique({
@@ -22,10 +20,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!customer) {
-      return NextResponse.json(
-        { success: false, error: 'العميل غير موجود' },
-        { status: 404 },
-      )
+      return notFound('العميل غير موجود')
     }
 
     const startDate = startDateStr ? new Date(startDateStr) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -160,37 +155,34 @@ export async function GET(request: NextRequest) {
       _sum: { totalAmount: true },
     })
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        customer: {
-          id: customer.id,
-          name: customer.name,
-          phone: customer.phone,
-          debt: customer.debt,
-          totalPurchases: customer.totalPurchases,
-          category: customer.category,
-          createdAt: customer.createdAt.toISOString(),
-        },
-        period: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-        },
-        summary: {
-          openingBalance,
-          totalDebits,
-          totalCredits,
-          closingBalance,
-          invoiceCount: invoices.filter((i) => i.type === 'sale').length,
-          returnCount: invoices.reduce((sum, i) => sum + i.returns.length, 0),
-          paymentCount: payments.length,
-          totalPurchasesAllTime: allPurchasesAgg._sum.totalAmount ?? 0,
-        },
-        transactions,
+    return successResponse({
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        debt: customer.debt,
+        totalPurchases: customer.totalPurchases,
+        category: customer.category,
+        createdAt: customer.createdAt.toISOString(),
       },
+      period: {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      },
+      summary: {
+        openingBalance,
+        totalDebits,
+        totalCredits,
+        closingBalance,
+        invoiceCount: invoices.filter((i) => i.type === 'sale').length,
+        returnCount: invoices.reduce((sum, i) => sum + i.returns.length, 0),
+        paymentCount: payments.length,
+        totalPurchasesAllTime: allPurchasesAgg._sum.totalAmount ?? 0,
+      },
+      transactions,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'فشل في تحميل كشف الحساب'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return serverError(message)
   }
-}
+})

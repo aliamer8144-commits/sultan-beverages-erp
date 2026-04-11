@@ -1,5 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
+import { withAuth, getRequestUser } from '@/lib/auth-middleware'
+import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { validateBody, createAuditLogSchema } from '@/lib/validations'
 
 // ── Seed sample audit log data ──────────────────────────────────────
 async function seedSampleData() {
@@ -34,7 +37,7 @@ async function seedSampleData() {
 }
 
 // ── GET: Paginated audit logs with filters ──────────────────────────
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     // Seed sample data if empty
     await seedSampleData()
@@ -122,31 +125,28 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      data: formattedLogs,
+    return successResponse({
+      logs: formattedLogs,
       total,
       page,
       totalPages,
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch audit logs'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  } catch {
+    return serverError('فشل في جلب سجل المراجعة')
   }
-}
+})
 
-// ── POST: Create a new audit log entry ──────────────────────────────
-export async function POST(request: NextRequest) {
+// ── POST: Create a new audit log entry (admin only) ─────────────────
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { action, entity, entityId, details, userName, ipAddress } = body
-
-    if (!action || !entity) {
-      return NextResponse.json(
-        { success: false, error: 'العملية والكيان مطلوبان' },
-        { status: 400 }
-      )
+    const validation = validateBody(createAuditLogSchema, body)
+    if (!validation.success) {
+      return errorResponse(validation.error)
     }
+
+    const { action, entity, entityId, details, userName, ipAddress } = validation.data
+    const user = getRequestUser(request)
 
     const log = await db.auditLog.create({
       data: {
@@ -154,14 +154,13 @@ export async function POST(request: NextRequest) {
         entity,
         entityId: entityId || null,
         details: details ? JSON.stringify(details) : null,
-        userName: userName || null,
+        userName: userName || user?.username || null,
         ipAddress: ipAddress || null,
       },
     })
 
-    return NextResponse.json({ success: true, data: log }, { status: 201 })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create audit log'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    return successResponse(log, 201)
+  } catch {
+    return serverError('فشل في إنشاء سجل مراجعة')
   }
-}
+}, { requireAdmin: true })
