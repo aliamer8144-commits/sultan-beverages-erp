@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { getRelativeTime } from '@/lib/date-utils'
 import { exportToCSV } from '@/lib/export-csv'
 import {
@@ -437,19 +438,15 @@ export function AuditLogScreen() {
           </div>
         ) : logs.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <div className="empty-state">
-              <div className="empty-state-icon">
-                <ShieldCheck className="w-10 h-10 text-muted-foreground/40" />
-              </div>
-              <div className="empty-state-title">
-                {hasActiveFilters ? 'لا توجد نتائج' : 'السجل فارغ'}
-              </div>
-              <div className="empty-state-description">
-                {hasActiveFilters
+            <EmptyState
+              icon={ShieldCheck}
+              title={hasActiveFilters ? 'لا توجد نتائج' : 'السجل فارغ'}
+              description={
+                hasActiveFilters
                   ? 'لم يتم العثور على عمليات تطابق معايير البحث. حاول تغيير الفلاتر.'
-                  : 'لم يتم تسجيل أي عمليات بعد. ستظهر العمليات هنا تلقائياً.'}
-              </div>
-            </div>
+                  : 'لم يتم تسجيل أي عمليات بعد. ستظهر العمليات هنا تلقائياً.'
+              }
+            />
           </div>
         ) : (
           <ScrollArea className="h-full px-4 md:px-6 pb-4">

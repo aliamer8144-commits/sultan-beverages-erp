@@ -55,6 +55,7 @@ import {
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { formatDate, formatTime, formatShortDate, formatDateFull } from '@/lib/date-utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -707,32 +708,28 @@ export function StockAdjustmentsScreen() {
       {loading && adjustments.length === 0 ? (
         renderSkeleton()
       ) : adjustments.length === 0 ? (
-        <div className="flex items-center justify-center py-16 empty-state">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center empty-state-icon">
-              <PackageOpen className="w-8 h-8 text-muted-foreground/50" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground empty-state-title">لا توجد حركات</p>
-              <p className="text-xs text-muted-foreground mt-1 empty-state-description">
-                {hasActiveFilters
-                  ? 'لم يتم العثور على حركات تطابق معايير البحث'
-                  : 'لم يتم تسجيل أي حركة على المخزون بعد'}
-              </p>
-            </div>
-            {!hasActiveFilters && (
+        <EmptyState
+          icon={PackageOpen}
+          title="لا توجد حركات"
+          description={
+            hasActiveFilters
+              ? 'لم يتم العثور على حركات تطابق معايير البحث'
+              : 'لم يتم تسجيل أي حركة على المخزون بعد'
+          }
+          action={
+            !hasActiveFilters ? (
               <Button
                 onClick={openNewAdjustmentDialog}
                 variant="outline"
                 size="sm"
-                className="gap-2 mt-2"
+                className="gap-2"
               >
                 <Plus className="w-4 h-4" />
                 تسجيل أول حركة
               </Button>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="space-y-6">
           {Object.entries(groupedAdjustments).map(([dateLabel, items]) => (

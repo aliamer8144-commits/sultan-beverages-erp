@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { formatCurrency } from '@/components/chart-utils'
 import { formatDate, formatShortDate } from '@/lib/date-utils'
 import {
@@ -516,21 +517,15 @@ export function ReturnsScreen() {
           </div>
         </div>
       ) : returns.length === 0 ? (
-        <div className="flex items-center justify-center py-16 empty-state">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center empty-state-icon">
-              <PackageOpen className="w-8 h-8 text-muted-foreground/50" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground empty-state-title">لا توجد مرتجعات</p>
-              <p className="text-xs text-muted-foreground mt-1 empty-state-description">
-                {hasActiveFilters
-                  ? 'لم يتم العثور على مرتجعات تطابق معايير البحث'
-                  : 'لم يتم تسجيل أي عملية إرجاع بعد'}
-              </p>
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          icon={PackageOpen}
+          title="لا توجد مرتجعات"
+          description={
+            hasActiveFilters
+              ? 'لم يتم العثور على مرتجعات تطابق معايير البحث'
+              : 'لم يتم تسجيل أي عملية إرجاع بعد'
+          }
+        />
       ) : (
         <div className="rounded-2xl border border-border/50 overflow-hidden">
           <ScrollArea className="max-h-[500px]">

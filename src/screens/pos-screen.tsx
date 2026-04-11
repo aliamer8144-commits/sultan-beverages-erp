@@ -44,6 +44,7 @@ import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1146,13 +1147,12 @@ export function POSScreen() {
         {/* Cart items */}
         <div className="flex-1 overflow-hidden">
           {cart.length === 0 ? (
-            <div className="empty-state-v2 h-full flex flex-col items-center justify-center text-center px-6">
-              <div className="empty-state-v2-icon w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-3 animate-pulse-glow">
-                <ShoppingCart className="w-7 h-7 text-muted-foreground/30" />
-              </div>
-              <p className="empty-state-v2-title text-sm">السلة فارغة</p>
-              <p className="empty-state-v2-description text-xs mt-1">اضغط على منتج لإضافته</p>
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              title="السلة فارغة"
+              description="اضغط على منتج لإضافته"
+              className="h-full"
+            />
           ) : (
             <ScrollArea className="h-full">
               <div className="scrollable-list p-3 space-y-0">

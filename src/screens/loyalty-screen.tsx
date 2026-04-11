@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { formatDate, formatTime } from '@/lib/date-utils'
 import { useTranslation } from '@/lib/translations'
 import {
@@ -394,14 +395,11 @@ export function LoyaltyScreen() {
               ))}
             </div>
           ) : customerTransactions.length === 0 ? (
-            <div className="flex items-center justify-center py-12 empty-state">
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center empty-state-icon">
-                  <Gift className="w-7 h-7 text-muted-foreground/50" />
-                </div>
-                <p className="text-sm text-muted-foreground">{t('loyalty.noTransactions')}</p>
-              </div>
-            </div>
+            <EmptyState
+              icon={Gift}
+              title={t('loyalty.noTransactions')}
+              compact
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 stagger-children">
               {customerTransactions.map((tx) => {
@@ -742,11 +740,12 @@ export function LoyaltyScreen() {
             </div>
           ) : recentTransactions.length === 0 ? (
             <Card className="rounded-2xl border-0 shadow-sm">
-              <CardContent className="p-12 flex flex-col items-center justify-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
-                  <Gift className="w-7 h-7 text-muted-foreground/50" />
-                </div>
-                <p className="text-sm text-muted-foreground">{t('loyalty.noTransactions')}</p>
+              <CardContent className="p-12">
+                <EmptyState
+                  icon={Gift}
+                  title={t('loyalty.noTransactions')}
+                  compact
+                />
               </CardContent>
             </Card>
           ) : (

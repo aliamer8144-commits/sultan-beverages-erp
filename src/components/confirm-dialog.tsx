@@ -145,7 +145,7 @@ export function useConfirm() {
   return {
     confirm,
     loading,
-    isOpen: state.open,
+    open: state.open,
     title: state.title,
     description: state.description,
     onConfirm: handleConfirm,

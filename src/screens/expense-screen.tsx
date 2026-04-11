@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useConfirm, ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ import {
 } from '@/components/chart-utils'
 import { formatDate } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
+import { Pagination, EmptyState } from '@/components/empty-state'
 import {
   Receipt,
   Plus,
@@ -347,9 +349,8 @@ export function ExpenseScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   // Delete dialog
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const deleteConfirm = useConfirm()
   const [deleteTarget, setDeleteTarget] = useState<ExpenseItem | null>(null)
-  const [deleting, setDeleting] = useState(false)
 
   // ── Fetch Data ─────────────────────────────────────────────────
 
@@ -427,15 +428,12 @@ export function ExpenseScreen() {
 
   const handleDeleteExpense = async () => {
     if (!deleteTarget) return
-    setDeleting(true)
     const success = await del('/api/expenses?id=' + deleteTarget.id)
 
     if (success) {
-      setDeleteDialogOpen(false)
       setDeleteTarget(null)
       fetchData(currentPage)
     }
-    setDeleting(false)
   }
 
   const resetAddForm = () => {
@@ -729,13 +727,12 @@ export function ExpenseScreen() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <Wallet className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد مصروفات بعد</p>
-                    <p className="empty-state-description mt-1">سيظهر توزيع المصروفات حسب الفئة هنا</p>
-                  </div>
+                  <EmptyState
+                    icon={Wallet}
+                    title="لا توجد مصروفات بعد"
+                    description="سيظهر توزيع المصروفات حسب الفئة هنا"
+                    className="h-full"
+                  />
                 )}
               </div>
             </CardContent>
@@ -795,13 +792,12 @@ export function ExpenseScreen() {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <TrendingDown className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد بيانات كافية</p>
-                    <p className="empty-state-description mt-1">سيظهر اتجاه المصروفات اليومي هنا</p>
-                  </div>
+                  <EmptyState
+                    icon={TrendingDown}
+                    title="لا توجد بيانات كافية"
+                    description="سيظهر اتجاه المصروفات اليومي هنا"
+                    className="h-full"
+                  />
                 )}
               </div>
             </CardContent>
@@ -1037,7 +1033,11 @@ export function ExpenseScreen() {
                                   className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => {
                                     setDeleteTarget(expense)
-                                    setDeleteDialogOpen(true)
+                                    deleteConfirm.confirm({
+                                      title: 'حذف المصروف',
+                                      description: 'هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.',
+                                      onConfirm: handleDeleteExpense,
+                                    })
                                   }}
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1051,72 +1051,24 @@ export function ExpenseScreen() {
                   </div>
                 </ScrollArea>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/30">
-                    <p className="text-xs text-muted-foreground">
-                      صفحة {currentPage} من {totalPages}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={currentPage <= 1}
-                        onClick={() => fetchData(currentPage - 1)}
-                      >
-                        <span className="text-xs">←</span>
-                      </Button>
-                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                        let pageNum: number
-                        if (totalPages <= 5) {
-                          pageNum = i + 1
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i
-                        } else {
-                          pageNum = currentPage - 2 + i
-                        }
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={currentPage === pageNum ? 'default' : 'outline'}
-                            size="icon"
-                            className="h-8 w-8 text-xs"
-                            onClick={() => fetchData(pageNum)}
-                          >
-                            {pageNum}
-                          </Button>
-                        )
-                      })}
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={currentPage >= totalPages}
-                        onClick={() => fetchData(currentPage + 1)}
-                      >
-                        <span className="text-xs">→</span>
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <Pagination
+                  page={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={(p) => fetchData(p)}
+                  className="mt-4 pt-3 border-t border-border/30"
+                />
               </>
             ) : (
-              <div className="h-48 flex items-center justify-center empty-state">
-                <div className="empty-state-icon">
-                  <Receipt className="w-6 h-6 text-primary/30" />
-                </div>
-                <p className="empty-state-title">
-                  {hasActiveFilters ? 'لا توجد نتائج' : 'لا توجد مصروفات'}
-                </p>
-                <p className="empty-state-description mt-1">
-                  {hasActiveFilters
+              <EmptyState
+                icon={Receipt}
+                title={hasActiveFilters ? 'لا توجد نتائج' : 'لا توجد مصروفات'}
+                description={
+                  hasActiveFilters
                     ? 'لم يتم العثور على مصروفات تطابق معايير البحث'
-                    : 'لم يتم تسجيل أي مصروفات بعد. اضغط على "إضافة مصروف" للبدء'}
-                </p>
-              </div>
+                    : 'لم يتم تسجيل أي مصروفات بعد. اضغط على "إضافة مصروف" للبدء'
+                }
+                className="h-48"
+              />
             )}
           </CardContent>
         </Card>
@@ -1291,69 +1243,30 @@ export function ExpenseScreen() {
       </Dialog>
 
       {/* ── Delete Confirmation Dialog ─────────────────────────────── */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-sm" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              تأكيد الحذف
-            </DialogTitle>
-            <DialogDescription>
-              هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.
-            </DialogDescription>
-          </DialogHeader>
-
-          {deleteTarget && (
-            <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 mt-2">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg ${getCategoryDef(deleteTarget.category).bgClass} ${getCategoryDef(deleteTarget.category).borderClass} border flex items-center justify-center flex-shrink-0`}>
-                  <CategoryIcon category={deleteTarget.category} size="sm" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{deleteTarget.description}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-4 ${getCategoryDef(deleteTarget.category).badgeClass}`}>
-                      {deleteTarget.category}
-                    </Badge>
-                    <span className="text-xs font-bold text-foreground tabular-nums">{formatCurrency(deleteTarget.amount)} ر.س</span>
-                  </div>
+      <ConfirmDialog
+        {...deleteConfirm}
+        confirmText="حذف"
+        variant="destructive"
+      >
+        {deleteTarget && (
+          <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 mt-2">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg ${getCategoryDef(deleteTarget.category).bgClass} ${getCategoryDef(deleteTarget.category).borderClass} border flex items-center justify-center flex-shrink-0`}>
+                <CategoryIcon category={deleteTarget.category} size="sm" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">{deleteTarget.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-4 ${getCategoryDef(deleteTarget.category).badgeClass}`}>
+                    {deleteTarget.category}
+                  </Badge>
+                  <span className="text-xs font-bold text-foreground tabular-nums">{formatCurrency(deleteTarget.amount)} ر.س</span>
                 </div>
               </div>
             </div>
-          )}
-
-          <DialogFooter className="gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false)
-                setDeleteTarget(null)
-              }}
-              className="btn-ripple"
-            >
-              إلغاء
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteExpense}
-              disabled={deleting}
-              className="btn-ripple"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري الحذف...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 ml-2" />
-                  حذف المصروف
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

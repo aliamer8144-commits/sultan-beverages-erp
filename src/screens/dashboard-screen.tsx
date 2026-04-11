@@ -21,6 +21,7 @@ import {
   StatCard,
   CHART_COLORS,
 } from '@/components/chart-utils'
+import { EmptyState } from '@/components/empty-state'
 import { formatDate } from '@/lib/date-utils'
 import {
   getMotivationalMessage,
@@ -458,13 +459,12 @@ export function DashboardScreen() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center empty-state">
-                      <div className="empty-state-icon">
-                        <TrendingUp className="w-6 h-6 text-primary/30" />
-                      </div>
-                      <p className="empty-state-title">لا توجد بيانات مبيعات بعد</p>
-                      <p className="empty-state-description mt-1">ستظهر أفضل المنتجات مبيعاً هنا بعد تسجيل أول عملية بيع</p>
-                    </div>
+                    <EmptyState
+                      icon={TrendingUp}
+                      title="لا توجد بيانات مبيعات بعد"
+                      description="ستظهر أفضل المنتجات مبيعاً هنا بعد تسجيل أول عملية بيع"
+                      className="h-full"
+                    />
                   )}
                 </div>
               </CardContent>
@@ -515,13 +515,12 @@ export function DashboardScreen() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center empty-state">
-                      <div className="empty-state-icon">
-                        <DollarSign className="w-6 h-6 text-primary/30" />
-                      </div>
-                      <p className="empty-state-title">لا توجد بيانات مبيعات بعد</p>
-                      <p className="empty-state-description mt-1">سيظهر توزيع المبيعات حسب الفئة هنا بعد تسجيل أول عملية بيع</p>
-                    </div>
+                    <EmptyState
+                      icon={DollarSign}
+                      title="لا توجد بيانات مبيعات بعد"
+                      description="سيظهر توزيع المبيعات حسب الفئة هنا بعد تسجيل أول عملية بيع"
+                      className="h-full"
+                    />
                   )}
                 </div>
               </CardContent>
@@ -604,13 +603,12 @@ export function DashboardScreen() {
                   </div>
                 </ScrollArea>
               ) : (
-                <div className="h-48 flex items-center justify-center empty-state">
-                  <div className="empty-state-icon">
-                    <FileText className="w-6 h-6 text-primary/30" />
-                  </div>
-                  <p className="empty-state-title">لا توجد فواتير بيع بعد</p>
-                  <p className="empty-state-description mt-1">ستظهر أحدث المعاملات هنا بعد تسجيل أول عملية بيع</p>
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="لا توجد فواتير بيع بعد"
+                  description="ستظهر أحدث المعاملات هنا بعد تسجيل أول عملية بيع"
+                  className="h-48"
+                />
               )}
             </CardContent>
           </Card>

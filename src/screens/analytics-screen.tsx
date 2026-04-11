@@ -46,7 +46,8 @@ import {
   Medal,
   ArrowUpDown,
 } from 'lucide-react'
-import { formatCurrency, CHART_COLORS } from '@/components/chart-utils'
+import { formatCurrency, CHART_COLORS, SummaryCardSkeleton, ChartSkeleton, TableSkeleton } from '@/components/chart-utils'
+import { EmptyState } from '@/components/empty-state'
 import { useApi } from '@/hooks/use-api'
 
 const EXPENSE_COLORS = ['#e03131', '#f08c00', '#9c36b5', '#e8590c', '#1c7ed6', '#c92a2a', '#364fc7']
@@ -201,54 +202,7 @@ function CustomLegend({ payload }: { payload?: Array<{ value: string; color: str
   )
 }
 
-// ─── Skeleton Components ─────────────────────────────────────────
-function KPICardSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardContent className="p-4 md:p-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2 flex-1">
-            <div className="skeleton-shimmer h-4 w-24 rounded" />
-            <div className="skeleton-shimmer h-8 w-28 rounded" />
-          </div>
-          <div className="skeleton-shimmer w-10 h-10 rounded-xl" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ChartSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="skeleton-shimmer h-5 w-40 rounded" />
-        <div className="skeleton-shimmer h-3 w-52 rounded mt-1" />
-      </CardHeader>
-      <CardContent className="p-6 pt-2">
-        <div className="skeleton-shimmer h-[300px] w-full rounded-xl" />
-      </CardContent>
-    </Card>
-  )
-}
-
-function TableSkeleton() {
-  return (
-    <Card className="rounded-2xl border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="skeleton-shimmer h-5 w-40 rounded" />
-        <div className="skeleton-shimmer h-3 w-52 rounded mt-1" />
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="skeleton-shimmer h-12 w-full rounded-lg" />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+// ─── Skeleton Components (imported from @/components/chart-utils) ───
 
 // ─── Main Component ──────────────────────────────────────────────
 export function AnalyticsScreen() {
@@ -387,7 +341,7 @@ export function AnalyticsScreen() {
           {/* KPI skeleton row */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <KPICardSkeleton key={i} />
+              <SummaryCardSkeleton key={i} />
             ))}
           </div>
           <ChartSkeleton />
@@ -557,13 +511,12 @@ export function AnalyticsScreen() {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center empty-state">
-                    <div className="empty-state-icon">
-                      <TrendingUp className="w-6 h-6 text-primary/30" />
-                    </div>
-                    <p className="empty-state-title">لا توجد بيانات مبيعات</p>
-                    <p className="empty-state-description mt-1">ستظهر بيانات المبيعات بعد تسجيل عمليات البيع</p>
-                  </div>
+                  <EmptyState
+                    icon={TrendingUp}
+                    title="لا توجد بيانات مبيعات"
+                    description="ستظهر بيانات المبيعات بعد تسجيل عمليات البيع"
+                    className="h-full"
+                  />
                 )}
               </div>
               {/* Legend */}
@@ -638,12 +591,11 @@ export function AnalyticsScreen() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center empty-state">
-                      <div className="empty-state-icon">
-                        <Package className="w-6 h-6 text-primary/30" />
-                      </div>
-                      <p className="empty-state-title">لا توجد بيانات فئات</p>
-                    </div>
+                    <EmptyState
+                      icon={Package}
+                      title="لا توجد بيانات فئات"
+                      className="h-full"
+                    />
                   )}
                 </div>
               </CardContent>
@@ -693,13 +645,12 @@ export function AnalyticsScreen() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center empty-state">
-                      <div className="empty-state-icon">
-                        <ShoppingCart className="w-6 h-6 text-red-300/50" />
-                      </div>
-                      <p className="empty-state-title">لا توجد مصروفات</p>
-                      <p className="empty-state-description mt-1">لم يتم تسجيل مصروفات في هذه الفترة</p>
-                    </div>
+                    <EmptyState
+                      icon={ShoppingCart}
+                      title="لا توجد مصروفات"
+                      description="لم يتم تسجيل مصروفات في هذه الفترة"
+                      className="h-full"
+                    />
                   )}
                 </div>
               </CardContent>
@@ -774,13 +725,12 @@ export function AnalyticsScreen() {
                   </div>
                 </ScrollArea>
               ) : (
-                <div className="h-48 flex items-center justify-center empty-state">
-                  <div className="empty-state-icon">
-                    <Package className="w-6 h-6 text-primary/30" />
-                  </div>
-                  <p className="empty-state-title">لا توجد منتجات مبيعة</p>
-                  <p className="empty-state-description mt-1">ستظهر المنتجات الأعلى مبيعاً بعد تسجيل عمليات البيع</p>
-                </div>
+                <EmptyState
+                  icon={Package}
+                  title="لا توجد منتجات مبيعة"
+                  description="ستظهر المنتجات الأعلى مبيعاً بعد تسجيل عمليات البيع"
+                  className="h-48"
+                />
               )}
             </CardContent>
           </Card>
@@ -843,13 +793,12 @@ export function AnalyticsScreen() {
                   </div>
                 </ScrollArea>
               ) : (
-                <div className="h-48 flex items-center justify-center empty-state">
-                  <div className="empty-state-icon">
-                    <Users className="w-6 h-6 text-primary/30" />
-                  </div>
-                  <p className="empty-state-title">لا توجد بيانات عملاء</p>
-                  <p className="empty-state-description mt-1">ستظهر ترتيب العملاء بعد تسجيل عمليات البيع</p>
-                </div>
+                <EmptyState
+                  icon={Users}
+                  title="لا توجد بيانات عملاء"
+                  description="ستظهر ترتيب العملاء بعد تسجيل عمليات البيع"
+                  className="h-48"
+                />
               )}
             </CardContent>
           </Card>
@@ -858,13 +807,11 @@ export function AnalyticsScreen() {
 
       {/* ─── Empty state for custom range not yet fetched ─────────── */}
       {!loading && !data && selectedPreset === 'custom' && (
-        <div className="flex flex-col items-center justify-center py-16 empty-state">
-          <div className="empty-state-icon">
-            <CalendarDays className="w-8 h-8 text-primary/30" />
-          </div>
-          <p className="empty-state-title">اختر نطاق التاريخ</p>
-          <p className="empty-state-description mt-1">حدد تاريخ البداية والنهاية ثم اضغط &quot;عرض التقرير&quot;</p>
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title="اختر نطاق التاريخ"
+          description='حدد تاريخ البداية والنهاية ثم اضغط "عرض التقرير"'
+        />
       )}
     </div>
   )

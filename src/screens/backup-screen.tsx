@@ -6,14 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { useConfirm, ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Shield,
   Download,
@@ -75,7 +68,7 @@ export function BackupScreen() {
   const [previewData, setPreviewData] = useState<BackupMetadata | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [restoreResult, setRestoreResult] = useState<{ success: boolean; counts: Record<string, number>; error?: string } | null>(null)
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const confirm = useConfirm()
   const [dragOver, setDragOver] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -193,7 +186,6 @@ export function BackupScreen() {
   const handleRestore = useCallback(async () => {
     if (!selectedFile || !previewData) return
 
-    setConfirmDialogOpen(false)
     setRestoring(true)
     setRestoreResult(null)
 
@@ -478,7 +470,11 @@ export function BackupScreen() {
                   {/* Restore / Reset Buttons */}
                   <div className="flex gap-3">
                     <Button
-                      onClick={() => setConfirmDialogOpen(true)}
+                      onClick={() => confirm.confirm({
+                        title: 'تأكيد استعادة البيانات',
+                        description: 'هل أنت متأكد من استعادة البيانات؟ سيتم حذف جميع البيانات الحالية واستبدالها ببيانات النسخة الاحتياطية. هذا الإجراء لا يمكن التراجع عنه.',
+                        onConfirm: handleRestore,
+                      })}
                       disabled={restoring}
                       className="gap-2 rounded-xl btn-ripple"
                     >
@@ -544,37 +540,12 @@ export function BackupScreen() {
       </Tabs>
 
       {/* ── Confirm Restore Dialog ── */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-right">
-              <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-              </div>
-              تأكيد استعادة البيانات
-            </DialogTitle>
-            <DialogDescription>
-              هل أنت متأكد من استعادة البيانات؟ سيتم حذف جميع البيانات الحالية واستبدالها ببيانات النسخة الاحتياطية. هذا الإجراء لا يمكن التراجع عنه.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDialogOpen(false)}
-              className="flex-1 h-11 rounded-xl"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleRestore}
-              className="flex-1 h-11 rounded-xl gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              نعم، استعادة البيانات
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        {...confirm}
+        confirmText="استعادة البيانات"
+        cancelText="إلغاء"
+        variant="destructive"
+      />
     </div>
   )
 }

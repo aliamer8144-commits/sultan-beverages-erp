@@ -6,6 +6,7 @@ import { exportToCSV } from '@/lib/export-csv'
 import { formatDateShortMonth, formatDateTime } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -676,30 +677,23 @@ export function CustomerStatementScreen() {
             </Card>
           ) : (
             /* ── Empty State ───────────────────────────────────────── */
-            <div className="empty-state py-12">
-              <div className="empty-state-icon">
-                <FileText className="w-16 h-16 text-muted-foreground/20" />
-              </div>
-              <h3 className="empty-state-title">لا توجد حركات</h3>
-              <p className="empty-state-description">
-                لا توجد فواتير أو مدفوعات أو مرتجعات للعميل في الفترة المحددة
-              </p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="لا توجد حركات"
+              description="لا توجد فواتير أو مدفوعات أو مرتجعات للعميل في الفترة المحددة"
+              compact
+            />
           )}
         </div>
       )}
 
       {/* ── Empty State (no statement generated) ───────────────────── */}
       {!statement && !loading && (
-        <div className="empty-state py-16">
-          <div className="empty-state-icon">
-            <FileText className="w-16 h-16 text-muted-foreground/20" />
-          </div>
-          <h3 className="empty-state-title">اختر عميلاً واضغط عرض الكشف</h3>
-          <p className="empty-state-description">
-            اختر العميل وحدد الفترة الزمنية لعرض كشف الحساب التفصيلي
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="اختر عميلاً واضغط عرض الكشف"
+          description="اختر العميل وحدد الفترة الزمنية لعرض كشف الحساب التفصيلي"
+        />
       )}
     </div>
   )

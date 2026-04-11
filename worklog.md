@@ -672,6 +672,31 @@ Stage Summary:
 - No breaking changes — all business logic, JSX, and styling preserved
 
 ---
+Task ID: 9
+Agent: Main Agent
+Task: Phase 9 — Component deduplication across screens
+
+Work Log:
+- Task 9a: Replaced 22 inline empty state patterns with shared EmptyState across 11 screens (analytics, dashboard, expense, customer-statement, loyalty, returns, purchases, sales-targets, stock-adjustments, audit-log, pos)
+- Task 9b: Removed 3 duplicate skeleton definitions from analytics-screen.tsx (~48 lines), replaced with chart-utils imports
+- Task 9c: Replaced inline pagination controls in 3 screens (expense ~50 lines, audit-log ~65 lines, returns ~25 lines) with shared Pagination component
+- Task 9d: Replaced confirmation dialog in backup-screen.tsx with shared ConfirmDialog; fixed redundant props in daily-close and expense screens
+- Task 9e: Consolidated progress-utils duplicates in sales-targets-screen and settings-screen; imported from @/lib/progress-utils
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- ESLint: 0 errors (bun run lint)
+- Dev server: running, all API calls returning 200
+
+Stage Summary:
+- Phase 9 complete: ~300+ lines of duplicated code eliminated
+- 22 empty states → shared EmptyState component
+- 3 skeleton definitions → shared chart-utils imports
+- 3 pagination controls → shared Pagination component
+- 3 confirmation dialogs → shared ConfirmDialog
+- 2 progress utility duplicates → shared progress-utils
+
+---
 Task ID: 8b-3
 Agent: Sub-agent (dashboard migration)
 Task: Migrate dashboard-screen.tsx to use useApi hook
@@ -968,3 +993,133 @@ Stage Summary:
 - Dynamic success toasts preserved for batch operations (price change, category change, status toggle, batch delete)
 - useCallback dependency arrays updated with `get` where applicable
 - TypeScript: 0 errors, ESLint: 0 errors for inventory-screen.tsx
+
+---
+Task ID: 9c-9e
+Agent: Sub-agent (pagination + progress utils)
+Task: Replace inline pagination controls and consolidate progress utilities
+
+Work Log:
+- Replaced inline pagination in expense-screen.tsx:
+  - Removed ~50 lines of windowed pagination (numbered page buttons + prev/next + page info text)
+  - Added `import { Pagination, EmptyState } from '@/components/empty-state'`
+  - Replaced with shared `<Pagination page={currentPage} totalPages={totalPages} onPageChange={(p) => fetchData(p)} />`
+  - Also fixed pre-existing missing `EmptyState` import
+- Replaced inline pagination in audit-log-screen.tsx:
+  - Removed `getPageNumbers()` helper function (~18 lines)
+  - Removed ~45 lines of windowed pagination JSX (numbered page buttons + prev/next + page info)
+  - Added `import { Pagination } from '@/components/empty-state'`
+  - Replaced with shared `<Pagination page={currentPage} totalPages={totalPages} onPageChange={(p) => fetchLogs(p)} />`
+  - Removed unused `ChevronLeft` and `ChevronRight` lucide icon imports
+- Replaced inline pagination in returns-screen.tsx:
+  - Removed ~25 lines of simple prev/next pagination with Button components
+  - Added `import { Pagination } from '@/components/empty-state'`
+  - Replaced with shared `<Pagination page={page} totalPages={totalPages} onPageChange={setPage} />`
+- Consolidated progress utils in sales-targets-screen.tsx:
+  - Removed local `getProgressColor` (used `bg-green-500` → standardized to shared `bg-emerald-500`)
+  - Removed local `getProgressTextColor` (used `text-green-500` → standardized to shared `text-emerald-600`)
+  - Removed local `getMotivationalMessage` (5 messages → shared 6 messages with better granularity)
+  - Kept local `getProgressRingClass` (returns CSS class names like `progress-ring-green` — fundamentally different from shared `getProgressRingColor` which returns SVG stroke classes)
+  - Added `import { getProgressColor, getProgressTextColor, getMotivationalMessage } from '@/lib/progress-utils'`
+- Consolidated progress utils in settings-screen.tsx:
+  - Removed local `getProgressColor` arrow function inside `SalesTargetsSection` (was identical to shared)
+  - Removed local `getProgressTextColor` arrow function inside `SalesTargetsSection` (was identical to shared)
+  - Added `import { getProgressColor, getProgressTextColor } from '@/lib/progress-utils'`
+
+Verified:
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- ESLint: 0 errors (`bun run lint`)
+- Dev server: running with 0 errors, all compilations successful
+
+Stage Summary:
+- 3 screens migrated to shared Pagination component (expense, audit-log, returns)
+- 2 screens migrated to shared progress-utils (sales-targets, settings)
+- ~120 lines of duplicate pagination code removed
+- ~25 lines of duplicate progress utility code removed
+- Color standardization: `green-500` → `emerald-500` for progress bars across sales-targets-screen
+- Local `getProgressRingClass` retained in sales-targets-screen (CSS class-based, not SVG stroke-based)
+
+---
+Task ID: 9a
+Agent: Sub-agent (empty states replacement)
+Task: Replace inline empty states with shared EmptyState component
+
+Work Log:
+- Added `import { EmptyState } from '@/components/empty-state'` to 10 screen files (analytics, dashboard, expense already had it, customer-statement, loyalty, returns, purchases, sales-targets, stock-adjustments, audit-log, pos)
+- Replaced 22 inline empty state blocks with shared `<EmptyState>` component calls
+- Extracted icon components, title text, and description text from each inline block
+- Preserved conditional rendering (ternaries, `{items.length === 0 && ...}`) around each replacement
+- Used `className="h-full"` / `className="h-48"` to preserve layout constraints inside chart containers and tables
+- Used `compact` prop for smaller empty states inside cards (customer-statement, loyalty)
+- Passed `action` prop for empty states with action buttons (purchases, sales-targets, stock-adjustments)
+- Fixed JSX string escaping issue in analytics-screen.tsx (used single quotes for description with Arabic quotes)
+- expense-screen.tsx: Updated existing import to include EmptyState alongside Pagination
+
+Files modified:
+1. src/screens/analytics-screen.tsx — 6 empty states replaced (area chart, bar chart, pie chart, top products table, top customers table, custom date range)
+2. src/screens/dashboard-screen.tsx — 3 empty states replaced (bar chart, pie chart, recent sales table)
+3. src/screens/expense-screen.tsx — 3 empty states replaced (donut chart, area chart, expense table)
+4. src/screens/customer-statement-screen.tsx — 2 empty states replaced (no transactions, no statement)
+5. src/screens/loyalty-screen.tsx — 2 empty states replaced (customer transactions, recent transactions)
+6. src/screens/returns-screen.tsx — 1 empty state replaced (returns table)
+7. src/screens/purchases-screen.tsx — 1 empty state replaced (suppliers table with conditional action button)
+8. src/screens/sales-targets-screen.tsx — 1 empty state replaced (targets list with create button)
+9. src/screens/stock-adjustments-screen.tsx — 1 empty state replaced (adjustments timeline with conditional action button)
+10. src/screens/audit-log-screen.tsx — 1 empty state replaced (audit log list)
+11. src/screens/pos-screen.tsx — 1 empty state replaced (cart empty, was empty-state-v2 variant)
+
+Not changed (not in task scope):
+- src/screens/settings-screen.tsx — still has 1 inline empty-state (SalesTargetWidget)
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- ESLint: 0 errors (bun run lint)
+
+Stage Summary:
+- 22 inline empty state patterns replaced with shared EmptyState component across 11 screen files
+- Consistent styling: all empty states now use the same icon sizing, padding, font weights, and colors
+- Zero inline `empty-state` / `empty-state-icon` / `empty-state-title` / `empty-state-description` class usage remaining in target files
+- Only settings-screen.tsx retains 1 inline empty-state pattern (outside task scope)
+
+---
+Task ID: 9b-9d
+Agent: Sub-agent (skeletons + confirm dialogs)
+Task: Replace duplicate skeletons and inline confirm dialogs with shared components
+
+Work Log:
+- Task 1 (Skeleton Deduplication in analytics-screen.tsx):
+  - Removed 3 local skeleton component definitions: `KPICardSkeleton`, `ChartSkeleton`, `TableSkeleton` (~48 lines)
+  - Added `SummaryCardSkeleton, ChartSkeleton, TableSkeleton` to imports from `@/components/chart-utils`
+  - Replaced all 6 `<KPICardSkeleton>` usages with `<SummaryCardSkeleton>`
+  - Kept local `AreaTooltip`, `BarTooltip`, `PieTooltip`, `CustomLegend` (analytics-specific, different from shared versions which use `dualFormat`)
+
+- Task 2a (backup-screen.tsx ConfirmDialog replacement):
+  - Removed Dialog/DialogContent/DialogHeader/DialogTitle/DialogDescription/DialogFooter imports
+  - Added `import { useConfirm, ConfirmDialog } from '@/components/confirm-dialog'`
+  - Replaced `const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)` with `const confirm = useConfirm()`
+  - Changed restore button onClick from `setConfirmDialogOpen(true)` to `confirm.confirm({...})` with title, description, and onConfirm
+  - Removed `setConfirmDialogOpen(false)` from handleRestore (dialog auto-closes via useConfirm)
+  - Replaced custom Dialog JSX (~30 lines) with `<ConfirmDialog {...confirm} confirmText="استعادة البيانات" cancelText="إلغاء" variant="destructive" />`
+
+- Task 2b (daily-close-screen.tsx ConfirmDialog fix):
+  - Already migrated to useConfirm/ConfirmDialog in prior phase
+  - Fixed bug: removed `title="" description=""` JSX overrides that were suppressing the hook-managed title/description values
+  - Changed `<ConfirmDialog {...closeConfirm} title="" description="" />` to `<ConfirmDialog {...closeConfirm} />`
+
+- Task 2c (expense-screen.tsx ConfirmDialog cleanup):
+  - Already migrated to useConfirm/ConfirmDialog in prior phase
+  - Removed redundant `title="حذف المصروف"` and `description="..."` JSX props that duplicated the values set by `confirm.confirm()`
+  - Kept `confirmText="حذف"` and `variant="destructive"` (not managed by useConfirm hook)
+  - Kept children (expense detail preview card) intact
+
+Verified:
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- ESLint: 0 errors (`bun run lint`)
+
+Stage Summary:
+- analytics-screen.tsx: 3 duplicate skeleton definitions removed, replaced with shared imports (~48 lines removed)
+- backup-screen.tsx: Custom Dialog replaced with shared ConfirmDialog + useConfirm (~30 lines removed, cleaner API)
+- daily-close-screen.tsx: Fixed bug where title/description overrides suppressed hook-managed values
+- expense-screen.tsx: Removed redundant JSX props that duplicated hook-managed values
+- All 3 remaining custom confirm dialogs now use shared ConfirmDialog consistently
+- Zero remaining inline Dialog-based confirmations across all screens

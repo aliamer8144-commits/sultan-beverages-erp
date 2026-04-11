@@ -15,6 +15,7 @@ import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, His
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { EmptyState } from '@/components/empty-state'
 import { StarRating } from '@/components/star-rating'
 import { formatShortDate } from '@/lib/date-utils'
 
@@ -549,26 +550,25 @@ export function PurchasesScreen() {
                     {suppliers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-12">
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground empty-state">
-                            <Truck className="w-12 h-12 opacity-20 empty-state-icon" />
-                            <p className="text-sm empty-state-title">
-                              {supplierSearch ? 'لا توجد نتائج للبحث' : 'لا يوجد موردين بعد'}
-                            </p>
-                            <p className="text-xs empty-state-description">
-                              {supplierSearch ? 'جرب كلمات بحث أخرى' : 'ابدأ بإضافة مورد جديد'}
-                            </p>
-                            {!supplierSearch && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={openAddSupplierDialog}
-                                className="mt-2 gap-2 rounded-xl"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                إضافة مورد جديد
-                              </Button>
-                            )}
-                          </div>
+                          <EmptyState
+                            icon={Truck}
+                            title={supplierSearch ? 'لا توجد نتائج للبحث' : 'لا يوجد موردين بعد'}
+                            description={supplierSearch ? 'جرب كلمات بحث أخرى' : 'ابدأ بإضافة مورد جديد'}
+                            action={
+                              !supplierSearch ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={openAddSupplierDialog}
+                                  className="gap-2 rounded-xl"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  إضافة مورد جديد
+                                </Button>
+                              ) : undefined
+                            }
+                            compact
+                          />
                         </TableCell>
                       </TableRow>
                     ) : (

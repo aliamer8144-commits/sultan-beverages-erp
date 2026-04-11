@@ -5,17 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+import { useConfirm, ConfirmDialog } from '@/components/confirm-dialog'
 import {
   BarChart,
   Bar,
@@ -214,6 +204,7 @@ function handlePrint(data: DailyCloseData) {
 // ─── Main Screen ───────────────────────────────────────────────────
 export function DailyCloseScreen() {
   const { get } = useApi()
+  const closeConfirm = useConfirm()
   const [data, setData] = useState<DailyCloseData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -270,31 +261,18 @@ export function DailyCloseScreen() {
             <span className="hidden sm:inline">تحديث</span>
           </button>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="rounded-xl btn-ripple gap-2">
-                <RotateCcw className="w-4 h-4" />
-                <span className="hidden sm:inline">فتح يوم جديد</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl" className="rounded-2xl">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2">
-                  <RotateCcw className="w-5 h-5 text-destructive" />
-                  تأكيد إغلاق اليوم
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  هل أنت متأكد من إغلاق هذا اليوم وبدء يوم جديد؟ سيتم حفظ تقرير الإغلاق الحالي.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="flex-row-reverse gap-2">
-                <AlertDialogAction className="rounded-xl" onClick={() => fetchData(true)}>
-                  نعم، إغلاق اليوم
-                </AlertDialogAction>
-                <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+              variant="destructive"
+              className="rounded-xl btn-ripple gap-2"
+              onClick={() => closeConfirm.confirm({
+                title: 'تأكيد إغلاق اليوم',
+                description: 'هل أنت متأكد من إغلاق هذا اليوم وبدء يوم جديد؟ سيتم حفظ تقرير الإغلاق الحالي.',
+                onConfirm: () => fetchData(true),
+              })}
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">فتح يوم جديد</span>
+            </Button>
 
           {data && (
             <Button
@@ -703,6 +681,9 @@ export function DailyCloseScreen() {
           </Card>
         </div>
       ) : null}
+
+      {/* ── Confirm Close Day Dialog ── */}
+      <ConfirmDialog {...closeConfirm} />
     </div>
   )
 }
