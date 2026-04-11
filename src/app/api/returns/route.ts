@@ -30,11 +30,7 @@ export async function GET(request: NextRequest) {
         (where.createdAt as Record<string, unknown>).gte = new Date(dateFrom)
       }
       if (dateTo) {
-        const endParts = dateTo.split('-')
-        const endOfYear = parseInt(endParts[0] || '2024', 10)
-        const endOfMonth = parseInt(endParts[1] || '1', 10)
-        const endOfDay = parseInt(endParts[2] || '1', 10)
-        const endDate = new Date(endOfYear, endOfMonth - 1, endOfDay, 23, 59, 59, 999)
+        const endDate = new Date(dateTo + 'T23:59:59.999Z')
         (where.createdAt as Record<string, unknown>).lte = endDate
       }
     }
