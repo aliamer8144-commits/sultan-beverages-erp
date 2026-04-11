@@ -151,3 +151,45 @@ Stage Summary:
 - Complete auth system: bcrypt hashing, JWT tokens, HTTP-only cookies, Edge middleware, role-based access
 - Backward compatible: login still works for plaintext passwords during migration
 - All APIs now protected by default — middleware blocks unauthenticated requests
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Phase 3 — API Routes Restructuring (Products, Categories, Customers, Suppliers, Invoices)
+
+Work Log:
+- Created src/lib/validations.ts — Zod schemas for all entities (Product, Category, Customer, Supplier, Invoice, bulk import, batch update)
+- Created src/app/api/products/[id]/route.ts — PUT/DELETE with URL params, withAuth, audit logging
+- Created src/app/api/categories/[id]/route.ts — PUT/DELETE with URL params, withAuth, audit logging
+- Created src/app/api/customers/[id]/route.ts — PUT/DELETE with URL params, withAuth, audit logging
+- Created src/app/api/suppliers/[id]/route.ts — PUT/DELETE with URL params, withAuth, audit logging
+- Updated src/app/api/products/route.ts — withAuth, Zod validation, audit logging with userId, successResponse/errorResponse
+- Updated src/app/api/categories/route.ts — withAuth, Zod validation, audit logging, Arabic error messages
+- Updated src/app/api/customers/route.ts — withAuth, Zod validation, audit logging, Arabic error messages
+- Updated src/app/api/suppliers/route.ts — withAuth, Zod validation, audit logging, fixed N+1 query (groupBy instead of Promise.all loop)
+- Updated src/app/api/invoices/route.ts — withAuth, Zod validation, userId from JWT (not client body), sequential invoice numbers
+- Updated src/lib/audit-logger.ts — added userId parameter
+- Updated src/screens/inventory-screen.tsx — Products PUT/DELETE use /api/products/${id}, Categories PUT/DELETE use /api/categories/${id}
+- Updated src/screens/customers-screen.tsx — PUT/DELETE use /api/customers/${id}
+- Updated src/screens/purchases-screen.tsx — Suppliers PUT/DELETE use /api/suppliers/${id}
+
+Verified:
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- 14 comprehensive tests ALL PASSED
+- All GET endpoints → 200 ✅
+- Create/Update/Delete (Category CRUD) → full lifecycle ✅
+- Validation error (empty POST) → proper error message ✅
+- API without token → 401 ✅
+- Suppliers N+1 fix: 180ms response (was N separate queries) ✅
+- Dev log: 0 server errors (500)
+
+Stage Summary:
+- 6 new files created (validations.ts, 4x [id]/route.ts)
+- 10 existing files updated (5 API routes, audit-logger.ts, 3 screens, 1 types file)
+- All CRUD endpoints now use proper REST URL params (/api/:resource/:id)
+- All endpoints protected with withAuth + audit logging with userId
+- Zod validation on all POST/PUT endpoints
+- Arabic error messages throughout
+- N+1 query fixed in suppliers (groupBy replaces per-supplier queries)
+- Invoice security: userId taken from JWT token, not client body

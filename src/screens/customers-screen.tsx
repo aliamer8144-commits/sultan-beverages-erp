@@ -263,11 +263,10 @@ export function CustomersScreen() {
     }
     try {
       setSubmitting(true)
-      const res = await fetch('/api/customers', {
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedCustomer.id,
           name: form.name.trim(),
           phone: form.phone.trim() || null,
           debt: parseFloat(form.debt) || 0,
@@ -292,10 +291,9 @@ export function CustomersScreen() {
     if (!selectedCustomer) return
     try {
       setDeleting(true)
-      const res = await fetch('/api/customers', {
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedCustomer.id }),
       })
       if (!res.ok) throw new Error('فشل في حذف العميل')
       toast.success('تم حذف العميل بنجاح')

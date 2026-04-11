@@ -1,46 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { logAction } from "@/lib/audit-logger";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
+import { validateBody, createInvoiceSchema } from "@/lib/validations";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-// GET /api/invoices?type=sale&search=INV-001&dateFrom=2024-01-01&dateTo=2024-12-31
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/invoices — List invoices with filters
+ */
+export const GET = withAuth(async (request: NextRequest) => {
   try {
-    const { searchParams } = request.nextUrl
+    const { searchParams } = request.nextUrl;
+    const type = searchParams.get("type") as "sale" | "purchase" | null;
+    const search = searchParams.get("search");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const customerId = searchParams.get("customerId");
 
-    const type = searchParams.get('type') as 'sale' | 'purchase' | null
-    const search = searchParams.get('search')
-    const dateFrom = searchParams.get('dateFrom')
-    const dateTo = searchParams.get('dateTo')
-    const customerId = searchParams.get('customerId')
+    const where: Record<string, unknown> = {};
 
-    // Build where clause based on params
-    const where: Record<string, unknown> = {}
-
-    if (type) {
-      where.type = type
-    }
-
-    if (customerId) {
-      where.customerId = customerId
-    }
+    if (type) where.type = type;
+    if (customerId) where.customerId = customerId;
 
     if (search) {
       where.OR = [
         { invoiceNo: { contains: search } },
         { customer: { name: { contains: search } } },
         { supplier: { name: { contains: search } } },
-      ]
+      ];
     }
 
     if (dateFrom || dateTo) {
-      where.createdAt = {}
-      if (dateFrom) {
-        (where.createdAt as Record<string, unknown>).gte = new Date(dateFrom)
-      }
+      where.createdAt = {};
+      if (dateFrom) (where.createdAt as Record<string, unknown>).gte = new Date(dateFrom);
       if (dateTo) {
-        // Include the entire end date by setting to end of day
-        const endDate = new Date(dateTo)
-        endDate.setHours(23, 59, 59, 999)
-        ;(where.createdAt as Record<string, unknown>).lte = endDate
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        (where.createdAt as Record<string, unknown>).lte = endDate;
       }
     }
 
@@ -49,55 +45,48 @@ export async function GET(request: NextRequest) {
       include: {
         customer: true,
         supplier: true,
-        user: {
-          select: { id: true, name: true },
-        },
-        items: {
-          include: {
-            product: {
-              select: { id: true, name: true },
-            },
-          },
-        },
+        user: { select: { id: true, name: true } },
+        items: { include: { product: { select: { id: true, name: true } } } },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+      orderBy: { createdAt: "desc" },
+    });
 
-    return NextResponse.json({ success: true, data: invoices })
+    return successResponse(invoices);
   } catch (error) {
-    console.error('Error fetching invoices:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch invoices' },
-      { status: 500 }
-    )
+    const message = error instanceof Error ? error.message : "فشل في تحميل الفواتير";
+    return errorResponse(message, 500);
   }
-}
+});
 
-// POST /api/invoices
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/invoices — Create an invoice (sale or purchase)
+ *
+ * Security: userId is taken from the JWT token, NOT from the request body.
+ */
+export const POST = withAuth(async (request: NextRequest) => {
   try {
-    const body = await request.json()
-    const { type, customerId, supplierId, discount, paidAmount, userId, items } = body
+    const body = await request.json();
+    const user = getRequestUser(request);
 
-    if (!type || !userId || !items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: type, userId, items' },
-        { status: 400 }
-      )
+    if (!user) {
+      return errorResponse("غير مصرح", 401);
     }
+
+    const validation = validateBody(createInvoiceSchema, body);
+    if (!validation.success) return errorResponse(validation.error, 422);
+
+    const { type, customerId, supplierId, discount, paidAmount, items } = validation.data;
+    const userId = user.userId;
 
     const invoice = await db.$transaction(async (tx) => {
       // 1. Generate invoice number
-      const invoiceNo = `INV-${Math.floor(Date.now() / 1000)}`
+      const count = await tx.invoice.count();
+      const invoiceNo = `INV-${String(count + 1).padStart(5, "0")}`;
 
-      // 2. Calculate totalAmount from items
-      const totalAmount = items.reduce((sum: number, item: { quantity: number; price: number }) => {
-        return sum + item.quantity * item.price
-      }, 0)
+      // 2. Calculate total from items
+      const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
 
-      // 3. Create the invoice with nested items
+      // 3. Create invoice with nested items
       const createdInvoice = await tx.invoice.create({
         data: {
           invoiceNo,
@@ -109,66 +98,51 @@ export async function POST(request: NextRequest) {
           paidAmount: paidAmount || 0,
           userId,
           items: {
-            create: items.map(
-              (item: { productId: string; quantity: number; price: number }) => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                price: item.price,
-                total: item.quantity * item.price,
-              })
-            ),
+            create: items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.price,
+              total: item.quantity * item.price,
+            })),
           },
         },
         include: {
           customer: true,
           supplier: true,
-          user: {
-            select: { id: true, name: true },
-          },
-          items: {
-            include: {
-              product: {
-                select: { id: true, name: true },
-              },
-            },
-          },
+          user: { select: { id: true, name: true } },
+          items: { include: { product: { select: { id: true, name: true } } } },
         },
-      })
+      });
 
-      // 4 & 5. Update product quantities and log stock adjustments
+      // 4. Update product quantities & log stock adjustments
       for (const item of items) {
-        // Get current stock before updating
         const productBefore = await tx.product.findUnique({
           where: { id: item.productId },
           select: { quantity: true },
-        })
-        const previousQty = productBefore?.quantity || 0
+        });
+        const previousQty = productBefore?.quantity || 0;
 
-        let newQty: number
-        let adjustmentType: string
-        let reason: string
+        let newQty: number;
+        let adjustmentType: string;
+        let reason: string;
 
-        if (type === 'sale') {
-          newQty = Math.max(0, previousQty - item.quantity)
-          adjustmentType = 'sale'
-          reason = `بيع - فاتورة ${invoiceNo}`
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { quantity: newQty },
-          })
-        } else if (type === 'purchase') {
-          newQty = previousQty + item.quantity
-          adjustmentType = 'purchase'
-          reason = `شراء - فاتورة ${invoiceNo}`
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { quantity: newQty },
-          })
+        if (type === "sale") {
+          newQty = Math.max(0, previousQty - item.quantity);
+          adjustmentType = "sale";
+          reason = `بيع - فاتورة ${invoiceNo}`;
+        } else if (type === "purchase") {
+          newQty = previousQty + item.quantity;
+          adjustmentType = "purchase";
+          reason = `شراء - فاتورة ${invoiceNo}`;
         } else {
-          continue
+          continue;
         }
 
-        // Auto-log stock adjustment
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { quantity: newQty },
+        });
+
         await tx.stockAdjustment.create({
           data: {
             productId: item.productId,
@@ -178,39 +152,50 @@ export async function POST(request: NextRequest) {
             newQty,
             reason,
             reference: invoiceNo,
-            referenceType: 'invoice',
-            userId: userId || '',
+            referenceType: "invoice",
+            userId,
             userName: createdInvoice.user?.name || null,
           },
-        })
+        });
       }
 
-      // 6. Update customer debt if sale and not fully paid + visit tracking
-      if (customerId && type === 'sale') {
-        const remaining = totalAmount - (paidAmount || 0)
+      // 5. Update customer debt + visit tracking (sales only)
+      if (customerId && type === "sale") {
+        const remaining = totalAmount - (paidAmount || 0);
         const customerUpdate: Record<string, unknown> = {
           visitCount: { increment: 1 },
           lastVisit: new Date(),
           totalPurchases: { increment: totalAmount },
-        }
+        };
         if (remaining > 0) {
-          customerUpdate.debt = { increment: remaining }
+          customerUpdate.debt = { increment: remaining };
         }
         await tx.customer.update({
           where: { id: customerId },
           data: customerUpdate,
-        })
+        });
       }
 
-      return createdInvoice
-    })
+      return createdInvoice;
+    });
 
-    return NextResponse.json({ success: true, data: invoice }, { status: 201 })
+    logAction({
+      action: "create",
+      entity: "Invoice",
+      entityId: invoice.id,
+      userId: user.userId,
+      userName: user.username,
+      details: {
+        invoiceNo: invoice.invoiceNo,
+        type: invoice.type,
+        totalAmount: invoice.totalAmount,
+        itemCount: invoice.items.length,
+      },
+    });
+
+    return successResponse(invoice, 201);
   } catch (error) {
-    console.error('Error creating invoice:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create invoice' },
-      { status: 500 }
-    )
+    const message = error instanceof Error ? error.message : "فشل في إنشاء الفاتورة";
+    return errorResponse(message, 500);
   }
-}
+});

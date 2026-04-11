@@ -1,17 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { logAction } from "@/lib/audit-logger";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
+import { validateBody, createSupplierSchema } from "@/lib/validations";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/suppliers — List suppliers with balance info
+ */
+export const GET = withAuth(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search") || "";
+    const sortBy = searchParams.get("sortBy") || "createdAt";
 
     const orderBy: Record<string, string> = {}
-    if (sortBy === 'rating') {
-      orderBy.rating = 'desc'
+    if (sortBy === "rating") {
+      orderBy.rating = "desc"
     } else {
-      orderBy.createdAt = 'desc'
+      orderBy.createdAt = "desc"
     }
 
     const suppliers = await db.supplier.findMany({
@@ -26,85 +33,78 @@ export async function GET(request: NextRequest) {
       orderBy,
     })
 
-    // Compute balance info for each supplier
-    const suppliersWithBalance = await Promise.all(
-      suppliers.map(async (supplier) => {
-        const [purchases, payments] = await Promise.all([
-          db.invoice.aggregate({
-            where: { supplierId: supplier.id, type: 'purchase' },
-            _sum: { totalAmount: true, discount: true, paidAmount: true },
-          }),
-          db.supplierPayment.aggregate({
-            where: { supplierId: supplier.id },
-            _sum: { amount: true },
-          }),
-        ])
+    // Efficient balance computation — single aggregate for all suppliers
+    const [purchaseAggregates, paymentAggregates] = await Promise.all([
+      db.invoice.groupBy({
+        by: ["supplierId"],
+        where: { type: "purchase", supplierId: { in: suppliers.map((s) => s.id) } },
+        _sum: { totalAmount: true, discount: true },
+      }),
+      db.supplierPayment.groupBy({
+        by: ["supplierId"],
+        where: { supplierId: { in: suppliers.map((s) => s.id) } },
+        _sum: { amount: true },
+      }),
+    ])
 
-        const totalPurchases = (purchases._sum.totalAmount || 0) - (purchases._sum.discount || 0)
-        const totalPaid = payments._sum.amount || 0
-        const remainingBalance = totalPurchases - totalPaid
+    const purchaseMap = new Map(purchaseAggregates.map((a) => [
+      a.supplierId,
+      (a._sum.totalAmount || 0) - (a._sum.discount || 0),
+    ]))
+    const paymentMap = new Map(paymentAggregates.map((a) => [a.supplierId, a._sum.amount || 0]))
 
-        return {
-          ...supplier,
-          totalPurchases,
-          totalPaid,
-          remainingBalance,
-        }
-      })
-    )
+    const suppliersWithBalance = suppliers.map((supplier) => {
+      const totalPurchases = purchaseMap.get(supplier.id) || 0
+      const totalPaid = paymentMap.get(supplier.id) || 0
+      return {
+        ...supplier,
+        totalPurchases,
+        totalPaid,
+        remainingBalance: totalPurchases - totalPaid,
+      }
+    })
 
-    return NextResponse.json({ success: true, data: suppliersWithBalance })
+    return successResponse(suppliersWithBalance)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch suppliers'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const message = error instanceof Error ? error.message : "فشل في تحميل الموردين"
+    return errorResponse(message, 500)
   }
-}
+})
 
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/suppliers — Create a new supplier
+ */
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json()
-    const { name, phone, phone2, address, website, paymentTerms, notes } = body
+    const user = getRequestUser(request)
+    const validation = validateBody(createSupplierSchema, body)
+    if (!validation.success) return errorResponse(validation.error, 422)
 
     const supplier = await db.supplier.create({
-      data: { name, phone, phone2, address, website, paymentTerms: paymentTerms || 'نقدي', notes },
+      data: {
+        name: validation.data.name,
+        phone: validation.data.phone,
+        phone2: validation.data.phone2,
+        address: validation.data.address,
+        website: validation.data.website || null,
+        paymentTerms: validation.data.paymentTerms || "نقدي",
+        notes: validation.data.notes,
+      },
     })
 
-    return NextResponse.json({ success: true, data: supplier }, { status: 201 })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create supplier'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { id, name, phone, phone2, address, website, paymentTerms, notes, isActive } = body
-
-    const updated = await db.supplier.update({
-      where: { id },
-      data: { name, phone, phone2, address, website, paymentTerms, notes, isActive },
+    logAction({
+      action: "create",
+      entity: "Supplier",
+      entityId: supplier.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { name: supplier.name },
     })
 
-    return NextResponse.json({ success: true, data: updated })
+    return successResponse(supplier, 201)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update supplier'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    const message = error instanceof Error ? error.message : "فشل في إنشاء المورد"
+    return errorResponse(message, 500)
   }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { id } = body
-
-    await db.supplier.delete({
-      where: { id },
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete supplier'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
-  }
-}
+})

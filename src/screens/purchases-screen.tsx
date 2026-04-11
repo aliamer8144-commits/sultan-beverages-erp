@@ -276,15 +276,14 @@ export function PurchasesScreen() {
     setSupplierLoading(true)
     try {
       const isEditing = !!editingSupplier
-      const res = await fetch('/api/suppliers', {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isEditing
-            ? { id: editingSupplier.id, ...supplierForm }
-            : supplierForm
-        ),
-      })
+      const res = await fetch(
+        isEditing ? `/api/suppliers/${editingSupplier.id}` : '/api/suppliers',
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(supplierForm),
+        }
+      )
       const data = await res.json()
 
       if (data.success) {
@@ -303,10 +302,9 @@ export function PurchasesScreen() {
 
   const handleDeleteSupplier = async (supplier: Supplier) => {
     try {
-      const res = await fetch('/api/suppliers', {
+      const res = await fetch(`/api/suppliers/${supplier.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: supplier.id }),
       })
       const data = await res.json()
 

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logAction } from "@/lib/audit-logger";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
+import { validateBody, createCustomerSchema } from "@/lib/validations";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/customers — List customers with optional filters
+ */
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
@@ -15,118 +22,53 @@ export async function GET(request: NextRequest) {
         { phone: { contains: search } },
       ];
     }
-
-    if (category) {
-      where.category = category;
-    }
+    if (category) where.category = category;
 
     const customers = await db.customer.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: customers });
+    return successResponse(customers);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch customers";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في تحميل العملاء";
+    return errorResponse(message, 500);
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/customers — Create a new customer
+ */
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { name, phone, category, notes } = body;
+    const user = getRequestUser(request);
+    const validation = validateBody(createCustomerSchema, body);
+    if (!validation.success) return errorResponse(validation.error, 422);
 
-    if (!name) {
-      return NextResponse.json(
-        { success: false, error: "Name is required" },
-        { status: 400 }
-      );
-    }
+    const { name, phone, category, notes } = validation.data;
 
     if (phone) {
-      const existingCustomer = await db.customer.findFirst({
-        where: { phone },
-      });
-
-      if (existingCustomer) {
-        return NextResponse.json(
-          { success: false, error: "A customer with this phone already exists" },
-          { status: 409 }
-        );
-      }
+      const existing = await db.customer.findFirst({ where: { phone } });
+      if (existing) return errorResponse("رقم الهاتف موجود بالفعل", 409);
     }
 
     const customer = await db.customer.create({
-      data: {
-        name,
-        phone,
-        category: category || "عادي",
-        notes: notes || null,
-      },
+      data: { name, phone, category: category || "عادي", notes: notes || null },
     });
 
-    return NextResponse.json({ success: true, data: customer }, { status: 201 });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create customer";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id, name, phone, debt, category, notes } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Customer ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const data: Record<string, unknown> = {};
-    if (name !== undefined) data.name = name;
-    if (phone !== undefined) data.phone = phone;
-    if (debt !== undefined) data.debt = debt;
-    if (category !== undefined) data.category = category;
-    if (notes !== undefined) data.notes = notes;
-
-    const updated = await db.customer.update({
-      where: { id },
-      data,
+    logAction({
+      action: "create",
+      entity: "Customer",
+      entityId: customer.id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { name, phone },
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    return successResponse(customer, 201);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update customer";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في إنشاء العميل";
+    return errorResponse(message, 500);
   }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Customer ID is required" },
-        { status: 400 }
-      );
-    }
-
-    await db.customer.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to delete customer";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
-  }
-}
+});

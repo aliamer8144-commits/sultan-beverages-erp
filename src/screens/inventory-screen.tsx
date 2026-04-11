@@ -513,10 +513,10 @@ export function InventoryScreen() {
 
       let res: Response
       if (editingProduct) {
-        res = await fetch('/api/products', {
+        res = await fetch(`/api/products/${editingProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingProduct.id, ...payload }),
+          body: JSON.stringify(payload),
         })
         toast.success('تم تحديث المنتج بنجاح')
       } else {
@@ -547,10 +547,9 @@ export function InventoryScreen() {
     if (!deletingProduct) return
 
     try {
-      const res = await fetch('/api/products', {
+      const res = await fetch(`/api/products/${deletingProduct.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deletingProduct.id }),
       })
       const data = await res.json()
 
@@ -903,10 +902,10 @@ export function InventoryScreen() {
     setCatSubmitting(true)
     try {
       if (editingCat) {
-        const res = await fetch('/api/categories', {
+        const res = await fetch(`/api/categories/${editingCat.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingCat.id, name: catName.trim(), icon: editingCat.icon }),
+          body: JSON.stringify({ name: catName.trim(), icon: editingCat.icon }),
         })
         const data = await res.json()
         if (data.success) {
@@ -941,10 +940,9 @@ export function InventoryScreen() {
   const handleCatDelete = async () => {
     if (!deletingCat) return
     try {
-      const res = await fetch('/api/categories', {
+      const res = await fetch(`/api/categories/${deletingCat.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deletingCat.id }),
       })
       const data = await res.json()
       if (data.success) {

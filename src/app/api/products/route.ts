@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logAction } from "@/lib/audit-logger";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
+import {
+  validateBody,
+  createProductSchema,
+  bulkImportSchema,
+  batchUpdateSchema,
+  deleteProductsSchema,
+} from "@/lib/validations";
+import { successResponse, errorResponse } from "@/lib/api-response";
 
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/products — List products with filters
+ */
+export const GET = withAuth(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
@@ -12,21 +24,13 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {};
 
-    if (search) {
-      where.name = { contains: search };
-    }
-
-    if (categoryId) {
-      where.categoryId = categoryId;
-    }
-
+    if (search) where.name = { contains: search };
+    if (categoryId) where.categoryId = categoryId;
     if (lowStock) {
       where.quantity = { lte: 5 };
+      where.isActive = true;
     }
-
-    if (barcode) {
-      where.barcode = barcode;
-    }
+    if (barcode) where.barcode = barcode;
 
     const products = await db.product.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
@@ -37,53 +41,34 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: products });
+    return successResponse(products);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch products";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في تحميل المنتجات";
+    return errorResponse(message, 500);
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/products — Create single product OR bulk import
+ */
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json();
+    const user = getRequestUser(request);
 
-    // ── Bulk import variant ──
-    if (body.action === 'bulk-import' && Array.isArray(body.products)) {
-      const { products } = body;
-
-      if (products.length === 0) {
-        return NextResponse.json({ success: false, error: 'لا توجد منتجات للاستيراد' }, { status: 400 });
-      }
-
-      if (products.length > 500) {
-        return NextResponse.json({ success: false, error: 'الحد الأقصى 500 منتج لكل عملية استيراد' }, { status: 400 });
-      }
-
+    // ── Bulk import ──
+    const bulkCheck = validateBody(bulkImportSchema, body);
+    if (bulkCheck.success) {
+      const { products } = bulkCheck.data;
       let created = 0;
       let skipped = 0;
 
-      // Get existing product names to skip duplicates
-      const existingProducts = await db.product.findMany({
-        select: { name: true },
-      });
+      const existingProducts = await db.product.findMany({ select: { name: true } });
       const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
 
       for (const item of products) {
-        const name = (item.name || '').toString().trim();
-        if (!name) {
-          skipped++;
-          continue;
-        }
-
-        // Skip duplicate by name
-        if (existingNames.has(name.toLowerCase())) {
-          skipped++;
-          continue;
-        }
-
-        const price = Number(item.price) || 0;
-        if (price <= 0) {
+        const name = item.name.trim();
+        if (!name || existingNames.has(name.toLowerCase())) {
           skipped++;
           continue;
         }
@@ -92,12 +77,12 @@ export async function POST(request: NextRequest) {
           await db.product.create({
             data: {
               name,
-              categoryId: item.categoryId || undefined,
-              price,
-              costPrice: Number(item.costPrice) || 0,
-              quantity: Number(item.quantity) || 0,
+              categoryId: item.categoryId || '',
+              price: item.price,
+              costPrice: item.costPrice || 0,
+              quantity: item.quantity || 0,
               minQuantity: 5,
-              barcode: (item.barcode || '').toString().trim() || null,
+              barcode: item.barcode?.trim() || null,
             },
           });
           existingNames.add(name.toLowerCase());
@@ -107,41 +92,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Log bulk import
       logAction({
-        action: 'bulk_import',
-        entity: 'Product',
+        action: "bulk_import",
+        entity: "Product",
+        userId: user?.userId,
+        userName: user?.username,
         details: { created, skipped, total: products.length },
       });
 
-      return NextResponse.json({
-        success: true,
-        data: { created, skipped },
-      }, { status: 201 });
+      return successResponse({ created, skipped }, 201);
     }
 
     // ── Single product creation ──
-    const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = body;
+    const validation = validateBody(createProductSchema, body);
+    if (!validation.success) return errorResponse(validation.error, 422);
 
-    // Validate image size (max 2MB raw, ~2.7MB base64) and type
-    if (image && typeof image === 'string') {
-      if (!image.startsWith('data:image/')) {
-        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة' }, { status: 400 });
-      }
-      const allowedTypes = ['data:image/jpeg', 'data:image/png', 'data:image/webp', 'data:image/gif'];
-      const mimeType = image.substring(0, image.indexOf(';base64,'));
-      if (!allowedTypes.some((t) => mimeType.startsWith(t))) {
-        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة (jpeg, png, webp, gif فقط)' }, { status: 400 });
-      }
-      if (image.length > 2700000) {
-        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 2 ميجابايت)' }, { status: 400 });
-      }
-    }
+    const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = validation.data;
 
     const product = await db.product.create({
       data: {
         name,
-        categoryId,
+        categoryId: categoryId || '',
         price,
         costPrice,
         quantity: quantity ?? 0,
@@ -151,89 +122,41 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Log product creation
     logAction({
-      action: 'create',
-      entity: 'Product',
+      action: "create",
+      entity: "Product",
       entityId: product.id,
+      userId: user?.userId,
+      userName: user?.username,
       details: { name, price, costPrice, quantity: quantity ?? 0 },
     });
 
-    return NextResponse.json({ success: true, data: product }, { status: 201 });
+    return successResponse(product, 201);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create product";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في إنشاء المنتج";
+    return errorResponse(message, 500);
   }
-}
+});
 
-export async function PUT(request: NextRequest) {
+/**
+ * PATCH /api/products — Batch update (price change, category change, status)
+ */
+export const PATCH = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { id, name, categoryId, price, costPrice, quantity, minQuantity, barcode, image, isActive } = body;
+    const user = getRequestUser(request);
+    const validation = validateBody(batchUpdateSchema, body);
+    if (!validation.success) return errorResponse(validation.error, 422);
 
-    // Validate image size and type
-    if (image && typeof image === 'string' && image.length > 0) {
-      if (!image.startsWith('data:image/')) {
-        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة' }, { status: 400 });
-      }
-      const allowedTypes = ['data:image/jpeg', 'data:image/png', 'data:image/webp', 'data:image/gif'];
-      const mimeType = image.substring(0, image.indexOf(';base64,'));
-      if (!allowedTypes.some((t) => mimeType.startsWith(t))) {
-        return NextResponse.json({ success: false, error: 'صيغة الصورة غير مدعومة (jpeg, png, webp, gif فقط)' }, { status: 400 });
-      }
-      if (image.length > 2700000) {
-        return NextResponse.json({ success: false, error: 'حجم الصورة كبير جداً (الحد الأقصى 2 ميجابايت)' }, { status: 400 });
-      }
-    }
-
-    const updated = await db.product.update({
-      where: { id },
-      data: {
-        name,
-        categoryId,
-        price,
-        costPrice,
-        quantity,
-        minQuantity,
-        barcode,
-        image,
-        isActive,
-      },
-    });
-
-    // Log product update
-    logAction({
-      action: 'update',
-      entity: 'Product',
-      entityId: id,
-      details: { name, price, costPrice, quantity },
-    });
-
-    return NextResponse.json({ success: true, data: updated });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update product";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { ids, price, categoryId, isActive, priceChangeType, priceChangeValue } = body;
-
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ success: false, error: "يرجى تحديد منتج واحد على الأقل" }, { status: 400 });
-    }
+    const { ids, price, categoryId, isActive, priceChangeType, priceChangeValue } = validation.data;
 
     // Build update data dynamically
     const updateData: Record<string, unknown> = {};
 
-    // Price change
     if (priceChangeType && priceChangeValue !== undefined) {
       if (priceChangeType === "fixed") {
         updateData.price = Number(priceChangeValue);
       } else if (priceChangeType === "percentage") {
-        // Fetch current products to calculate percentage
         const currentProducts = await db.product.findMany({
           where: { id: { in: ids } },
           select: { id: true, price: true },
@@ -241,106 +164,99 @@ export async function PATCH(request: NextRequest) {
 
         const priceUpdates = currentProducts.map((p) => {
           const newPrice = Math.max(0, Number((p.price * (1 + Number(priceChangeValue) / 100)).toFixed(2)));
-          return db.product.update({
-            where: { id: p.id },
-            data: { price: newPrice },
-          });
+          return db.product.update({ where: { id: p.id }, data: { price: newPrice } });
         });
 
         await Promise.all(priceUpdates);
+
+        logAction({
+          action: "batch_update",
+          entity: "Product",
+          userId: user?.userId,
+          userName: user?.username,
+          details: { ids, count: ids.length, priceChangeType, priceChangeValue },
+        });
+
+        return successResponse({ count: ids.length });
       }
     } else if (price !== undefined) {
       updateData.price = Number(price);
     }
 
-    // Category change
-    if (categoryId) {
-      updateData.categoryId = categoryId;
-    }
-
-    // Status change
-    if (isActive !== undefined) {
-      updateData.isActive = isActive;
-    }
+    if (categoryId) updateData.categoryId = categoryId;
+    if (isActive !== undefined) updateData.isActive = isActive;
 
     let count = 0;
-
-    // If we have non-percentage updates to apply
     if (Object.keys(updateData).length > 0) {
       const result = await db.product.updateMany({
         where: { id: { in: ids } },
         data: updateData,
       });
       count = result.count;
-    } else if (priceChangeType === "percentage") {
-      // We already updated via Promise.all above
-      count = ids.length;
     } else {
-      return NextResponse.json({ success: false, error: "لا توجد تغييرات للتطبيق" }, { status: 400 });
+      return errorResponse("لا توجد تغييرات للتطبيق");
     }
 
-    // Log batch operation
     logAction({
       action: "batch_update",
       entity: "Product",
-      details: {
-        ids,
-        count,
-        priceChangeType: priceChangeType || null,
-        priceChangeValue: priceChangeValue || null,
-        newCategoryId: categoryId || null,
-        newIsActive: isActive !== undefined ? isActive : null,
-      },
+      userId: user?.userId,
+      userName: user?.username,
+      details: { ids, count, priceChangeType: priceChangeType || null, newCategoryId: categoryId || null, newIsActive: isActive ?? null },
     });
 
-    return NextResponse.json({ success: true, data: { count } });
+    return successResponse({ count });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to batch update products";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في تحديث المنتجات";
+    return errorResponse(message, 500);
   }
-}
+});
 
-export async function DELETE(request: NextRequest) {
+/**
+ * DELETE /api/products — Bulk delete (single ID or array of IDs)
+ */
+export const DELETE = withAuth(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { id, ids } = body as { id?: string; ids?: string[] };
+    const user = getRequestUser(request);
+    const validation = validateBody(deleteProductsSchema, body);
+    if (!validation.success) return errorResponse(validation.error);
 
-    // Bulk delete: array of IDs
-    if (ids && Array.isArray(ids) && ids.length > 0) {
-      // Delete related records first (variants, stock adjustments via cascade)
-      // Then delete products
-      const result = await db.product.deleteMany({
-        where: { id: { in: ids } },
-      });
+    const { id, ids } = validation.data;
+
+    if (ids && ids.length > 0) {
+      const result = await db.product.deleteMany({ where: { id: { in: ids } } });
 
       logAction({
-        action: 'bulk_delete',
-        entity: 'Product',
+        action: "bulk_delete",
+        entity: "Product",
+        userId: user?.userId,
+        userName: user?.username,
         details: { reason: `حذف ${result.count} منتج دفعة واحدة`, ids },
       });
 
-      return NextResponse.json({ success: true, data: { count: result.count } });
+      return successResponse({ count: result.count });
     }
 
-    // Single delete: one ID
     if (id) {
-      await db.product.delete({
-        where: { id },
-      });
+      const existing = await db.product.findUnique({ where: { id } });
+      await db.product.delete({ where: { id } });
 
       logAction({
-        action: 'delete',
-        entity: 'Product',
+        action: "delete",
+        entity: "Product",
         entityId: id,
-        details: { reason: 'تم حذف المنتج' },
+        userId: user?.userId,
+        userName: user?.username,
+        details: { name: existing?.name },
       });
 
-      return NextResponse.json({ success: true });
+      return successResponse({ deleted: true });
     }
 
-    return NextResponse.json({ success: false, error: "يرجى تحديد منتج واحد على الأقل" }, { status: 400 });
+    return errorResponse("يرجى تحديد منتج واحد على الأقل");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete product(s)";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل في حذف المنتج(ات)";
+    return errorResponse(message, 500);
   }
-}
+});
