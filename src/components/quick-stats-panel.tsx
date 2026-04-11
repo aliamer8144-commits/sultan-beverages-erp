@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useAppStore, type Screen } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { type Screen } from '@/types'
 import { useCurrency } from '@/hooks/use-currency'
 import { toast } from 'sonner'
 import {

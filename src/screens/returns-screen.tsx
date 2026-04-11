@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAppStore, CURRENCY_MAP } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { CURRENCY_MAP } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

@@ -595,3 +595,46 @@ Stage Summary:
 - Remaining acceptable raw date formatting: 4 instances (2 in CSV filenames, 2 in print templates where hooks don't work)
 - Remaining formatWithSettings: 3 instances in invoices-screen.tsx (intentionally kept for print templates)
 - Remaining AlertDialog: 1 instance in daily-close-screen.tsx (trigger-based pattern, not replaceable with ConfirmDialog)
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Phase 7 — Store cleanup + dead code removal
+
+Work Log:
+- Analyzed all source files for dead/unused code using comprehensive grep analysis
+- Deleted 2 unused files:
+  - src/lib/print-templates.ts (575 lines) — never imported by any file
+  - src/components/product-image-upload.tsx (173 lines) — never imported
+- Cleaned src/store/app-store.ts:
+  - Removed all type re-exports (12 lines) — 9 files migrated to import from @/types directly
+  - Store now only imports types it uses internally (User, CartItem, HeldOrder, SettingsState, Screen)
+  - Reduced from 229 to 202 lines
+- Migrated 9 files from @/store/app-store type imports to @/types:
+  - settings-screen.tsx, invoices-screen.tsx, returns-screen.tsx
+  - currency.ts, use-currency.ts, exchange-rate-widget.tsx
+  - app-layout.tsx, global-search-dialog.tsx, quick-stats-panel.tsx
+- Cleaned src/lib/constants.ts:
+  - Removed 5 unused exports (ITEMS_PER_PAGE, MAX_ITEMS_PER_PAGE, DEBOUNCE_MS, TOAST_DURATION, ANIMATION_DURATION)
+  - Reduced from 75 to 62 lines
+- Cleaned src/lib/api-response.ts:
+  - Removed 5 unused exports (unauthorized, forbidden, validationError, paginatedResponse, parseBody)
+  - Reduced from 81 to 40 lines
+- Cleaned src/lib/image-utils.ts:
+  - Removed 2 unused exports (getDefaultPlaceholder, getBase64Size)
+  - Reduced from 96 to 72 lines
+- Kept src/hooks/use-api.ts and use-data-table.ts (future-use shared utilities from Phase 5)
+- Kept src/hooks/use-toast.ts (used by shadcn/ui Toaster component)
+
+Verified:
+- TypeScript: 0 errors (npx tsc --noEmit)
+- ESLint: 0 errors (bun run lint)
+- Dev server: running, 0 errors
+
+Stage Summary:
+- Phase 7 complete: 748 lines of dead code removed (575 + 173 deleted files + cleanups)
+- Store simplified: no more re-exports, types imported directly from @/types
+- 5 unused constant exports removed
+- 5 unused API helper exports removed
+- 2 unused image utility exports removed
+- Total project reduction across Phase 6+7: ~1,000+ lines of duplication/dead code eliminated

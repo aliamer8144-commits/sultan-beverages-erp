@@ -32,7 +32,8 @@ import {
   Loader2,
   CheckCircle2,
 } from 'lucide-react'
-import { useAppStore, CURRENCY_MAP, type CurrencyCode } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { CURRENCY_MAP, type CurrencyCode } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────
 interface ExchangeRateData {

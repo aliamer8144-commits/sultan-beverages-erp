@@ -1,4 +1,5 @@
-import { useAppStore, CURRENCY_MAP, type CurrencyCode } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { CURRENCY_MAP, type CurrencyCode } from '@/types'
 
 /**
  * Format a number as currency string.

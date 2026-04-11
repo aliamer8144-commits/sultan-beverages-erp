@@ -54,19 +54,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 
 // ── Pagination & Limits ─────────────────────────────────────────────
 
-export const ITEMS_PER_PAGE = 20
-export const MAX_ITEMS_PER_PAGE = 100
 export const MAX_HELD_ORDERS = 5
-
-// ── UI ──────────────────────────────────────────────────────────────
-
-export const DEBOUNCE_MS = 250
-export const TOAST_DURATION = 3000
-export const ANIMATION_DURATION = {
-  slow: 500,
-  normal: 300,
-  fast: 150,
-} as const
 
 // ── Store ───────────────────────────────────────────────────────────
 

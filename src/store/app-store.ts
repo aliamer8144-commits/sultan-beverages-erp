@@ -10,37 +10,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// ── Import types from central location ──────────────────────────────
-import type {
-  CurrencyCode,
-  User,
-  CartItem,
-  HeldOrder,
-  SettingsState,
-  Screen,
-  CurrencyMeta,
-  UserRole,
-  AnimationSpeed,
-  CurrencyPosition,
-  InvoiceTemplate,
-  CurrencyDisplayMode,
-  InvoiceData,
-  TemplateType,
-  Lang,
-} from '@/types'
-
 import { DEFAULT_SETTINGS, MAX_HELD_ORDERS, STORE_PERSIST_KEY } from '@/lib/constants'
+import type { User, CartItem, HeldOrder, SettingsState, Screen } from '@/types'
 
-// ── Re-export types for backward compatibility ───────────────────────
-// Files that still import from '@/store/app-store' will keep working.
-
-export type { CurrencyCode, CurrencyMeta, User, UserRole }
-export type { CartItem, HeldOrder }
-export type { SettingsState, AnimationSpeed, CurrencyPosition, InvoiceTemplate, CurrencyDisplayMode }
-export type { Screen }
-export type { InvoiceData, TemplateType }
-export type { Lang }
-export { CURRENCY_MAP } from '@/types'
+// Types are imported from @/types. No re-exports — consumers import directly from @/types.
 
 // ── Store Interface ─────────────────────────────────────────────────
 

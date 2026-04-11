@@ -8,7 +8,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useAppStore, type Screen } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { type Screen } from '@/types'
 import {
   Search,
   Package,

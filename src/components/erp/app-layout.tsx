@@ -1,6 +1,7 @@
 'use client'
 
-import { useAppStore, type Screen } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { type Screen } from '@/types'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 

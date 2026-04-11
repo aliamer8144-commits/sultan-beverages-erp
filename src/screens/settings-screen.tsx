@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useAppStore, type SettingsState, CURRENCY_MAP, type CurrencyCode } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
+import { type SettingsState, CURRENCY_MAP, type CurrencyCode } from '@/types'
 import { formatCurrency as fc, getCurrencySymbol } from '@/lib/currency'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'

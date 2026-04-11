@@ -1,6 +1,6 @@
 /**
  * Image utility functions for product image handling.
- * Provides compression and placeholder helpers.
+ * Provides compression helpers.
  */
 
 /**
@@ -69,27 +69,4 @@ export function compressImage(
     img.onerror = () => reject(new Error('فشل في تحميل الصورة'))
     img.src = URL.createObjectURL(file)
   })
-}
-
-/**
- * Returns an empty string for fallback when no image is available.
- * The UI components handle the empty state by showing placeholder icons.
- *
- * @returns Empty string
- */
-export function getDefaultPlaceholder(): string {
-  return ''
-}
-
-/**
- * Get the estimated file size in KB from a base64 data URL.
- *
- * @param base64 - The base64 data URL string
- * @returns Estimated size in KB
- */
-export function getBase64Size(base64: string): number {
-  if (!base64) return 0
-  // Base64 encoding: 4 chars = 3 bytes, minus data URL prefix
-  const base64Length = base64.split(',')[1]?.length || 0
-  return Math.round((base64Length * 3) / 4 / 1024)
 }
