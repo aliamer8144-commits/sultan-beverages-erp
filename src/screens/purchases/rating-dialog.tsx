@@ -10,9 +10,17 @@ import { useAppStore } from '@/store/app-store'
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createSupplierReviewSchema } from '@/lib/validations'
+import { z } from 'zod'
 import type { Supplier } from './types'
 
-const reviewFormSchema = createSupplierReviewSchema.omit({ supplierId: true })
+const reviewFormSchema = createSupplierReviewSchema
+  .omit({ supplierId: true })
+  .extend({ rating: z.coerce.number().int().min(0).max(5) })
+
+interface RatingFormValues {
+  rating: number
+  review: string
+}
 
 interface RatingDialogProps {
   open: boolean
@@ -30,10 +38,10 @@ export function RatingDialog({
   const { user } = useAppStore()
   const { post } = useApi()
 
-  const form = useZodForm({
+  const form = useZodForm<RatingFormValues, z.infer<typeof reviewFormSchema>>({
     schema: reviewFormSchema,
     defaultValues: {
-      rating: 0 as any,
+      rating: 0,
       review: '',
     },
   })

@@ -93,6 +93,7 @@ function SalesTargetWidget() {
   }, [get])
 
   useEffect(() => {
+    // Intentionally triggers data fetch that sets state — safe pattern
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTarget()
     const interval = setInterval(fetchTarget, 60000) // refresh every 60s
@@ -238,6 +239,7 @@ export function DashboardScreen() {
   }, [])
 
   useEffect(() => {
+    // Intentionally triggers data fetch that sets state — safe pattern
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboard()
   }, [])

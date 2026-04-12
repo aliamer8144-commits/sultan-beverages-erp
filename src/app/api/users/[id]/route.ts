@@ -1,5 +1,5 @@
 import { withAuth, getRequestUser } from '@/lib/auth-middleware'
-import { tryCatch, validateRequest } from '@/lib/api-error-handler'
+import { tryCatch, validateRequest, getRequiredParam } from '@/lib/api-error-handler'
 import { successResponse, errorResponse } from '@/lib/api-response'
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
@@ -10,11 +10,7 @@ import { editUserSchema } from '@/lib/validations'
  * If `password` is provided, it will be hashed automatically.
  */
 export const PUT = withAuth(tryCatch(async (request, { params }) => {
-  const { id } = params ?? {}
-
-  if (!id) {
-    return errorResponse('معرف المستخدم مطلوب', 400)
-  }
+  const id = getRequiredParam(params, 'id')
 
   const body = await validateRequest(request, editUserSchema)
   const { name, password } = body
@@ -37,11 +33,7 @@ export const PUT = withAuth(tryCatch(async (request, { params }) => {
  * DELETE /api/users/[id] — Delete a user (admin only)
  */
 export const DELETE = withAuth(tryCatch(async (request, { params }) => {
-  const { id } = params ?? {}
-
-  if (!id) {
-    return errorResponse('معرف المستخدم مطلوب', 400)
-  }
+  const id = getRequiredParam(params, 'id')
 
   // Prevent self-deletion
   const currentUser = getRequestUser(request)

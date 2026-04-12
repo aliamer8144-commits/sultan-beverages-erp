@@ -12,10 +12,11 @@ import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createProductSchema } from '@/lib/validations'
+import type { z } from 'zod'
 import { compressImage } from '@/lib/image-utils'
 
 import type { Product, Category } from './types'
-import { emptyForm } from './types'
+import { emptyForm, type ProductFormData } from './types'
 
 export interface ProductFormDialogProps {
   open: boolean
@@ -28,7 +29,7 @@ export interface ProductFormDialogProps {
 export function ProductFormDialog({ open, onOpenChange, editingProduct, categories, onSaved }: ProductFormDialogProps) {
   const { post, put } = useApi()
 
-  const form = useZodForm({
+  const form = useZodForm<ProductFormData, z.infer<typeof createProductSchema>>({
     schema: createProductSchema,
     defaultValues: emptyForm,
   })

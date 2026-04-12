@@ -3,14 +3,13 @@ import { logAction } from "@/lib/audit-logger";
 import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { validateBody, updateCustomerSchema } from "@/lib/validations";
 import { successResponse, errorResponse, notFound } from "@/lib/api-response";
-import { tryCatch } from "@/lib/api-error-handler";
+import { tryCatch, getRequiredParam } from "@/lib/api-error-handler";
 
 /**
  * PUT /api/customers/[id] — Update a customer
  */
 export const PUT = withAuth(tryCatch(async (request, context) => {
-  const { id } = context.params ?? {};
-  if (!id) return errorResponse("معرف العميل مطلوب");
+  const id = getRequiredParam(context.params, 'id');
 
   const body = await request.json();
   const validation = validateBody(updateCustomerSchema, body);
@@ -41,8 +40,7 @@ export const PUT = withAuth(tryCatch(async (request, context) => {
  * DELETE /api/customers/[id] — Delete a customer
  */
 export const DELETE = withAuth(tryCatch(async (request, context) => {
-  const { id } = context.params ?? {};
-  if (!id) return errorResponse("معرف العميل مطلوب");
+  const id = getRequiredParam(context.params, 'id');
 
   const existing = await db.customer.findUnique({ where: { id } });
   if (!existing) return notFound("العميل غير موجود");

@@ -13,8 +13,10 @@ function getDatabaseUrl(): string {
   }
   // Fallback: read from .env file directly
   try {
+    // Prisma generate requires dynamic require
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs')
+    // Prisma generate requires dynamic require
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path')
     const envPath = path.join(process.cwd(), '.env')

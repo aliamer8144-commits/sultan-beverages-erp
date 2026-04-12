@@ -25,6 +25,11 @@ import {
   CHART_COLORS,
 } from '@/components/chart-utils'
 
+// ─── Shared Types ───────────────────────────────────────────────────
+
+/** Recharts XAxis interval — number or special keywords */
+type AxisInterval = number | 'preserveStartEnd' | 'preserveStart' | 'preserveEnd'
+
 // ─── Shared Defaults ─────────────────────────────────────────────────
 
 const GRID_STROKE = 'oklch(0.92 0.005 260)'
@@ -39,8 +44,8 @@ const kFormatter = (val: number) => `${(val / 1000).toFixed(0)}k`
 // ─── Vertical Bar Chart ─────────────────────────────────────────────
 // Used by: Dashboard (monthly sales), Daily-close (hourly)
 
-interface VerticalBarChartProps {
-  data: any[]
+interface VerticalBarChartProps<T = Record<string, unknown>> {
+  data: T[]
   dataKey: string
   labelKey?: string
   color?: string
@@ -51,7 +56,7 @@ interface VerticalBarChartProps {
   /** Override default k-formatter */
   yAxisFormatter?: (val: number) => string
   xAxisTickFormatter?: (value: unknown) => string
-  xAxisInterval?: any
+  xAxisInterval?: AxisInterval
   xAxisAngle?: number
   xAxisHeight?: number
   tooltipSuffix?: string
@@ -60,7 +65,7 @@ interface VerticalBarChartProps {
   emptyDescription?: string
 }
 
-export function VerticalBarChart({
+export function VerticalBarChart<T = Record<string, unknown>>({
   data,
   dataKey,
   labelKey = 'name',
@@ -78,7 +83,7 @@ export function VerticalBarChart({
   emptyIcon,
   emptyTitle = 'لا توجد بيانات',
   emptyDescription,
-}: VerticalBarChartProps) {
+}: VerticalBarChartProps<T>) {
   return (
     <div className="w-full" style={{ height }}>
       {!data || data.length === 0 ? (
@@ -119,8 +124,8 @@ export function VerticalBarChart({
 // ─── Horizontal Bar Chart ───────────────────────────────────────────
 // Used by: Dashboard (top products), Analytics (category revenue)
 
-interface HorizontalBarChartProps {
-  data: any[]
+interface HorizontalBarChartProps<T = Record<string, unknown>> {
+  data: T[]
   dataKey: string
   labelKey?: string
   colors?: string[]
@@ -136,7 +141,7 @@ interface HorizontalBarChartProps {
   emptyDescription?: string
 }
 
-export function HorizontalBarChart({
+export function HorizontalBarChart<T = Record<string, unknown>>({
   data,
   dataKey,
   labelKey = 'name',
@@ -151,7 +156,7 @@ export function HorizontalBarChart({
   emptyIcon,
   emptyTitle = 'لا توجد بيانات',
   emptyDescription,
-}: HorizontalBarChartProps) {
+}: HorizontalBarChartProps<T>) {
   return (
     <div className="w-full" style={{ height }}>
       {!data || data.length === 0 ? (
@@ -198,8 +203,8 @@ export function HorizontalBarChart({
 // ─── Area Trend Chart ───────────────────────────────────────────────
 // Used by: Analytics (sales trend), Expense (daily trend)
 
-interface AreaTrendChartProps {
-  data: any[]
+interface AreaTrendChartProps<T = Record<string, unknown>> {
+  data: T[]
   dataKey: string
   labelKey?: string
   color?: string
@@ -208,7 +213,7 @@ interface AreaTrendChartProps {
   strokeWidth?: number
   animationDuration?: number
   xAxisTickFormatter?: (value: unknown) => string
-  xAxisInterval?: any
+  xAxisInterval?: AxisInterval
   yAxisFormatter?: (val: number) => string
   showDot?: boolean
   emptyIcon?: LucideIcon
@@ -216,7 +221,7 @@ interface AreaTrendChartProps {
   emptyDescription?: string
 }
 
-export function AreaTrendChart({
+export function AreaTrendChart<T = Record<string, unknown>>({
   data,
   dataKey,
   labelKey = 'date',
@@ -232,7 +237,7 @@ export function AreaTrendChart({
   emptyIcon,
   emptyTitle = 'لا توجد بيانات',
   emptyDescription,
-}: AreaTrendChartProps) {
+}: AreaTrendChartProps<T>) {
   return (
     <div className="w-full" style={{ height }}>
       {!data || data.length === 0 ? (
@@ -278,8 +283,8 @@ export function AreaTrendChart({
 // ─── Donut Chart ────────────────────────────────────────────────────
 // Used by: Dashboard (sales by category), Analytics (expense breakdown), Expense (category)
 
-interface DonutChartProps {
-  data: any[]
+interface DonutChartProps<T = Record<string, unknown>> {
+  data: T[]
   dataKey?: string
   nameKey?: string
   colors?: string[]
@@ -291,7 +296,7 @@ interface DonutChartProps {
   emptyDescription?: string
 }
 
-export function DonutChart({
+export function DonutChart<T = Record<string, unknown>>({
   data,
   dataKey = 'value',
   nameKey = 'name',
@@ -302,7 +307,7 @@ export function DonutChart({
   emptyIcon,
   emptyTitle = 'لا توجد بيانات',
   emptyDescription,
-}: DonutChartProps) {
+}: DonutChartProps<T>) {
   return (
     <div className="w-full" style={{ height }}>
       {!data || data.length === 0 ? (
@@ -347,8 +352,8 @@ interface BarSeries {
   maxBarSize?: number
 }
 
-interface GroupedBarChartProps {
-  data: any[]
+interface GroupedBarChartProps<T = Record<string, unknown>> {
+  data: T[]
   bars: BarSeries[]
   labelKey?: string
   height?: number
@@ -359,7 +364,7 @@ interface GroupedBarChartProps {
   emptyDescription?: string
 }
 
-export function GroupedBarChart({
+export function GroupedBarChart<T = Record<string, unknown>>({
   data,
   bars,
   labelKey = 'name',
@@ -369,9 +374,9 @@ export function GroupedBarChart({
   emptyIcon,
   emptyTitle = 'لا توجد بيانات',
   emptyDescription,
-}: GroupedBarChartProps) {
+}: GroupedBarChartProps<T>) {
   // Check if any bar series has data
-  const hasData = data.length > 0 && bars.some(b => data.some(d => (d[b.dataKey] as number) > 0))
+  const hasData = data.length > 0 && bars.some(b => data.some(d => (d as Record<string, unknown>)[b.dataKey] as number > 0))
 
   return (
     <div className="w-full" style={{ height }}>

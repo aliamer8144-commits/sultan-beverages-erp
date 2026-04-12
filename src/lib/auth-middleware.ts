@@ -13,6 +13,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, AUTH_COOKIE_NAME } from './auth'
 
+// ── Type Augmentation ──────────────────────────────────────────────
+
+/** Auth user info attached to NextRequest after withAuth */
+export interface AuthUserInfo {
+  userId: string
+  username: string
+  role: string
+}
+
+/** Extend NextRequest with auth user property via declaration merging */
+declare module 'next/server' {
+  interface NextRequest {
+    __authUser?: AuthUserInfo
+  }
+}
+
 // ── Response Helpers ────────────────────────────────────────────────
 
 function unauthorizedResponse(message = 'غير مصرح بهذا الطلب') {
@@ -66,7 +82,7 @@ export function withAuth(
     }
 
     // Attach user info to the request for downstream use
-    ;(request as unknown as Record<string, unknown>).__authUser = user
+    request.__authUser = user
 
     return handler(request, context)
   }
@@ -78,10 +94,8 @@ export function withAuth(
  * Get the authenticated user from a request that has already passed
  * through `withAuth`. Returns null if no user is attached.
  */
-export function getRequestUser(request: NextRequest) {
-  return (request as unknown as Record<string, unknown>).__authUser as
-    | { userId: string; username: string; role: string }
-    | undefined
+export function getRequestUser(request: NextRequest): AuthUserInfo | undefined {
+  return request.__authUser
 }
 
 /**

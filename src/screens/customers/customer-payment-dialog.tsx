@@ -24,8 +24,17 @@ import { Wallet, Crown, Banknote } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createCustomerPaymentSchema } from '@/lib/validations'
+import type { z } from 'zod'
 
 import type { Customer } from './types'
+
+/** Form state type — HTML inputs return strings for number fields */
+interface PaymentFormValues {
+  customerId: string
+  amount: string
+  method: string
+  notes: string
+}
 
 interface CustomerPaymentDialogProps {
   open: boolean
@@ -54,7 +63,7 @@ export function CustomerPaymentDialog({
 }: CustomerPaymentDialogProps) {
   const { post } = useApi()
 
-  const form = useZodForm({
+  const form = useZodForm<PaymentFormValues, z.infer<typeof createCustomerPaymentSchema>>({
     schema: createCustomerPaymentSchema,
     defaultValues: PAYMENT_DEFAULTS,
   })

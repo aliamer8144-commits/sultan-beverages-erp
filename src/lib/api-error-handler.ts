@@ -185,6 +185,33 @@ function handlePrismaError(error: PrismaError, fallback: string): NextResponse {
   }
 }
 
+// ── Route Param Helpers ────────────────────────────────────────────
+
+/**
+ * Extract a required route param from the resolved context.
+ * Returns the param value or throws an error (caught by tryCatch → 400).
+ *
+ * @example
+ * ```ts
+ * export const PUT = withAuth(tryCatch(async (req, { params }) => {
+ *   const id = getRequiredParam(params, 'id')
+ *   // id is now typed as string (not string | undefined)
+ * }))
+ * ```
+ */
+export function getRequiredParam(
+  params: Record<string, string> | undefined,
+  name: string
+): string {
+  const value = params?.[name]
+  if (!value) {
+    const error = new Error(`معرف "${name}" مطلوب`)
+    ;(error as ValidationError).statusCode = 400
+    throw error
+  }
+  return value
+}
+
 // ── Internal Types ─────────────────────────────────────────────────
 
 interface ValidationError extends Error {

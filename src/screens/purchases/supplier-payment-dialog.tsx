@@ -11,9 +11,16 @@ import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createSupplierPaymentSchema } from '@/lib/validations'
+import type { z } from 'zod'
 import type { Supplier } from './types'
 
 const paymentFormSchema = createSupplierPaymentSchema.omit({ supplierId: true })
+
+interface PaymentFormValues {
+  amount: string
+  method: string
+  notes: string
+}
 
 interface SupplierPaymentDialogProps {
   open: boolean
@@ -31,10 +38,10 @@ export function SupplierPaymentDialog({
   const { formatCurrency } = useCurrency()
   const { post } = useApi()
 
-  const form = useZodForm({
+  const form = useZodForm<PaymentFormValues, z.infer<typeof paymentFormSchema>>({
     schema: paymentFormSchema,
     defaultValues: {
-      amount: '' as any,
+      amount: '',
       method: 'cash',
       notes: '',
     },

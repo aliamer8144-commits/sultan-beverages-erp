@@ -10,10 +10,16 @@ import { Loader2, Layers, Plus, Pencil, Trash2, Save, AlertTriangle } from 'luci
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createProductVariantSchema } from '@/lib/validations'
+import type { z } from 'zod'
 import { useCurrency } from '@/hooks/use-currency'
 
 import type { Product, ProductVariant } from './types'
-import { emptyVariantForm } from './types'
+import { emptyVariantForm, type VariantFormData } from './types'
+
+/** Form state type — includes productId + string fields for number inputs */
+interface VariantFormState extends VariantFormData {
+  productId: string
+}
 
 const variantDefaultValues = {
   productId: '',
@@ -40,7 +46,7 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
   const [variantFormOpen, setVariantFormOpen] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
 
-  const variantForm = useZodForm({
+  const variantForm = useZodForm<VariantFormState, z.infer<typeof createProductVariantSchema>>({
     schema: createProductVariantSchema,
     defaultValues: variantDefaultValues,
   })

@@ -217,6 +217,7 @@ export function ExpenseScreen() {
   }, [categoryFilter, dateRange, search, get])
 
   useEffect(() => {
+    // Intentionally triggers data fetch that sets state — safe pattern
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData(1)
   }, [fetchData])

@@ -3,14 +3,13 @@ import { logAction } from "@/lib/audit-logger";
 import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { validateBody, updateSupplierSchema } from "@/lib/validations";
 import { successResponse, errorResponse, notFound } from "@/lib/api-response";
-import { tryCatch } from "@/lib/api-error-handler";
+import { tryCatch, getRequiredParam } from "@/lib/api-error-handler";
 
 /**
  * PUT /api/suppliers/[id] — Update a supplier
  */
 export const PUT = withAuth(tryCatch(async (request, context) => {
-  const { id } = context.params ?? {};
-  if (!id) return errorResponse("معرف المورد مطلوب");
+  const id = getRequiredParam(context.params, 'id');
 
   const body = await request.json();
   const validation = validateBody(updateSupplierSchema, body);
@@ -41,8 +40,7 @@ export const PUT = withAuth(tryCatch(async (request, context) => {
  * DELETE /api/suppliers/[id] — Delete a supplier
  */
 export const DELETE = withAuth(tryCatch(async (request, context) => {
-  const { id } = context.params ?? {};
-  if (!id) return errorResponse("معرف المورد مطلوب");
+  const id = getRequiredParam(context.params, 'id');
 
   const existing = await db.supplier.findUnique({ where: { id } });
   if (!existing) return notFound("المورد غير موجود");

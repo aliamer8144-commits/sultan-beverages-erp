@@ -221,6 +221,7 @@ export function SalesTargetsScreen() {
   }, [get])
 
   useEffect(() => {
+    // Intentionally triggers data fetch that sets state — safe pattern
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTargets()
   }, [fetchTargets])

@@ -176,6 +176,7 @@ export function AnalyticsScreen() {
 
   useEffect(() => {
     if (selectedPreset !== 'custom') {
+      // Intentionally triggers data fetch that sets state — safe pattern
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAnalytics()
     }

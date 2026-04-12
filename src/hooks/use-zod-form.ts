@@ -5,31 +5,28 @@
  * and submission lifecycle. Designed for self-contained form components
  * that manage their own state (dialog forms, etc.).
  *
+ * Supports separate input/output types — useful when form fields store
+ * raw strings (e.g., `amount: ''`) but the schema coerces them to numbers
+ * (e.g., `z.coerce.number()`).
+ *
  * @example
  * ```tsx
- * function MyForm({ onSaved }: { onSaved: () => void }) {
- *   const form = useZodForm({
- *     schema: createCustomerSchema,
- *     defaultValues: { name: '', phone: '', category: 'عادي', notes: '' },
- *   })
+ * // Simple: same type for form values and submit handler
+ * const form = useZodForm({
+ *   schema: createCategorySchema,
+ *   defaultValues: { name: '', icon: '' },
+ * })
  *
- *   return (
- *     <form onSubmit={form.handleSubmit(async (values) => {
- *       await post('/api/customers', values)
- *       form.reset()
- *       onSaved()
- *     })}>
- *       <Input
- *         value={form.values.name}
- *         onChange={(e) => form.setValue('name', e.target.value)}
- *         className={form.errors.name ? 'border-destructive' : ''}
- *       />
- *       {form.errors.name && (
- *         <p className="text-sm text-destructive">{form.errors.name}</p>
- *       )}
- *     </form>
- *   )
- * }
+ * @example
+ * ```tsx
+ * // Advanced: separate input/output types (coerce.number scenario)
+ * const form = useZodForm<PaymentInput, PaymentOutput>({
+ *   schema: createPaymentSchema,
+ *   defaultValues: { amount: '', method: 'cash' },
+ * })
+ * form.handleSubmit(async (values) => {
+ *   // values.amount is number here (schema output)
+ * })
  * ```
  */
 
@@ -39,18 +36,25 @@ import { useState, useCallback } from 'react'
 import { type z } from 'zod'
 import { validateFormClient } from '@/lib/validation-utils'
 
+/** Base type for form field values (string keys, any values) */
 type FieldValues = Record<string, any>
 
-interface UseZodFormOptions<TValues extends FieldValues = FieldValues> {
-  /** Zod schema to validate against */
-  schema: z.ZodType<any, any, any>
-  /** Default values for the form */
-  defaultValues: TValues
+interface UseZodFormOptions<
+  TInput extends FieldValues = FieldValues,
+  TOutput extends FieldValues = TInput,
+> {
+  /** Zod schema to validate against — output type is TOutput */
+  schema: z.ZodType<TOutput>
+  /** Default values for the form (input type) */
+  defaultValues: TInput
 }
 
-interface UseZodFormReturn<TValues extends FieldValues = FieldValues> {
-  /** Current form values */
-  values: TValues
+interface UseZodFormReturn<
+  TInput extends FieldValues = FieldValues,
+  TOutput extends FieldValues = TInput,
+> {
+  /** Current form values (raw input state) */
+  values: TInput
   /** Field-level error messages (field path → Arabic message) */
   errors: Record<string, string>
   /** Whether the form is currently being submitted */
@@ -58,9 +62,9 @@ interface UseZodFormReturn<TValues extends FieldValues = FieldValues> {
   /** Whether the form has any errors */
   hasErrors: boolean
   /** Set a single field value (auto-clears its error) */
-  setValue: <K extends keyof TValues>(field: K, value: TValues[K]) => void
+  setValue: <K extends keyof TInput>(field: K, value: TInput[K]) => void
   /** Set multiple field values at once (auto-clears their errors) */
-  setValues: (partial: Partial<TValues>) => void
+  setValues: (partial: Partial<TInput>) => void
   /** Set error for a specific field */
   setError: (field: string, message: string) => void
   /** Replace all errors at once (e.g., from API or cross-field validation) */
@@ -70,29 +74,33 @@ interface UseZodFormReturn<TValues extends FieldValues = FieldValues> {
   /** Clear all field errors */
   clearErrors: () => void
   /** Reset form to default values and clear all errors */
-  reset: (newValues?: Partial<TValues>) => void
+  reset: (newValues?: Partial<TInput>) => void
   /** Manually trigger validation. Returns `true` if valid. */
   validate: () => boolean
   /**
    * Wrap a submit handler with validation + loading state.
    * Only calls the callback if validation passes.
+   * The callback receives schema-parsed values (TOutput — coerced types).
    * Automatically sets/unsets `isSubmitting`.
    */
   handleSubmit: (
-    onValid: (values: z.infer<any>) => void | Promise<void>
+    onValid: (values: TOutput) => void | Promise<void>
   ) => () => Promise<void>
 }
 
-export function useZodForm<TValues extends FieldValues = FieldValues>({
+export function useZodForm<
+  TInput extends FieldValues = FieldValues,
+  TOutput extends FieldValues = TInput,
+>({
   schema,
   defaultValues,
-}: UseZodFormOptions<TValues>): UseZodFormReturn<TValues> {
-  const [values, setValuesState] = useState<TValues>(() => ({ ...defaultValues }))
+}: UseZodFormOptions<TInput, TOutput>): UseZodFormReturn<TInput, TOutput> {
+  const [values, setValuesState] = useState<TInput>(() => ({ ...defaultValues }))
   const [errors, setErrorsState] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const setValue = useCallback(
-    <K extends keyof TValues>(field: K, value: TValues[K]) => {
+    <K extends keyof TInput>(field: K, value: TInput[K]) => {
       setValuesState((prev) => ({ ...prev, [field]: value }))
       // Auto-clear error for this field
       setErrorsState((prev) => {
@@ -106,7 +114,7 @@ export function useZodForm<TValues extends FieldValues = FieldValues>({
     []
   )
 
-  const setValues = useCallback((partial: Partial<TValues>) => {
+  const setValues = useCallback((partial: Partial<TInput>) => {
     setValuesState((prev) => ({ ...prev, ...partial }))
     // Auto-clear errors for updated fields
     setErrorsState((prev) => {
@@ -144,7 +152,7 @@ export function useZodForm<TValues extends FieldValues = FieldValues>({
   }, [])
 
   const reset = useCallback(
-    (newValues?: Partial<TValues>) => {
+    (newValues?: Partial<TInput>) => {
       setValuesState({ ...defaultValues, ...newValues })
       setErrorsState({})
       setIsSubmitting(false)
@@ -163,7 +171,7 @@ export function useZodForm<TValues extends FieldValues = FieldValues>({
   }, [schema, values])
 
   const handleSubmit = useCallback(
-    (onValid: (values: any) => void | Promise<void>) => {
+    (onValid: (values: TOutput) => void | Promise<void>) => {
       return async () => {
         const fieldErrors = validateFormClient(schema, values)
         if (fieldErrors) {

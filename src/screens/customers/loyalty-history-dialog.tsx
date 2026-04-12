@@ -19,9 +19,18 @@ import { formatShortDate } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
 import { useZodForm } from '@/hooks/use-zod-form'
 import { createLoyaltyTransactionSchema } from '@/lib/validations'
+import type { z } from 'zod'
 import { validateFormClient } from '@/lib/validation-utils'
 
 import type { Customer, LoyaltyTransaction } from './types'
+
+/** Form state type — HTML inputs return strings for number fields */
+interface LoyaltyAdjustFormValues {
+  customerId: string
+  points: string
+  transactionType: string
+  description: string
+}
 
 interface LoyaltyHistoryDialogProps {
   open: boolean
@@ -58,7 +67,7 @@ export function LoyaltyHistoryDialog({
   const [adjustCustomer, setAdjustCustomer] = useState<Customer | null>(null)
 
   // ── Adjust form (self-contained, useZodForm) ──
-  const adjustForm = useZodForm({
+  const adjustForm = useZodForm<LoyaltyAdjustFormValues, z.infer<typeof createLoyaltyTransactionSchema>>({
     schema: createLoyaltyTransactionSchema,
     defaultValues: ADJUST_DEFAULTS,
   })
