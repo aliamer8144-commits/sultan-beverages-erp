@@ -25,7 +25,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Search,
@@ -131,10 +130,6 @@ export function CustomersScreen() {
 
   // ─── Create Customer ──────────────────────────────────────────────
   const handleCreate = async () => {
-    if (!form.name.trim()) {
-      toast.error('يرجى إدخال اسم العميل')
-      return
-    }
     try {
       setSubmitting(true)
       const result = await post('/api/customers', {
@@ -159,10 +154,6 @@ export function CustomersScreen() {
   // ─── Update Customer ──────────────────────────────────────────────
   const handleUpdate = async () => {
     if (!selectedCustomer) return
-    if (!form.name.trim()) {
-      toast.error('يرجى إدخال اسم العميل')
-      return
-    }
     try {
       setSubmitting(true)
       const result = await put(`/api/customers/${selectedCustomer.id}`, {

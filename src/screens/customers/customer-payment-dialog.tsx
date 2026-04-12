@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +22,8 @@ import {
 import { toast } from 'sonner'
 import { Wallet, Crown, Banknote } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createCustomerPaymentSchema } from '@/lib/validations'
 
 import type { Customer } from './types'
 
@@ -34,6 +36,14 @@ interface CustomerPaymentDialogProps {
   onSuccess: () => void
 }
 
+/** Stable defaults so useZodForm.reset reference stays constant */
+const PAYMENT_DEFAULTS = {
+  customerId: '',
+  amount: '',
+  method: 'cash',
+  notes: '',
+}
+
 export function CustomerPaymentDialog({
   open,
   onOpenChange,
@@ -43,45 +53,53 @@ export function CustomerPaymentDialog({
   onSuccess,
 }: CustomerPaymentDialogProps) {
   const { post } = useApi()
-  const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [paymentNotes, setPaymentNotes] = useState('')
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false)
 
-  const handleRecordPayment = async () => {
-    if (!customer) return
-    const amount = parseFloat(paymentAmount)
-    if (!amount || amount <= 0) {
-      toast.error('يرجى إدخال مبلغ صحيح')
+  const form = useZodForm({
+    schema: createCustomerPaymentSchema,
+    defaultValues: PAYMENT_DEFAULTS,
+  })
+
+  // Memoize reset deps to prevent unnecessary re-triggers
+  const customerId = customer?.id ?? ''
+
+  // Reset form whenever the dialog opens or the customer changes
+  useEffect(() => {
+    if (open) {
+      form.reset({ ...PAYMENT_DEFAULTS, customerId })
+    }
+  }, [open, customerId, form])
+
+  const paymentAmount = String(form.values.amount || '')
+  const exceedsDebt = customer
+    ? !!paymentAmount && parseFloat(paymentAmount) > customer.debt
+    : false
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!customer) {
+      toast.error('يرجى تسجيل الدخول')
       return
     }
-    if (amount > customer.debt) {
-      toast.error('المبلغ أكبر من المديونية الحالية')
+    // Cross-field: amount must not exceed current debt
+    if (values.amount > customer.debt) {
+      form.setError('amount', 'المبلغ أكبر من المديونية الحالية')
       return
     }
 
-    setPaymentSubmitting(true)
-    try {
-      const result = await post('/api/customer-payments', {
-        customerId: customer.id,
-        amount,
-        method: paymentMethod,
-        notes: paymentNotes.trim() || null,
-      }, {
-        showSuccessToast: true,
-        successMessage: `تم تسجيل دفعة ${formatCurrency(amount)} (${paymentMethod === 'cash' ? 'نقدي' : 'تحويل'}) للعميل ${customer.name}`,
-      })
-      if (result) {
-        setPaymentAmount('')
-        setPaymentMethod('cash')
-        setPaymentNotes('')
-        onOpenChange(false)
-        onSuccess()
-      }
-    } finally {
-      setPaymentSubmitting(false)
+    const result = await post('/api/customer-payments', {
+      customerId: values.customerId,
+      amount: values.amount,
+      method: values.method,
+      notes: values.notes?.trim() || null,
+    }, {
+      showSuccessToast: true,
+      successMessage: `تم تسجيل دفعة ${formatCurrency(values.amount)} (${values.method === 'cash' ? 'نقدي' : 'تحويل'}) للعميل ${customer.name}`,
+    })
+    if (result) {
+      form.reset()
+      onOpenChange(false)
+      onSuccess()
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,23 +144,29 @@ export function CustomerPaymentDialog({
                   min={0}
                   step={0.01}
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(e) => form.setValue('amount', e.target.value)}
                   placeholder="أدخل المبلغ"
-                  className="h-11 text-base font-bold pr-4 pl-14 tabular-nums"
+                  className={`h-11 text-base font-bold pr-4 pl-14 tabular-nums${
+                    form.errors.amount || exceedsDebt
+                      ? ' border-destructive focus-visible:ring-destructive'
+                      : ''
+                  }`}
                   dir="ltr"
                   autoFocus
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
               </div>
-              {paymentAmount && parseFloat(paymentAmount) > customer.debt && (
-                <p className="text-[11px] text-destructive">المبلغ يتجاوز المديونية الحالية</p>
+              {(form.errors.amount || exceedsDebt) && (
+                <p className="text-[11px] text-destructive">
+                  {form.errors.amount || 'المبلغ يتجاوز المديونية الحالية'}
+                </p>
               )}
             </div>
 
             <div className="flex gap-2 flex-wrap">
               {customer.debt >= 50 && (
                 <button
-                  onClick={() => setPaymentAmount(String(Math.min(50, customer.debt)))}
+                  onClick={() => form.setValue('amount', String(Math.min(50, customer.debt)))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                     parseFloat(paymentAmount) === Math.min(50, customer.debt)
                       ? 'bg-primary text-white shadow-sm'
@@ -154,7 +178,7 @@ export function CustomerPaymentDialog({
               )}
               {customer.debt >= 100 && (
                 <button
-                  onClick={() => setPaymentAmount(String(Math.min(100, customer.debt)))}
+                  onClick={() => form.setValue('amount', String(Math.min(100, customer.debt)))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                     parseFloat(paymentAmount) === Math.min(100, customer.debt)
                       ? 'bg-primary text-white shadow-sm'
@@ -166,7 +190,7 @@ export function CustomerPaymentDialog({
               )}
               {customer.debt >= 200 && (
                 <button
-                  onClick={() => setPaymentAmount(String(Math.min(200, customer.debt)))}
+                  onClick={() => form.setValue('amount', String(Math.min(200, customer.debt)))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                     parseFloat(paymentAmount) === Math.min(200, customer.debt)
                       ? 'bg-primary text-white shadow-sm'
@@ -178,7 +202,7 @@ export function CustomerPaymentDialog({
               )}
               {customer.debt >= 500 && (
                 <button
-                  onClick={() => setPaymentAmount(String(Math.min(500, customer.debt)))}
+                  onClick={() => form.setValue('amount', String(Math.min(500, customer.debt)))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                     parseFloat(paymentAmount) === Math.min(500, customer.debt)
                       ? 'bg-primary text-white shadow-sm'
@@ -189,7 +213,7 @@ export function CustomerPaymentDialog({
                 </button>
               )}
               <button
-                onClick={() => setPaymentAmount(String(customer.debt))}
+                onClick={() => form.setValue('amount', String(customer.debt))}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
                   parseFloat(paymentAmount) === customer.debt
                     ? 'bg-emerald-500 text-white shadow-sm'
@@ -202,7 +226,7 @@ export function CustomerPaymentDialog({
 
             <div className="space-y-1.5">
               <Label>طريقة الدفع</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <Select value={form.values.method} onValueChange={(v) => form.setValue('method', v)}>
                 <SelectTrigger className="h-10 rounded-xl bg-muted/30 border-0">
                   <SelectValue />
                 </SelectTrigger>
@@ -231,8 +255,8 @@ export function CustomerPaymentDialog({
               <Textarea
                 id="payment-notes"
                 placeholder="أضف ملاحظة للدفعة..."
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
+                value={form.values.notes || ''}
+                onChange={(e) => form.setValue('notes', e.target.value)}
                 rows={2}
                 className="resize-none"
               />
@@ -241,11 +265,11 @@ export function CustomerPaymentDialog({
         )}
         <DialogFooter className="flex gap-2 sm:justify-start">
           <Button
-            onClick={handleRecordPayment}
-            disabled={paymentSubmitting || !paymentAmount || parseFloat(paymentAmount) <= 0}
+            onClick={onSubmit}
+            disabled={form.isSubmitting || !paymentAmount || parseFloat(paymentAmount) <= 0}
             className="btn-ripple"
           >
-            {paymentSubmitting ? 'جارٍ التسجيل...' : 'تسجيل الدفعة'}
+            {form.isSubmitting ? 'جارٍ التسجيل...' : 'تسجيل الدفعة'}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء

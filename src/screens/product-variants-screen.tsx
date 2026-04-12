@@ -13,8 +13,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { z } from 'zod'
+import { useFormValidation } from '@/hooks/use-form-validation'
 import {
   Layers, Search, Plus, Pencil, Trash2, ChevronDown, ChevronLeft,
   Loader2, Package, PackagePlus, RotateCcw, RefreshCw,
@@ -66,6 +67,17 @@ const emptyVariantForm: VariantFormData = {
   stock: '0',
 }
 
+const variantFormSchema = z.object({
+  name: z.string().min(1, 'يرجى إدخال اسم المتغير'),
+  sellPrice: z.string()
+    .refine((val) => val !== '' && !isNaN(Number(val)) && Number(val) > 0, 'يرجى إدخال سعر البيع'),
+})
+
+const stockAdjustSchema = z.object({
+  adjustment: z.string()
+    .refine((val) => val.trim() !== '' && !isNaN(Number(val)) && Number(val) !== 0, 'يرجى إدخال قيمة صحيحة'),
+})
+
 interface QuickAdjustment {
   variantId: string
   variantName: string
@@ -76,6 +88,8 @@ interface QuickAdjustment {
 export function ProductVariantsScreen() {
   const { symbol } = useCurrency()
   const { get, post, put, del } = useApi()
+  const variantValidation = useFormValidation({ schema: variantFormSchema })
+  const quickAdjustValidation = useFormValidation({ schema: stockAdjustSchema })
 
   // Data state
   const [products, setProducts] = useState<Product[]>([])
@@ -166,6 +180,7 @@ export function ProductVariantsScreen() {
     setFormProduct(product)
     setEditingVariant(null)
     setForm(emptyVariantForm)
+    variantValidation.clearAllErrors()
     setFormOpen(true)
   }
 
@@ -181,20 +196,14 @@ export function ProductVariantsScreen() {
       sellPrice: String(variant.sellPrice),
       stock: String(variant.stock),
     })
+    variantValidation.clearAllErrors()
     setFormOpen(true)
   }
 
   // ─── Submit variant form ───────────────────────────────────────
   const handleSubmit = async () => {
     if (!formProduct) return
-    if (!form.name.trim()) {
-      toast.error('يرجى إدخال اسم المتغير')
-      return
-    }
-    if (!form.sellPrice || Number(form.sellPrice) <= 0) {
-      toast.error('يرجى إدخال سعر البيع')
-      return
-    }
+    if (!variantValidation.validate({ name: form.name, sellPrice: form.sellPrice })) return
 
     setSubmitting(true)
     const payload = {
@@ -248,20 +257,19 @@ export function ProductVariantsScreen() {
   const openQuickAdjust = (variant: ProductVariant) => {
     setQuickAdjustVariant(variant)
     setQuickAdjustValue('')
+    quickAdjustValidation.clearAllErrors()
     setQuickAdjustOpen(true)
   }
 
   const handleQuickAdjust = async () => {
     if (!quickAdjustVariant) return
-    const adjustment = Number(quickAdjustValue)
-    if (isNaN(adjustment) || adjustment === 0) {
-      toast.error('يرجى إدخال قيمة صحيحة')
-      return
-    }
 
+    if (!quickAdjustValidation.validate({ adjustment: quickAdjustValue })) return
+
+    const adjustment = Number(quickAdjustValue)
     const newStock = quickAdjustVariant.stock + adjustment
     if (newStock < 0) {
-      toast.error('المخزون لا يمكن أن يكون سالباً')
+      quickAdjustValidation.setErrorMap({ adjustment: 'المخزون لا يمكن أن يكون سالباً' })
       return
     }
 
@@ -622,7 +630,7 @@ export function ProductVariantsScreen() {
       </div>
 
       {/* ─── Add/Edit Variant Dialog ──────────────────────────────── */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) variantValidation.clearAllErrors(); setFormOpen(open) }}>
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -642,9 +650,15 @@ export function ProductVariantsScreen() {
               <Input
                 placeholder="مثال: صغير، كبير، نكهة مانجو"
                 value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                className="h-10 rounded-lg"
+                onChange={(e) => {
+                  setForm((prev) => ({ ...prev, name: e.target.value }))
+                  variantValidation.clearFieldError('name')
+                }}
+                className={`h-10 rounded-lg ${variantValidation.errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
+              {variantValidation.errors.name && (
+                <p className="text-xs text-destructive">{variantValidation.errors.name}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -689,11 +703,17 @@ export function ProductVariantsScreen() {
                   type="number"
                   placeholder="0"
                   value={form.sellPrice}
-                  onChange={(e) => setForm((prev) => ({ ...prev, sellPrice: e.target.value }))}
-                  className="h-10 rounded-lg tabular-nums"
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, sellPrice: e.target.value }))
+                    variantValidation.clearFieldError('sellPrice')
+                  }}
+                  className={`h-10 rounded-lg tabular-nums ${variantValidation.errors.sellPrice ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                   dir="ltr"
                   min="0"
                 />
+                {variantValidation.errors.sellPrice && (
+                  <p className="text-xs text-destructive">{variantValidation.errors.sellPrice}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">المخزون</Label>
@@ -738,7 +758,7 @@ export function ProductVariantsScreen() {
       />
 
       {/* ─── Quick Stock Adjustment Dialog ─────────────────────────── */}
-      <Dialog open={quickAdjustOpen} onOpenChange={setQuickAdjustOpen}>
+      <Dialog open={quickAdjustOpen} onOpenChange={(open) => { if (!open) quickAdjustValidation.clearAllErrors(); setQuickAdjustOpen(open) }}>
         <DialogContent className="sm:max-w-sm" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -759,10 +779,16 @@ export function ProductVariantsScreen() {
                 type="number"
                 placeholder="مثال: 10 أو -5"
                 value={quickAdjustValue}
-                onChange={(e) => setQuickAdjustValue(e.target.value)}
-                className="h-10 rounded-lg tabular-nums text-center text-lg font-bold"
+                onChange={(e) => {
+                  setQuickAdjustValue(e.target.value)
+                  quickAdjustValidation.clearFieldError('adjustment')
+                }}
+                className={`h-10 rounded-lg tabular-nums text-center text-lg font-bold ${quickAdjustValidation.errors.adjustment ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 dir="ltr"
               />
+              {quickAdjustValidation.errors.adjustment && (
+                <p className="text-xs text-destructive">{quickAdjustValidation.errors.adjustment}</p>
+              )}
             </div>
 
             {/* Quick buttons */}

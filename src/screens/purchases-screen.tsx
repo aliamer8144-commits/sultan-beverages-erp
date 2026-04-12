@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { invoiceItemSchema } from '@/lib/validations'
 import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
@@ -124,11 +126,6 @@ export function PurchasesScreen() {
   }
 
   const handleSaveSupplier = async () => {
-    if (!supplierForm.name.trim()) {
-      toast.error('يرجى إدخال اسم المورد')
-      return
-    }
-
     setSupplierLoading(true)
     try {
       const isEditing = !!editingSupplier
@@ -175,19 +172,11 @@ export function PurchasesScreen() {
     }
   }, [selectedProduct])
 
+  const itemV = useFormValidation({ schema: invoiceItemSchema })
+  const invoiceV = useFormValidation({ schema: invoiceItemSchema })
+
   const handleAddItem = () => {
-    if (!selectedProductId) {
-      toast.error('يرجى اختيار منتج')
-      return
-    }
-    if (itemQuantity <= 0) {
-      toast.error('يرجى إدخال كمية صحيحة')
-      return
-    }
-    if (itemCostPrice <= 0) {
-      toast.error('يرجى إدخال سعر شراء صحيح')
-      return
-    }
+    if (!itemV.validate({ productId: selectedProductId, quantity: itemQuantity, price: itemCostPrice })) return
 
     const existingIndex = purchaseItems.findIndex(
       (item) => item.productId === selectedProductId
@@ -215,6 +204,8 @@ export function PurchasesScreen() {
     setSelectedProductId('')
     setItemQuantity(1)
     setItemCostPrice(0)
+    itemV.clearAllErrors()
+    invoiceV.clearFieldError('items')
   }
 
   const handleRemoveItem = (productId: string) => {
@@ -247,16 +238,20 @@ export function PurchasesScreen() {
   )
 
   const handleSubmitInvoice = async () => {
-    if (!selectedSupplierId) {
-      toast.error('يرجى اختيار المورد')
-      return
-    }
-    if (purchaseItems.length === 0) {
-      toast.error('يرجى إضافة منتج واحد على الأقل')
-      return
-    }
     if (!user) {
       toast.error('يرجى تسجيل الدخول أولاً')
+      return
+    }
+
+    const invoiceErrors: Record<string, string> = {}
+    if (!selectedSupplierId) {
+      invoiceErrors.supplierId = 'يرجى اختيار المورد'
+    }
+    if (purchaseItems.length === 0) {
+      invoiceErrors.items = 'يجب إضافة منتج واحد على الأقل'
+    }
+    if (Object.keys(invoiceErrors).length > 0) {
+      invoiceV.setErrorMap(invoiceErrors)
       return
     }
 
@@ -283,6 +278,7 @@ export function PurchasesScreen() {
         setSelectedProductId('')
         setItemQuantity(1)
         setItemCostPrice(0)
+        invoiceV.clearAllErrors()
         fetchSuppliers(supplierSearch, supplierSort)
       }
     } finally {
@@ -574,8 +570,11 @@ export function PurchasesScreen() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">اختر المورد</Label>
-                    <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                      <SelectTrigger className="h-10 rounded-xl">
+                    <Select value={selectedSupplierId} onValueChange={(val) => {
+                      setSelectedSupplierId(val)
+                      invoiceV.clearFieldError('supplierId')
+                    }}>
+                      <SelectTrigger className={`h-10 rounded-xl${invoiceV.errors.supplierId ? ' border-destructive' : ''}`}>
                         <SelectValue placeholder="اختر المورد..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -596,6 +595,9 @@ export function PurchasesScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {invoiceV.errors.supplierId && (
+                      <p className="text-sm text-destructive">{invoiceV.errors.supplierId}</p>
+                    )}
                     {selectedSupplierId && (
                       <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
                         <span className="text-xs text-muted-foreground">الرصيد المتبقي</span>
@@ -619,8 +621,11 @@ export function PurchasesScreen() {
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">المنتج</Label>
-                      <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                        <SelectTrigger className="h-10 rounded-xl">
+                      <Select value={selectedProductId} onValueChange={(val) => {
+                        setSelectedProductId(val)
+                        itemV.clearFieldError('productId')
+                      }}>
+                        <SelectTrigger className={`h-10 rounded-xl${itemV.errors.productId ? ' border-destructive' : ''}`}>
                           <SelectValue placeholder="اختر المنتج..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -636,6 +641,9 @@ export function PurchasesScreen() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {itemV.errors.productId && (
+                        <p className="text-sm text-destructive">{itemV.errors.productId}</p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -645,10 +653,16 @@ export function PurchasesScreen() {
                           type="number"
                           min={1}
                           value={itemQuantity}
-                          onChange={(e) => setItemQuantity(parseInt(e.target.value) || 0)}
-                          className="h-10 rounded-xl"
+                          onChange={(e) => {
+                            setItemQuantity(parseInt(e.target.value) || 0)
+                            itemV.clearFieldError('quantity')
+                          }}
+                          className={`h-10 rounded-xl${itemV.errors.quantity ? ' border-destructive' : ''}`}
                           placeholder="0"
                         />
+                        {itemV.errors.quantity && (
+                          <p className="text-sm text-destructive">{itemV.errors.quantity}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">سعر الشراء</Label>
@@ -657,10 +671,16 @@ export function PurchasesScreen() {
                           min={0}
                           step={0.01}
                           value={itemCostPrice || ''}
-                          onChange={(e) => setItemCostPrice(parseFloat(e.target.value) || 0)}
-                          className="h-10 rounded-xl"
+                          onChange={(e) => {
+                            setItemCostPrice(parseFloat(e.target.value) || 0)
+                            itemV.clearFieldError('price')
+                          }}
+                          className={`h-10 rounded-xl${itemV.errors.price ? ' border-destructive' : ''}`}
                           placeholder="0.00"
                         />
+                        {itemV.errors.price && (
+                          <p className="text-sm text-destructive">{itemV.errors.price}</p>
+                        )}
                       </div>
                     </div>
 
@@ -762,6 +782,9 @@ export function PurchasesScreen() {
 
                   {/* Total & Submit */}
                   <div className="border-t border-border/50 p-4 space-y-3 bg-muted/20 rounded-b-xl">
+                    {invoiceV.errors.items && (
+                      <p className="text-sm text-destructive">{invoiceV.errors.items}</p>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-muted-foreground">المجموع الكلي</span>
                       <span className="text-xl font-bold text-primary tabular-nums">

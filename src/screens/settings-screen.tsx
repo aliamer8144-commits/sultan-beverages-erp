@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createSalesTargetSchema } from '@/lib/validations'
 import {
   Store,
   Receipt,
@@ -173,6 +175,9 @@ function SalesTargetsSection() {
   const [formAmount, setFormAmount] = useState('')
   const [formEndDate, setFormEndDate] = useState('')
 
+  // Validation
+  const v = useFormValidation({ schema: createSalesTargetSchema })
+
   const fetchTargets = useCallback(async () => {
     try {
       const result = await get<SalesTarget[]>('/api/sales-targets', { all: 'true' }, { showErrorToast: false })
@@ -196,14 +201,17 @@ function SalesTargetsSection() {
     setFormEndDate('')
     setEditingId(null)
     setShowForm(false)
+    v.clearAllErrors()
   }
 
   const handleCreate = async () => {
     const amount = parseFloat(formAmount)
-    if (!amount || amount <= 0) {
-      toast.error('يرجى إدخال مبلغ صحيح أكبر من صفر')
-      return
-    }
+    if (!v.validate({
+      type: formType,
+      targetAmount: amount,
+      endDate: formEndDate || null,
+    })) return
+
     setSaving(true)
     try {
       const result = await post('/api/sales-targets', {
@@ -309,11 +317,17 @@ function SalesTargetsSection() {
                   min={0}
                   step={0.01}
                   value={formAmount}
-                  onChange={(e) => setFormAmount(e.target.value)}
+                  onChange={(e) => {
+                    setFormAmount(e.target.value)
+                    v.clearFieldError('targetAmount')
+                  }}
                   placeholder="0.00"
-                  className="text-left"
+                  className={`text-left ${v.errors.targetAmount ? 'border-destructive' : ''}`}
                   dir="ltr"
                 />
+                {v.errors.targetAmount && (
+                  <p className="text-sm text-destructive">{v.errors.targetAmount}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-medium">تاريخ الانتهاء (اختياري)</Label>

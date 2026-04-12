@@ -31,6 +31,8 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useAppStore } from '@/store/app-store'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createUserSchema, editUserSchema } from '@/lib/validations'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, UserCog, Shield, ShieldCheck } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
@@ -82,6 +84,10 @@ export function UsersScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Validation
+  const addV = useFormValidation({ schema: createUserSchema })
+  const editV = useFormValidation({ schema: editUserSchema })
+
   // ─── Fetch users ───────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     try {
@@ -101,14 +107,11 @@ export function UsersScreen() {
 
   // ─── Add user ──────────────────────────────────────────────────
   const handleAdd = async () => {
-    if (!addForm.username || !addForm.password || !addForm.name) {
-      toast.error('يرجى ملء جميع الحقول المطلوبة')
-      return
-    }
-    if (addForm.password.length < 4) {
-      toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل')
-      return
-    }
+    if (!addV.validate({
+      username: addForm.username,
+      password: addForm.password,
+      name: addForm.name,
+    })) return
 
     setSubmitting(true)
     try {
@@ -120,6 +123,7 @@ export function UsersScreen() {
       }, { showSuccessToast: true, successMessage: `تم إضافة المستخدم "${addForm.name}" بنجاح` })
       if (result) {
         setAddForm({ ...emptyForm })
+        addV.clearAllErrors()
         setAddDialogOpen(false)
         fetchUsers()
       }
@@ -142,14 +146,10 @@ export function UsersScreen() {
   }
 
   const handleEdit = async () => {
-    if (!editingUserId || !editForm.name) {
-      toast.error('يرجى ملء جميع الحقول المطلوبة')
-      return
-    }
-    if (editForm.password && editForm.password.length < 4) {
-      toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل')
-      return
-    }
+    if (!editV.validate({
+      name: editForm.name,
+      password: editForm.password,
+    })) return
 
     setSubmitting(true)
     try {
@@ -543,9 +543,15 @@ export function UsersScreen() {
                   id="add-name"
                   placeholder="مثال: أحمد محمد"
                   value={addForm.name}
-                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, name: e.target.value })
+                    addV.clearFieldError('name')
+                  }}
                   className="h-11 rounded-xl"
                 />
+                {addV.errors.name && (
+                  <p className="text-sm text-destructive">{addV.errors.name}</p>
+                )}
               </div>
 
               {/* Username */}
@@ -557,10 +563,16 @@ export function UsersScreen() {
                   id="add-username"
                   placeholder="مثال: ahmed"
                   value={addForm.username}
-                  onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, username: e.target.value })
+                    addV.clearFieldError('username')
+                  }}
                   className="h-11 rounded-xl font-mono text-sm"
                   dir="ltr"
                 />
+                {addV.errors.username && (
+                  <p className="text-sm text-destructive">{addV.errors.username}</p>
+                )}
               </div>
 
               {/* Password */}
@@ -573,9 +585,15 @@ export function UsersScreen() {
                   type="password"
                   placeholder="4 أحرف على الأقل"
                   value={addForm.password}
-                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, password: e.target.value })
+                    addV.clearFieldError('password')
+                  }}
                   className="h-11 rounded-xl"
                 />
+                {addV.errors.password && (
+                  <p className="text-sm text-destructive">{addV.errors.password}</p>
+                )}
               </div>
 
               {/* Role */}
@@ -660,9 +678,15 @@ export function UsersScreen() {
                   id="edit-name"
                   placeholder="الاسم الكامل"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setEditForm({ ...editForm, name: e.target.value })
+                    editV.clearFieldError('name')
+                  }}
                   className="h-11 rounded-xl"
                 />
+                {editV.errors.name && (
+                  <p className="text-sm text-destructive">{editV.errors.name}</p>
+                )}
               </div>
 
               {/* Username (read-only) */}
@@ -691,9 +715,15 @@ export function UsersScreen() {
                   type="password"
                   placeholder="اتركها فارغة للإبقاء على كلمة المرور الحالية"
                   value={editForm.password}
-                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  onChange={(e) => {
+                    setEditForm({ ...editForm, password: e.target.value })
+                    editV.clearFieldError('password')
+                  }}
                   className="h-11 rounded-xl"
                 />
+                {editV.errors.password && (
+                  <p className="text-sm text-destructive">{editV.errors.password}</p>
+                )}
               </div>
 
               {/* Role */}

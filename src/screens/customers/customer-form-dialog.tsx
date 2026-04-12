@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, Pencil } from 'lucide-react'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createCustomerSchema } from '@/lib/validations'
 
 import type { CustomerFormData } from './types'
 import { CUSTOMER_CATEGORIES } from './types'
@@ -46,6 +48,13 @@ export function CustomerFormDialog({
 }: CustomerFormDialogProps) {
   const prefix = mode === 'add' ? 'add' : 'edit'
   const isAdd = mode === 'add'
+
+  const v = useFormValidation({ schema: createCustomerSchema })
+
+  const handleSubmit = () => {
+    if (!v.validate(form)) return
+    onSubmit()
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,9 +84,16 @@ export function CustomerFormDialog({
               id={`${prefix}-name`}
               placeholder="أدخل اسم العميل"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value })
+                v.clearFieldError('name')
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              className={v.errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
             />
+            {v.errors.name && (
+              <p className="text-sm text-destructive">{v.errors.name}</p>
+            )}
           </div>
           <div className={isAdd ? 'form-group' : 'flex flex-col gap-2'}>
             {isAdd ? (
@@ -91,10 +107,17 @@ export function CustomerFormDialog({
               id={`${prefix}-phone`}
               placeholder={isAdd ? 'أدخل رقم الهاتف (اختياري)' : 'أدخل رقم الهاتف'}
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+              onChange={(e) => {
+                setForm({ ...form, phone: e.target.value })
+                v.clearFieldError('phone')
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               dir="ltr"
+              className={v.errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
             />
+            {v.errors.phone && (
+              <p className="text-sm text-destructive">{v.errors.phone}</p>
+            )}
           </div>
           {!isAdd && (
             <div className="flex flex-col gap-2">
@@ -107,7 +130,7 @@ export function CustomerFormDialog({
                 placeholder="0.00"
                 value={form.debt}
                 onChange={(e) => setForm({ ...form, debt: e.target.value })}
-                onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                 dir="ltr"
                 className={parseFloat(form.debt) > 0 ? 'border-destructive/50' : ''}
               />
@@ -143,14 +166,21 @@ export function CustomerFormDialog({
               id={`${prefix}-notes`}
               placeholder="أضف ملاحظات عن العميل..."
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, notes: e.target.value })
+                v.clearFieldError('notes')
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               rows={2}
               className="resize-none"
             />
+            {v.errors.notes && (
+              <p className="text-sm text-destructive">{v.errors.notes}</p>
+            )}
           </div>
         </div>
         <DialogFooter className="flex gap-2 sm:justify-start">
-          <Button onClick={onSubmit} disabled={submitting} className="btn-ripple">
+          <Button onClick={handleSubmit} disabled={submitting} className="btn-ripple">
             {submitting
               ? (isAdd ? 'جارٍ الإضافة...' : 'جارٍ التحديث...')
               : (isAdd ? 'إضافة' : 'تحديث')}

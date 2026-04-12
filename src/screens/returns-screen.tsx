@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/table'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createReturnSchema } from '@/lib/validations'
 import { EmptyState } from '@/components/empty-state'
 import { formatCurrency } from '@/components/chart-utils'
 import { formatDate, formatShortDate } from '@/lib/date-utils'
@@ -139,6 +141,7 @@ export function ReturnsScreen() {
   const settings = useAppStore((s) => s.settings)
   const currencySymbol = CURRENCY_MAP[settings.currency]?.symbol || 'ر.س'
   const { get, patch, post } = useApi()
+  const returnValidation = useFormValidation({ schema: createReturnSchema })
 
   // Filters
   const [search, setSearch] = useState('')
@@ -270,6 +273,7 @@ export function ReturnsScreen() {
     setReturnQuantity(1)
     setReturnReason('')
     setSubmitting(false)
+    returnValidation.clearAllErrors()
 
     try {
       const result = await get<SaleInvoice[]>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
@@ -286,6 +290,8 @@ export function ReturnsScreen() {
     setSelectedProductId('')
     setSelectedProductItem(null)
     setReturnQuantity(1)
+    returnValidation.clearFieldError('productId')
+    returnValidation.clearFieldError('quantity')
 
     const invoice = saleInvoices.find((inv) => inv.id === invoiceId)
     setSelectedInvoice(invoice || null)
@@ -294,6 +300,8 @@ export function ReturnsScreen() {
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId)
     setReturnQuantity(1)
+    returnValidation.clearFieldError('productId')
+    returnValidation.clearFieldError('quantity')
 
     if (selectedInvoice) {
       const item = selectedInvoice.items.find((i) => i.productId === productId)
@@ -302,20 +310,23 @@ export function ReturnsScreen() {
   }
 
   const handleSubmitReturn = async () => {
-    if (!selectedInvoiceId || !selectedProductId || !returnQuantity || returnQuantity <= 0) {
-      toast.error('يرجى اختيار الفاتورة والمنتج والكمية')
-      return
-    }
-
     if (!user) {
       toast.error('يرجى تسجيل الدخول أولاً')
       return
     }
 
+    const isValid = returnValidation.validate({
+      invoiceId: selectedInvoiceId,
+      productId: selectedProductId,
+      quantity: returnQuantity,
+      reason: returnReason,
+    })
+    if (!isValid) return
+
     if (!selectedProductItem) return
 
     if (returnQuantity > selectedProductItem.quantity) {
-      toast.error('الكمية المرتجعة لا يمكن أن تتجاوز كمية الفاتورة')
+      returnValidation.setErrorMap({ quantity: 'الكمية المرتجعة لا يمكن أن تتجاوز كمية الفاتورة' })
       return
     }
 
@@ -650,8 +661,11 @@ export function ReturnsScreen() {
               {/* Select Invoice */}
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">اختر فاتورة البيع</Label>
-                <Select value={selectedInvoiceId} onValueChange={handleSelectInvoice}>
-                  <SelectTrigger className="w-full h-10">
+                <Select value={selectedInvoiceId} onValueChange={(val) => {
+                  handleSelectInvoice(val)
+                  returnValidation.clearFieldError('invoiceId')
+                }}>
+                  <SelectTrigger className={`w-full h-10 ${returnValidation.errors.invoiceId ? 'border-destructive' : ''}`}>
                     <SelectValue placeholder="اختر فاتورة..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -674,6 +688,9 @@ export function ReturnsScreen() {
                   </SelectContent>
                 </Select>
               </div>
+              {returnValidation.errors.invoiceId && (
+                <p className="text-sm text-destructive">{returnValidation.errors.invoiceId}</p>
+              )}
 
               {/* Invoice Items */}
               {selectedInvoice && (
@@ -725,11 +742,16 @@ export function ReturnsScreen() {
                     min={1}
                     max={selectedProductItem.quantity}
                     value={returnQuantity}
-                    onChange={(e) => setReturnQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="h-10 text-sm input-glass"
+                    onChange={(e) => {
+                      setReturnQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                      returnValidation.clearFieldError('quantity')
+                    }}
+                    className={`h-10 text-sm input-glass ${returnValidation.errors.quantity ? 'border-destructive' : ''}`}
                   />
-                  {returnQuantity > selectedProductItem.quantity && (
-                    <p className="text-[10px] text-destructive">الكمية تتجاوز الحد المسموح</p>
+                  {(returnValidation.errors.quantity || returnQuantity > selectedProductItem.quantity) && (
+                    <p className="text-[10px] text-destructive">
+                      {returnValidation.errors.quantity || 'الكمية تتجاوز الحد المسموح'}
+                    </p>
                   )}
                   <div className="bg-muted/50 rounded-lg p-3 mt-2 space-y-1">
                     <div className="flex justify-between text-xs">
@@ -756,9 +778,15 @@ export function ReturnsScreen() {
                 <Textarea
                   placeholder="أدخل سبب الإرجاع..."
                   value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  className="text-sm min-h-[80px] input-glass"
+                  onChange={(e) => {
+                    setReturnReason(e.target.value)
+                    returnValidation.clearFieldError('reason')
+                  }}
+                  className={`text-sm min-h-[80px] input-glass ${returnValidation.errors.reason ? 'border-destructive' : ''}`}
                 />
+                {returnValidation.errors.reason && (
+                  <p className="text-sm text-destructive">{returnValidation.errors.reason}</p>
+                )}
               </div>
             </div>
           </ScrollArea>

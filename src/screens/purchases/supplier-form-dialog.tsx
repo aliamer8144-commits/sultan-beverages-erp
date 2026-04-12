@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Pencil, Star, Globe, Phone } from 'lucide-react'
 import { StarRating } from '@/components/star-rating'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createSupplierSchema } from '@/lib/validations'
 import type { Supplier } from './types'
 import { PAYMENT_TERMS } from './types'
 
@@ -42,8 +43,18 @@ export function SupplierFormDialog({
   onSave,
   loading,
 }: SupplierFormDialogProps) {
+  const v = useFormValidation({ schema: createSupplierSchema })
+
+  const handleSave = () => {
+    if (!v.validate(supplierForm)) return
+    onSave()
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen) v.clearAllErrors()
+      onOpenChange(newOpen)
+    }}>
       <DialogContent className="sm:max-w-lg" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -86,12 +97,16 @@ export function SupplierFormDialog({
                   id="supplier-name"
                   placeholder="أدخل اسم المورد"
                   value={supplierForm.name}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSupplierForm({ ...supplierForm, name: e.target.value })
-                  }
-                  className="h-10 rounded-xl"
+                    v.clearFieldError('name')
+                  }}
+                  className={`h-10 rounded-xl${v.errors.name ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                   autoFocus
                 />
+                {v.errors.name && (
+                  <p className="text-sm text-destructive">{v.errors.name}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -104,12 +119,16 @@ export function SupplierFormDialog({
                     id="supplier-phone"
                     placeholder="رقم الهاتف"
                     value={supplierForm.phone}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setSupplierForm({ ...supplierForm, phone: e.target.value })
-                    }
-                    className="h-10 rounded-xl"
+                      v.clearFieldError('phone')
+                    }}
+                    className={`h-10 rounded-xl${v.errors.phone ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                     dir="ltr"
                   />
+                  {v.errors.phone && (
+                    <p className="text-sm text-destructive">{v.errors.phone}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="supplier-phone2" className="flex items-center gap-1.5">
@@ -120,12 +139,16 @@ export function SupplierFormDialog({
                     id="supplier-phone2"
                     placeholder="رقم احتياطي"
                     value={supplierForm.phone2}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setSupplierForm({ ...supplierForm, phone2: e.target.value })
-                    }
-                    className="h-10 rounded-xl"
+                      v.clearFieldError('phone2')
+                    }}
+                    className={`h-10 rounded-xl${v.errors.phone2 ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                     dir="ltr"
                   />
+                  {v.errors.phone2 && (
+                    <p className="text-sm text-destructive">{v.errors.phone2}</p>
+                  )}
                 </div>
               </div>
 
@@ -135,11 +158,15 @@ export function SupplierFormDialog({
                   id="supplier-address"
                   placeholder="أدخل العنوان"
                   value={supplierForm.address}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSupplierForm({ ...supplierForm, address: e.target.value })
-                  }
-                  className="h-10 rounded-xl"
+                    v.clearFieldError('address')
+                  }}
+                  className={`h-10 rounded-xl${v.errors.address ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 />
+                {v.errors.address && (
+                  <p className="text-sm text-destructive">{v.errors.address}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -151,19 +178,26 @@ export function SupplierFormDialog({
                   id="supplier-website"
                   placeholder="https://example.com"
                   value={supplierForm.website}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSupplierForm({ ...supplierForm, website: e.target.value })
-                  }
-                  className="h-10 rounded-xl"
+                    v.clearFieldError('website')
+                  }}
+                  className={`h-10 rounded-xl${v.errors.website ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                   dir="ltr"
                 />
+                {v.errors.website && (
+                  <p className="text-sm text-destructive">{v.errors.website}</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="supplier-payment-terms">شروط الدفع</Label>
                 <Select
                   value={supplierForm.paymentTerms}
-                  onValueChange={(val) => setSupplierForm({ ...supplierForm, paymentTerms: val })}
+                  onValueChange={(val) => {
+                    setSupplierForm({ ...supplierForm, paymentTerms: val })
+                    v.clearFieldError('paymentTerms')
+                  }}
                 >
                   <SelectTrigger className="h-10 rounded-xl">
                     <SelectValue placeholder="شروط الدفع" />
@@ -176,6 +210,9 @@ export function SupplierFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {v.errors.paymentTerms && (
+                  <p className="text-sm text-destructive">{v.errors.paymentTerms}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -184,12 +221,16 @@ export function SupplierFormDialog({
                   id="supplier-notes"
                   placeholder="ملاحظات إضافية عن المورد..."
                   value={supplierForm.notes}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSupplierForm({ ...supplierForm, notes: e.target.value })
-                  }
-                  className="rounded-xl resize-none min-h-[80px]"
+                    v.clearFieldError('notes')
+                  }}
+                  className={`rounded-xl resize-none min-h-[80px]${v.errors.notes ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                   rows={3}
                 />
+                {v.errors.notes && (
+                  <p className="text-sm text-destructive">{v.errors.notes}</p>
+                )}
               </div>
             </div>
           </div>
@@ -204,7 +245,7 @@ export function SupplierFormDialog({
             إلغاء
           </Button>
           <Button
-            onClick={onSave}
+            onClick={handleSave}
             disabled={loading}
             className="rounded-xl gap-2"
           >

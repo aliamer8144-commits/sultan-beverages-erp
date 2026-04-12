@@ -5,11 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import { Star } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createSupplierReviewSchema } from '@/lib/validations'
 import type { Supplier } from './types'
+
+const reviewFormSchema = createSupplierReviewSchema.omit({ supplierId: true })
 
 interface RatingDialogProps {
   open: boolean
@@ -26,31 +29,37 @@ export function RatingDialog({
 }: RatingDialogProps) {
   const { user } = useAppStore()
   const { post } = useApi()
-  const [ratingValue, setRatingValue] = useState(0)
-  const [ratingReview, setRatingReview] = useState('')
+
+  const form = useZodForm({
+    schema: reviewFormSchema,
+    defaultValues: {
+      rating: 0 as any,
+      review: '',
+    },
+  })
+
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [ratingHover, setRatingHover] = useState(0)
 
   const handleSubmitRating = async () => {
-    if (!supplier || ratingValue === 0) {
-      toast.error('يرجى اختيار تقييم')
-      return
-    }
+    if (!supplier) return
 
+    if (!form.validate()) return
+
+    const rating = Number(form.values.rating)
     setRatingSubmitting(true)
     try {
       const result = await post('/api/supplier-rating', {
         supplierId: supplier.id,
-        rating: ratingValue,
-        review: ratingReview.trim() || undefined,
+        rating,
+        review: form.values.review?.trim() || undefined,
         userName: user?.name || undefined,
       }, {
         showSuccessToast: true,
-        successMessage: `تم تقييم المورد ${ratingValue} نجوم`,
+        successMessage: `تم تقييم المورد ${rating} نجوم`,
       })
       if (result) {
-        setRatingValue(0)
-        setRatingReview('')
+        form.reset()
         setRatingHover(0)
         onOpenChange(false)
         onSuccess()
@@ -61,7 +70,10 @@ export function RatingDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen) form.clearErrors()
+      onOpenChange(newOpen)
+    }}>
       <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -88,7 +100,7 @@ export function RatingDialog({
               <Label className="text-sm font-medium">اختر التقييم</Label>
               <div className="flex items-center gap-1 justify-center py-2">
                 {[1, 2, 3, 4, 5].map((star) => {
-                  const filled = star <= (ratingHover || ratingValue)
+                  const filled = star <= (ratingHover || form.values.rating)
                   return (
                     <button
                       key={star}
@@ -96,7 +108,7 @@ export function RatingDialog({
                       className="cursor-pointer hover:scale-125 transition-transform p-1"
                       onMouseEnter={() => setRatingHover(star)}
                       onMouseLeave={() => setRatingHover(0)}
-                      onClick={() => setRatingValue(star)}
+                      onClick={() => form.setValue('rating', star)}
                     >
                       <Star
                         className={`w-8 h-8 ${
@@ -109,13 +121,16 @@ export function RatingDialog({
                   )
                 })}
               </div>
-              {ratingValue > 0 && (
+              {form.errors.rating && (
+                <p className="text-sm text-destructive text-center">{form.errors.rating}</p>
+              )}
+              {form.values.rating > 0 && (
                 <p className="text-xs text-center text-muted-foreground">
-                  {ratingValue === 1 && 'سيئ'}
-                  {ratingValue === 2 && 'مقبول'}
-                  {ratingValue === 3 && 'جيد'}
-                  {ratingValue === 4 && 'جيد جداً'}
-                  {ratingValue === 5 && 'ممتاز'}
+                  {form.values.rating === 1 && 'سيئ'}
+                  {form.values.rating === 2 && 'مقبول'}
+                  {form.values.rating === 3 && 'جيد'}
+                  {form.values.rating === 4 && 'جيد جداً'}
+                  {form.values.rating === 5 && 'ممتاز'}
                 </p>
               )}
             </div>
@@ -127,13 +142,16 @@ export function RatingDialog({
               </Label>
               <Textarea
                 placeholder="أضف تعليقاً على تقييمك..."
-                value={ratingReview}
-                onChange={(e) => setRatingReview(e.target.value)}
-                className="rounded-xl min-h-[80px] resize-none"
+                value={form.values.review || ''}
+                onChange={(e) => form.setValue('review', e.target.value)}
+                className={`rounded-xl min-h-[80px] resize-none${form.errors.review ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 maxLength={200}
               />
+              {form.errors.review && (
+                <p className="text-sm text-destructive">{form.errors.review}</p>
+              )}
               <p className="text-[10px] text-muted-foreground text-left" dir="ltr">
-                {ratingReview.length}/200
+                {(form.values.review || '').length}/200
               </p>
             </div>
           </div>
@@ -149,7 +167,7 @@ export function RatingDialog({
           </Button>
           <Button
             onClick={handleSubmitRating}
-            disabled={ratingSubmitting || ratingValue === 0}
+            disabled={ratingSubmitting || form.values.rating === 0}
             className="gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
           >
             {ratingSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}

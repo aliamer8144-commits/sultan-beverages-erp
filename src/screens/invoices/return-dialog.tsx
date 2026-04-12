@@ -19,6 +19,8 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createReturnSchema } from '@/lib/validations'
 import type { Invoice, InvoiceItem } from './types'
 
 interface ReturnDialogProps {
@@ -37,67 +39,70 @@ export function ReturnDialog({
   const { formatCurrency, formatDual } = useCurrency()
   const { post } = useApi()
 
-  const [returnProductId, setReturnProductId] = useState('')
   const [returnProductItem, setReturnProductItem] = useState<InvoiceItem | null>(null)
-  const [returnQuantity, setReturnQuantity] = useState(1)
-  const [returnReason, setReturnReason] = useState('')
-  const [returnSubmitting, setReturnSubmitting] = useState(false)
+  const [crossFieldError, setCrossFieldError] = useState('')
+
+  const form = useZodForm({
+    schema: createReturnSchema,
+    defaultValues: {
+      invoiceId: '',
+      productId: '',
+      quantity: 1,
+      reason: '',
+    },
+  })
 
   const handleReturnProductSelect = (productId: string) => {
-    setReturnProductId(productId)
-    setReturnQuantity(1)
+    form.setValue('productId', productId)
+    form.setValue('quantity', 1)
+    setCrossFieldError('')
     if (invoice) {
       const item = invoice.items.find((i) => i.productId === productId)
       setReturnProductItem(item || null)
     }
   }
 
-  const handleSubmitReturn = async () => {
-    if (!invoice || !returnProductId || !returnQuantity || returnQuantity <= 0) {
-      toast.error('يرجى اختيار المنتج والكمية')
+  const onSubmit = form.handleSubmit(async (values) => {
+    // Cross-field validation: quantity must not exceed available quantity
+    if (returnProductItem && values.quantity > returnProductItem.quantity) {
+      setCrossFieldError(`الكمية تتجاوز الحد الأقصى (${returnProductItem.quantity})`)
       return
     }
-    if (!returnProductItem || returnQuantity > returnProductItem.quantity) {
-      toast.error('الكمية غير صالحة')
-      return
-    }
+
     const user = useAppStore.getState().user
     if (!user) {
       toast.error('يرجى تسجيل الدخول')
       return
     }
 
-    setReturnSubmitting(true)
-    try {
-      const result = await post('/api/returns', {
-        invoiceId: invoice.id,
-        productId: returnProductId,
-        quantity: returnQuantity,
-        reason: returnReason,
-        userId: user.id,
-        userName: user.name,
-      }, { showSuccessToast: true, successMessage: 'تم إنشاء المرتجع بنجاح' })
-      if (result) {
-        setReturnProductId('')
-        setReturnProductItem(null)
-        setReturnQuantity(1)
-        setReturnReason('')
-        onOpenChange(false)
-        onSuccess()
-      }
-    } finally {
-      setReturnSubmitting(false)
+    const result = await post('/api/returns', {
+      invoiceId: invoice!.id,
+      productId: values.productId,
+      quantity: values.quantity,
+      reason: values.reason,
+      userId: user.id,
+      userName: user.name,
+    }, { showSuccessToast: true, successMessage: 'تم إنشاء المرتجع بنجاح' })
+    if (result) {
+      form.reset({ invoiceId: invoice?.id || '' })
+      setReturnProductItem(null)
+      setCrossFieldError('')
+      onOpenChange(false)
+      onSuccess()
     }
+  })
+
+  const handleSubmitReturn = () => {
+    if (!invoice) return
+    onSubmit()
   }
 
   // Reset state when dialog opens
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
-      setReturnProductId('')
+      form.reset({ invoiceId: invoice?.id || '' })
       setReturnProductItem(null)
-      setReturnQuantity(1)
-      setReturnReason('')
-      setReturnSubmitting(false)
+      setCrossFieldError('')
     }
     onOpenChange(newOpen)
   }
@@ -122,8 +127,8 @@ export function ReturnDialog({
                 {/* Select Product */}
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">اختر المنتج</Label>
-                  <Select value={returnProductId} onValueChange={handleReturnProductSelect}>
-                    <SelectTrigger className="w-full h-10">
+                  <Select value={form.values.productId} onValueChange={handleReturnProductSelect}>
+                    <SelectTrigger className={`w-full h-10${form.errors.productId ? ' border-destructive' : ''}`}>
                       <SelectValue placeholder="اختر منتجاً..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -137,6 +142,9 @@ export function ReturnDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {form.errors.productId && (
+                    <p className="text-sm text-destructive">{form.errors.productId}</p>
+                  )}
                 </div>
 
                 {/* Quantity and Summary */}
@@ -150,10 +158,17 @@ export function ReturnDialog({
                         type="number"
                         min={1}
                         max={returnProductItem.quantity}
-                        value={returnQuantity}
-                        onChange={(e) => setReturnQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-sm input-glass"
+                        value={form.values.quantity}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1)
+                          form.setValue('quantity', val)
+                          setCrossFieldError('')
+                        }}
+                        className={`h-10 text-sm input-glass${form.errors.quantity || crossFieldError ? ' border-destructive' : ''}`}
                       />
+                      {(form.errors.quantity || crossFieldError) && (
+                        <p className="text-sm text-destructive">{form.errors.quantity || crossFieldError}</p>
+                      )}
                     </div>
 
                     <div className="bg-muted/50 rounded-lg p-3 space-y-1">
@@ -163,12 +178,12 @@ export function ReturnDialog({
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">الكمية</span>
-                        <span className="font-medium">{returnQuantity}</span>
+                        <span className="font-medium">{form.values.quantity}</span>
                       </div>
                       <div className="border-t border-border/50 pt-1 flex justify-between text-sm">
                         <span className="font-semibold">إجمالي الإرجاع</span>
                         <span className="font-bold text-amber-600">
-                          {formatDual(returnProductItem.price * returnQuantity).display}
+                          {formatDual(returnProductItem.price * form.values.quantity).display}
                         </span>
                       </div>
                     </div>
@@ -180,10 +195,13 @@ export function ReturnDialog({
                   <Label className="text-sm font-medium">سبب الإرجاع (اختياري)</Label>
                   <Textarea
                     placeholder="أدخل سبب الإرجاع..."
-                    value={returnReason}
-                    onChange={(e) => setReturnReason(e.target.value)}
-                    className="text-sm min-h-[80px] input-glass"
+                    value={form.values.reason}
+                    onChange={(e) => form.setValue('reason', e.target.value)}
+                    className={`text-sm min-h-[80px] input-glass${form.errors.reason ? ' border-destructive' : ''}`}
                   />
+                  {form.errors.reason && (
+                    <p className="text-sm text-destructive">{form.errors.reason}</p>
+                  )}
                 </div>
               </div>
             </ScrollArea>
@@ -193,17 +211,17 @@ export function ReturnDialog({
               <Button
                 variant="outline"
                 onClick={() => handleOpenChange(false)}
-                disabled={returnSubmitting}
+                disabled={form.isSubmitting}
                 className="text-sm"
               >
                 إلغاء
               </Button>
               <Button
                 onClick={handleSubmitReturn}
-                disabled={returnSubmitting || !returnProductId}
+                disabled={form.isSubmitting || !form.values.productId}
                 className="gap-2 text-sm btn-ripple shimmer"
               >
-                {returnSubmitting ? (
+                {form.isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <RotateCcw className="w-4 h-4" />

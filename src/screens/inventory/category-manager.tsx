@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Loader2, Plus, PackageX, Pencil, Trash2, Tags, Package } from 'lucide-react'
-import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createCategorySchema } from '@/lib/validations'
 
 import type { Category } from './types'
 
@@ -25,8 +26,10 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
   // Category form dialog state
   const [catFormOpen, setCatFormOpen] = useState(false)
   const [editingCat, setEditingCat] = useState<Category | null>(null)
-  const [catName, setCatName] = useState('')
-  const [catSubmitting, setCatSubmitting] = useState(false)
+  const catForm = useZodForm({
+    schema: createCategorySchema,
+    defaultValues: { name: '', icon: 'CupSoda' },
+  })
 
   // Category delete confirmation state
   const [catDeleteOpen, setCatDeleteOpen] = useState(false)
@@ -35,28 +38,22 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
   // ─── Category Management Handlers ─────────────────────────────
   const openAddCatDialog = () => {
     setEditingCat(null)
-    setCatName('')
+    catForm.reset()
     setCatFormOpen(true)
   }
 
   const openEditCatDialog = (cat: Category) => {
     setEditingCat(cat)
-    setCatName(cat.name)
+    catForm.reset({ name: cat.name, icon: cat.icon })
     setCatFormOpen(true)
   }
 
-  const handleCatSubmit = async () => {
-    if (!catName.trim()) {
-      toast.error('يرجى إدخال اسم التصنيف')
-      return
-    }
-
-    setCatSubmitting(true)
+  const handleCatSubmit = catForm.handleSubmit(async (values) => {
     try {
       if (editingCat) {
         const result = await put<Category>(
           `/api/categories/${editingCat.id}`,
-          { name: catName.trim(), icon: editingCat.icon },
+          { name: values.name.trim(), icon: values.icon },
           { showSuccessToast: true, successMessage: 'تم تحديث التصنيف بنجاح' },
         )
         if (result) {
@@ -66,7 +63,7 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
       } else {
         const result = await post<Category>(
           '/api/categories',
-          { name: catName.trim() },
+          { name: values.name.trim() },
           { showSuccessToast: true, successMessage: 'تم إضافة التصنيف بنجاح' },
         )
         if (result) {
@@ -76,10 +73,8 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
       }
     } catch {
       // handled by useApi
-    } finally {
-      setCatSubmitting(false)
     }
-  }
+  })
 
   const handleCatDelete = async () => {
     if (!deletingCat) return
@@ -201,14 +196,17 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
               <Input
                 id="cat-name"
                 placeholder="مثال: مشروبات غازية"
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-                className="h-10 rounded-lg"
+                value={catForm.values.name}
+                onChange={(e) => catForm.setValue('name', e.target.value)}
+                className={`h-10 rounded-lg${catForm.errors.name ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleCatSubmit()
                 }}
               />
+              {catForm.errors.name && (
+                <p className="text-sm text-destructive">{catForm.errors.name}</p>
+              )}
             </div>
           </div>
 
@@ -216,17 +214,17 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
             <Button
               variant="outline"
               onClick={() => setCatFormOpen(false)}
-              disabled={catSubmitting}
+              disabled={catForm.isSubmitting}
               className="rounded-lg"
             >
               إلغاء
             </Button>
             <Button
               onClick={handleCatSubmit}
-              disabled={catSubmitting}
+              disabled={catForm.isSubmitting}
               className="gap-2 rounded-lg shadow-md shadow-primary/20"
             >
-              {catSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {catForm.isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {editingCat ? 'حفظ التعديلات' : 'إضافة التصنيف'}
             </Button>
           </DialogFooter>

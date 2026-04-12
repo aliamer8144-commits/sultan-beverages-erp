@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import {
   Target,
   Plus,
@@ -34,6 +33,8 @@ import {
 } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createSalesTargetSchema } from '@/lib/validations'
 import { EmptyState } from '@/components/empty-state'
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ function StatPill({ icon: Icon, label, value, colorClass = '' }: { icon: React.E
 
 export function SalesTargetsScreen() {
   const { get, post, put, del } = useApi()
+  const targetValidation = useFormValidation({ schema: createSalesTargetSchema })
 
   // Data state
   const [targets, setTargets] = useState<SalesTarget[]>([])
@@ -236,6 +238,7 @@ export function SalesTargetsScreen() {
     setFormType('daily')
     setFormAmount('')
     setFormEndDate('')
+    targetValidation.clearAllErrors()
     setDialogOpen(true)
   }
 
@@ -244,14 +247,20 @@ export function SalesTargetsScreen() {
     setFormType(target.type)
     setFormAmount(String(target.targetAmount))
     setFormEndDate(target.endDate ? target.endDate.split('T')[0] : '')
+    targetValidation.clearAllErrors()
     setDialogOpen(true)
   }
 
   const handleSubmit = async () => {
-    if (!formType || !formAmount || parseFloat(formAmount) <= 0) {
-      toast.error('الرجاء اختيار نوع الهدف وإدخال مبلغ صحيح')
-      return
-    }
+    const isValid = targetValidation.validate({
+      type: formType,
+      targetAmount: parseFloat(formAmount) || 0,
+      startDate: editingTarget
+        ? editingTarget.startDate
+        : new Date().toISOString().split('T')[0],
+      endDate: formEndDate || null,
+    })
+    if (!isValid) return
 
     setSubmitting(true)
     const body: Record<string, unknown> = {
@@ -637,11 +646,14 @@ export function SalesTargetsScreen() {
                   <button
                     key={t.value}
                     type="button"
-                    onClick={() => setFormType(t.value)}
+                    onClick={() => {
+                      setFormType(t.value)
+                      targetValidation.clearFieldError('type')
+                    }}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 ${
                       formType === t.value
                         ? 'border-primary bg-primary/5'
-                        : 'border-border/50 hover:border-primary/50 hover:bg-muted/50'
+                        : `border-border/50 hover:border-primary/50 hover:bg-muted/50 ${targetValidation.errors.type ? 'border-destructive' : ''}`
                     }`}
                   >
                     <span className="text-xl">{t.icon}</span>
@@ -651,6 +663,9 @@ export function SalesTargetsScreen() {
                   </button>
                 ))}
               </div>
+              {targetValidation.errors.type && (
+                <p className="text-sm text-destructive">{targetValidation.errors.type}</p>
+              )}
             </div>
 
             {/* Target Amount */}
@@ -662,10 +677,16 @@ export function SalesTargetsScreen() {
                 min="1"
                 placeholder="0.00"
                 value={formAmount}
-                onChange={(e) => setFormAmount(e.target.value)}
-                className="h-10 text-sm tabular-nums text-left"
+                onChange={(e) => {
+                  setFormAmount(e.target.value)
+                  targetValidation.clearFieldError('targetAmount')
+                }}
+                className={`h-10 text-sm tabular-nums text-left ${targetValidation.errors.targetAmount ? 'border-destructive' : ''}`}
                 dir="ltr"
               />
+              {targetValidation.errors.targetAmount && (
+                <p className="text-sm text-destructive">{targetValidation.errors.targetAmount}</p>
+              )}
               {formAmount && parseFloat(formAmount) > 0 && (
                 <div className="flex gap-2 mt-1">
                   {[0.5, 1, 2, 5, 10].map((mult) => (
@@ -699,8 +720,11 @@ export function SalesTargetsScreen() {
               <Input
                 type="date"
                 value={formEndDate}
-                onChange={(e) => setFormEndDate(e.target.value)}
-                className="h-10 text-sm input-glass"
+                onChange={(e) => {
+                  setFormEndDate(e.target.value)
+                  targetValidation.clearFieldError('endDate')
+                }}
+                className={`h-10 text-sm input-glass ${targetValidation.errors.endDate ? 'border-destructive' : ''}`}
               />
               <p className="text-[10px] text-muted-foreground">
                 اتركه فارغاً ليكون الهدف متجدد (يومي/أسبوعي/شهري)

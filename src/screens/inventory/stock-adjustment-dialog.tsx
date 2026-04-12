@@ -1,19 +1,40 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Loader2, PackagePlus, Package, ArrowLeft, ArrowUpDown } from 'lucide-react'
-import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
 import { useAppStore } from '@/store/app-store'
 
-import type { Product, StockAdjustment, AdjustmentFormData } from './types'
-import { emptyAdjustmentForm } from './types'
+import type { Product, StockAdjustment } from './types'
 import { adjustmentTypeConfig } from './constants'
+
+// Inline schema matching the form's actual type values ('addition'/'subtraction'/'correction')
+// Note: createStockAdjustmentSchema uses backend types ('in'/'out'/'adjustment'/'sale'/'purchase'/'return')
+// which don't match the UI radio button values, so we use a form-specific schema here.
+const adjustmentFormSchema = z.object({
+  productId: z.string().min(1, 'المنتج مطلوب'),
+  type: z.enum(['addition', 'subtraction', 'correction']),
+  quantity: z.coerce.number().int().positive('يرجى إدخال الكمية'),
+  reason: z.string().min(1, 'يرجى إدخال سبب التعديل'),
+  reference: z.string().max(100),
+})
+
+type AdjustmentType = 'addition' | 'subtraction' | 'correction'
+
+const adjustDefaultValues: Record<string, any> = {
+  productId: '',
+  type: 'addition' as AdjustmentType,
+  quantity: '',
+  reason: '',
+  reference: '',
+}
 
 export interface StockAdjustmentDialogProps {
   open: boolean
@@ -26,39 +47,30 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
   const { post } = useApi()
   const user = useAppStore((s) => s.user)
 
-  const [adjustForm, setAdjustForm] = useState<AdjustmentFormData>(emptyAdjustmentForm)
-  const [adjustSubmitting, setAdjustSubmitting] = useState(false)
+  const adjustForm = useZodForm({
+    schema: adjustmentFormSchema,
+    defaultValues: adjustDefaultValues,
+  })
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setAdjustForm(emptyAdjustmentForm)
+      adjustForm.reset({ ...adjustDefaultValues, productId: product?.id || '' })
     }
-  }, [open])
+  }, [open, product, adjustForm.reset])
 
-  const handleAdjustSubmit = async () => {
-    if (!product) return
-    if (!adjustForm.quantity || Number(adjustForm.quantity) <= 0) {
-      toast.error('يرجى إدخال الكمية')
-      return
-    }
-    if (!adjustForm.reason.trim()) {
-      toast.error('يرجى إدخال سبب التعديل')
-      return
-    }
-
-    setAdjustSubmitting(true)
+  const handleAdjustSubmit = adjustForm.handleSubmit(async (values) => {
     try {
       const result = await post<StockAdjustment & { message?: string }>(
         '/api/stock-adjustments',
         {
-          productId: product.id,
-          type: adjustForm.type,
-          quantity: Number(adjustForm.quantity),
-          reason: adjustForm.reason.trim(),
+          productId: values.productId,
+          type: values.type,
+          quantity: values.quantity,
+          reason: values.reason.trim(),
           userId: user?.id || 'unknown',
           userName: user?.name || null,
-          reference: adjustForm.reference.trim() || null,
+          reference: values.reference.trim() || null,
         },
         { showSuccessToast: true, successMessage: 'تم تعديل المخزون بنجاح' },
       )
@@ -68,10 +80,8 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
       onSaved()
     } catch {
       // handled by useApi
-    } finally {
-      setAdjustSubmitting(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,8 +129,8 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
             <div className="space-y-3">
               <Label className="text-sm font-medium">نوع التعديل</Label>
               <RadioGroup
-                value={adjustForm.type}
-                onValueChange={(val) => setAdjustForm({ ...adjustForm, type: val as AdjustmentFormData['type'] })}
+                value={adjustForm.values.type}
+                onValueChange={(val) => adjustForm.setValue('type', val as typeof adjustDefaultValues.type)}
                 className="grid grid-cols-3 gap-2"
               >
                 {(['addition', 'subtraction', 'correction'] as const).map((type) => {
@@ -130,7 +140,7 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
                     <label
                       key={type}
                       className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        adjustForm.type === type
+                        adjustForm.values.type === type
                           ? `${config.bgColor} ${config.color} border-current`
                           : 'border-border hover:border-muted-foreground/30'
                       }`}
@@ -142,7 +152,7 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
                   )
                 })}
               </RadioGroup>
-              {adjustForm.type === 'correction' && (
+              {adjustForm.values.type === 'correction' && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <ArrowUpDown className="w-3 h-3" />
                   عند اختيار التصحيح، سيتم تعيين الكمية المدخلة كرصيد جديد
@@ -159,24 +169,27 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
                 id="adjust-qty"
                 type="number"
                 min="1"
-                placeholder={adjustForm.type === 'correction' ? 'الكمية الجديدة المطلوبة' : 'عدد الوحدات'}
-                value={adjustForm.quantity}
-                onChange={(e) => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
-                className="h-10 rounded-lg text-left tabular-nums"
+                placeholder={adjustForm.values.type === 'correction' ? 'الكمية الجديدة المطلوبة' : 'عدد الوحدات'}
+                value={adjustForm.values.quantity}
+                onChange={(e) => adjustForm.setValue('quantity', e.target.value)}
+                className={`h-10 rounded-lg text-left tabular-nums${adjustForm.errors.quantity ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 dir="ltr"
               />
+              {adjustForm.errors.quantity && (
+                <p className="text-sm text-destructive">{adjustForm.errors.quantity}</p>
+              )}
               {/* Preview */}
-              {adjustForm.quantity && Number(adjustForm.quantity) > 0 && (
+              {adjustForm.values.quantity && Number(adjustForm.values.quantity) > 0 && (
                 <div className="flex items-center justify-center gap-2 p-2 rounded-lg bg-muted/50 text-xs">
                   <span className="text-muted-foreground">النتيجة:</span>
                   <span className="font-semibold tabular-nums">{product.quantity}</span>
                   <ArrowLeft className="w-3 h-3 text-muted-foreground" />
                   <span className="font-bold tabular-nums text-primary">
-                    {adjustForm.type === 'addition'
-                      ? product.quantity + Number(adjustForm.quantity)
-                      : adjustForm.type === 'subtraction'
-                        ? Math.max(0, product.quantity - Number(adjustForm.quantity))
-                        : Number(adjustForm.quantity)}
+                    {adjustForm.values.type === 'addition'
+                      ? product.quantity + Number(adjustForm.values.quantity)
+                      : adjustForm.values.type === 'subtraction'
+                        ? Math.max(0, product.quantity - Number(adjustForm.values.quantity))
+                        : Number(adjustForm.values.quantity)}
                   </span>
                 </div>
               )}
@@ -190,10 +203,13 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
               <Input
                 id="adjust-reason"
                 placeholder="مثال: تزويد مخزون جديد، تالف، جرد..."
-                value={adjustForm.reason}
-                onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
-                className="h-10 rounded-lg"
+                value={adjustForm.values.reason}
+                onChange={(e) => adjustForm.setValue('reason', e.target.value)}
+                className={`h-10 rounded-lg${adjustForm.errors.reason ? ' border-destructive focus-visible:ring-destructive' : ''}`}
               />
+              {adjustForm.errors.reason && (
+                <p className="text-sm text-destructive">{adjustForm.errors.reason}</p>
+              )}
             </div>
 
             {/* Reference */}
@@ -204,8 +220,8 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
               <Input
                 id="adjust-ref"
                 placeholder="مثال: رقم فاتورة الشراء"
-                value={adjustForm.reference}
-                onChange={(e) => setAdjustForm({ ...adjustForm, reference: e.target.value })}
+                value={adjustForm.values.reference}
+                onChange={(e) => adjustForm.setValue('reference', e.target.value)}
                 className="h-10 rounded-lg"
                 dir="ltr"
               />
@@ -217,17 +233,17 @@ export function StockAdjustmentDialog({ open, onOpenChange, product, onSaved }: 
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={adjustSubmitting}
+            disabled={adjustForm.isSubmitting}
             className="rounded-lg"
           >
             إلغاء
           </Button>
           <Button
             onClick={handleAdjustSubmit}
-            disabled={adjustSubmitting || !product}
+            disabled={adjustForm.isSubmitting || !product}
             className="gap-2 rounded-lg shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            {adjustSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {adjustForm.isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
             <PackagePlus className="w-4 h-4" />
             تطبيق التعديل
           </Button>

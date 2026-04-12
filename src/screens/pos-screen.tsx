@@ -300,21 +300,12 @@ export function POSScreen() {
     // Compute the actual paid amount based on payment mode
     let paid: number
     if (paymentTab === 'split') {
-      if (!isSplitValid) {
-        toast.error('المبلغ غير كافٍ لتغطية الإجمالي')
-        return
-      }
+      if (!isSplitValid) return
       paid = splitCashNum + splitCardNum
     } else {
       paid = parseFloat(paidAmount)
-      if (isNaN(paid) || paid < 0) {
-        toast.error('يرجى إدخال مبلغ صحيح')
-        return
-      }
-      if (paid < grandTotal) {
-        toast.error('المبلغ المدفوع أقل من الإجمالي')
-        return
-      }
+      if (isNaN(paid) || paid < 0) return
+      if (paid < grandTotal) return
     }
 
     // Generate and store receipt number
@@ -396,22 +387,13 @@ export function POSScreen() {
 
   const handleApplyCustomDiscount = useCallback(() => {
     const val = parseFloat(customDiscountValue)
-    if (isNaN(val) || val <= 0) {
-      toast.error('يرجى إدخال قيمة صحيحة')
-      return
-    }
+    if (isNaN(val) || val <= 0) return
     if (customDiscountType === 'percent') {
-      if (val > 100) {
-        toast.error('نسبة الخصم لا يمكن أن تتجاوز 100%')
-        return
-      }
+      if (val > 100) return
       const discountAmount = (subtotal * val) / 100
       setCartDiscount(Math.round(discountAmount * 100) / 100)
     } else {
-      if (val > subtotal) {
-        toast.error('مبلغ الخصم لا يمكن أن يتجاوز المجموع الفرعي')
-        return
-      }
+      if (val > subtotal) return
       setCartDiscount(Math.round(val * 100) / 100)
     }
     setCustomDiscountDialogOpen(false)

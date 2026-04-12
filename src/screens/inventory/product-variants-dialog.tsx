@@ -7,12 +7,23 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Loader2, Layers, Plus, Pencil, Trash2, Save, AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createProductVariantSchema } from '@/lib/validations'
 import { useCurrency } from '@/hooks/use-currency'
 
-import type { Product, ProductVariant, VariantFormData } from './types'
+import type { Product, ProductVariant } from './types'
 import { emptyVariantForm } from './types'
+
+const variantDefaultValues = {
+  productId: '',
+  name: '',
+  sku: '',
+  barcode: '',
+  costPrice: '',
+  sellPrice: '',
+  stock: '0',
+}
 
 export interface ProductVariantsDialogProps {
   open: boolean
@@ -28,8 +39,11 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
   const [variantsLoading, setVariantsLoading] = useState(false)
   const [variantFormOpen, setVariantFormOpen] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
-  const [variantForm, setVariantForm] = useState<VariantFormData>(emptyVariantForm)
-  const [variantSubmitting, setVariantSubmitting] = useState(false)
+
+  const variantForm = useZodForm({
+    schema: createProductVariantSchema,
+    defaultValues: variantDefaultValues,
+  })
 
   // Fetch variants when dialog opens or product changes
   const fetchVariants = useCallback(async (prod: Product) => {
@@ -60,13 +74,14 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
 
   const openAddVariantDialog = () => {
     setEditingVariant(null)
-    setVariantForm(emptyVariantForm)
+    variantForm.reset({ ...variantDefaultValues, productId: product?.id || '' })
     setVariantFormOpen(true)
   }
 
   const openEditVariantDialog = (variant: ProductVariant) => {
     setEditingVariant(variant)
-    setVariantForm({
+    variantForm.reset({
+      productId: variant.productId,
       name: variant.name,
       sku: variant.sku || '',
       barcode: variant.barcode || '',
@@ -77,22 +92,16 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
     setVariantFormOpen(true)
   }
 
-  const handleVariantSubmit = async () => {
+  const handleVariantSubmit = variantForm.handleSubmit(async (values) => {
     if (!product) return
-    if (!variantForm.name.trim()) {
-      toast.error('يرجى إدخال اسم المتغير')
-      return
-    }
-
-    setVariantSubmitting(true)
     try {
       const payload = {
-        name: variantForm.name.trim(),
-        sku: variantForm.sku.trim() || null,
-        barcode: variantForm.barcode.trim() || null,
-        costPrice: Number(variantForm.costPrice) || 0,
-        sellPrice: Number(variantForm.sellPrice) || 0,
-        stock: Number(variantForm.stock) || 0,
+        name: values.name.trim(),
+        sku: values.sku?.trim() || null,
+        barcode: values.barcode?.trim() || null,
+        costPrice: values.costPrice || 0,
+        sellPrice: values.sellPrice || 0,
+        stock: values.stock || 0,
       }
       let result: ProductVariant | null
       if (editingVariant) {
@@ -115,10 +124,8 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
       fetchVariants(product)
     } catch {
       // handled by useApi
-    } finally {
-      setVariantSubmitting(false)
     }
-  }
+  })
 
   const handleDeleteVariant = async (variantId: string) => {
     const ok = await del(`/api/product-variants?id=${variantId}`)
@@ -244,18 +251,21 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                     <Label className="text-xs font-medium">اسم المتغير <span className="text-destructive">*</span></Label>
                     <Input
                       placeholder="مثال: صغير، كبير، نكهة مانجو"
-                      value={variantForm.name}
-                      onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
-                      className="h-9 rounded-lg text-sm"
+                      value={variantForm.values.name}
+                      onChange={(e) => variantForm.setValue('name', e.target.value)}
+                      className={`h-9 rounded-lg text-sm${variantForm.errors.name ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                       autoFocus
                     />
+                    {variantForm.errors.name && (
+                      <p className="text-sm text-destructive">{variantForm.errors.name}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">SKU</Label>
                     <Input
                       placeholder="رمز SKU"
-                      value={variantForm.sku}
-                      onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
+                      value={variantForm.values.sku}
+                      onChange={(e) => variantForm.setValue('sku', e.target.value)}
                       className="h-9 rounded-lg text-sm font-mono"
                       dir="ltr"
                     />
@@ -264,8 +274,8 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                     <Label className="text-xs font-medium">باركود</Label>
                     <Input
                       placeholder="باركود"
-                      value={variantForm.barcode}
-                      onChange={(e) => setVariantForm({ ...variantForm, barcode: e.target.value })}
+                      value={variantForm.values.barcode}
+                      onChange={(e) => variantForm.setValue('barcode', e.target.value)}
                       className="h-9 rounded-lg text-sm font-mono"
                       dir="ltr"
                     />
@@ -277,8 +287,8 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                       step="0.01"
                       min="0"
                       placeholder="0.00"
-                      value={variantForm.costPrice}
-                      onChange={(e) => setVariantForm({ ...variantForm, costPrice: e.target.value })}
+                      value={variantForm.values.costPrice}
+                      onChange={(e) => variantForm.setValue('costPrice', e.target.value)}
                       className="h-9 rounded-lg text-sm text-left tabular-nums"
                       dir="ltr"
                     />
@@ -290,8 +300,8 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                       step="0.01"
                       min="0"
                       placeholder="0.00"
-                      value={variantForm.sellPrice}
-                      onChange={(e) => setVariantForm({ ...variantForm, sellPrice: e.target.value })}
+                      value={variantForm.values.sellPrice}
+                      onChange={(e) => variantForm.setValue('sellPrice', e.target.value)}
                       className="h-9 rounded-lg text-sm text-left tabular-nums"
                       dir="ltr"
                     />
@@ -302,8 +312,8 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                       type="number"
                       min="0"
                       placeholder="0"
-                      value={variantForm.stock}
-                      onChange={(e) => setVariantForm({ ...variantForm, stock: e.target.value })}
+                      value={variantForm.values.stock}
+                      onChange={(e) => variantForm.setValue('stock', e.target.value)}
                       className="h-9 rounded-lg text-sm text-left tabular-nums"
                       dir="ltr"
                     />
@@ -321,10 +331,10 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                   <Button
                     size="sm"
                     onClick={handleVariantSubmit}
-                    disabled={variantSubmitting || !variantForm.name.trim()}
+                    disabled={variantForm.isSubmitting || !variantForm.values.name.trim()}
                     className="gap-1.5 text-xs rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20"
                   >
-                    {variantSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {variantForm.isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     <Save className="w-3.5 h-3.5" />
                     {editingVariant ? 'حفظ التعديلات' : 'إضافة المتغير'}
                   </Button>

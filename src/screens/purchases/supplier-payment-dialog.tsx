@@ -6,11 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import { Wallet } from 'lucide-react'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createSupplierPaymentSchema } from '@/lib/validations'
 import type { Supplier } from './types'
+
+const paymentFormSchema = createSupplierPaymentSchema.omit({ supplierId: true })
 
 interface SupplierPaymentDialogProps {
   open: boolean
@@ -27,39 +30,46 @@ export function SupplierPaymentDialog({
 }: SupplierPaymentDialogProps) {
   const { formatCurrency } = useCurrency()
   const { post } = useApi()
-  const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [paymentNotes, setPaymentNotes] = useState('')
+
+  const form = useZodForm({
+    schema: paymentFormSchema,
+    defaultValues: {
+      amount: '' as any,
+      method: 'cash',
+      notes: '',
+    },
+  })
+
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
+  const [crossFieldError, setCrossFieldError] = useState('')
 
   const handleRecordPayment = async () => {
     if (!supplier) return
-    const amount = parseFloat(paymentAmount)
-    if (!amount || amount <= 0) {
-      toast.error('يرجى إدخال مبلغ صحيح')
-      return
-    }
+    setCrossFieldError('')
+
+    if (!form.validate()) return
+
+    const amount = parseFloat(String(form.values.amount))
     if (amount > supplier.remainingBalance) {
-      toast.error('المبلغ أكبر من الرصيد المتبقي')
+      setCrossFieldError('المبلغ أكبر من الرصيد المتبقي')
       return
     }
 
     setPaymentSubmitting(true)
     try {
-      const methodLabel = paymentMethod === 'cash' ? 'نقدي' : paymentMethod === 'transfer' ? 'تحويل' : 'شيك'
+      const methodLabel = form.values.method === 'cash' ? 'نقدي' : form.values.method === 'transfer' ? 'تحويل' : 'شيك'
       const result = await post('/api/supplier-payments', {
         supplierId: supplier.id,
         amount,
-        method: paymentMethod,
-        notes: paymentNotes.trim() || null,
+        method: form.values.method,
+        notes: form.values.notes?.trim() || null,
       }, {
         showSuccessToast: true,
         successMessage: `تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${supplier.name}`,
       })
       if (result) {
-        setPaymentAmount('')
-        setPaymentMethod('cash')
-        setPaymentNotes('')
+        form.reset()
+        setCrossFieldError('')
         onOpenChange(false)
         onSuccess()
       }
@@ -68,8 +78,16 @@ export function SupplierPaymentDialog({
     }
   }
 
+  const amountError = form.errors.amount || crossFieldError
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen) {
+        form.clearErrors()
+        setCrossFieldError('')
+      }
+      onOpenChange(newOpen)
+    }}>
       <DialogContent className="sm:max-w-md" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -99,18 +117,21 @@ export function SupplierPaymentDialog({
                 type="number"
                 min={0}
                 step={0.01}
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                className="h-10 rounded-xl"
+                value={form.values.amount}
+                onChange={(e) => form.setValue('amount', e.target.value)}
+                className={`h-10 rounded-xl${amountError ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 placeholder="0.00"
                 dir="ltr"
               />
+              {amountError && (
+                <p className="text-sm text-destructive">{amountError}</p>
+              )}
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   className="text-xs rounded-lg"
-                  onClick={() => setPaymentAmount(String(Math.ceil(supplier.remainingBalance / 4)))}
+                  onClick={() => form.setValue('amount', String(Math.ceil(supplier.remainingBalance / 4)))}
                 >
                   الربع
                 </Button>
@@ -118,7 +139,7 @@ export function SupplierPaymentDialog({
                   variant="outline"
                   size="sm"
                   className="text-xs rounded-lg"
-                  onClick={() => setPaymentAmount(String(Math.ceil(supplier.remainingBalance / 2)))}
+                  onClick={() => form.setValue('amount', String(Math.ceil(supplier.remainingBalance / 2)))}
                 >
                   النصف
                 </Button>
@@ -126,7 +147,7 @@ export function SupplierPaymentDialog({
                   variant="outline"
                   size="sm"
                   className="text-xs rounded-lg"
-                  onClick={() => setPaymentAmount(String(supplier.remainingBalance))}
+                  onClick={() => form.setValue('amount', String(supplier.remainingBalance))}
                 >
                   الكل
                 </Button>
@@ -144,10 +165,10 @@ export function SupplierPaymentDialog({
                   <Button
                     key={m.value}
                     type="button"
-                    variant={paymentMethod === m.value ? 'default' : 'outline'}
+                    variant={form.values.method === m.value ? 'default' : 'outline'}
                     size="sm"
                     className="rounded-lg text-xs"
-                    onClick={() => setPaymentMethod(m.value)}
+                    onClick={() => form.setValue('method', m.value)}
                   >
                     {m.label}
                   </Button>
@@ -158,17 +179,20 @@ export function SupplierPaymentDialog({
             <div className="space-y-2">
               <Label>ملاحظات</Label>
               <Textarea
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-                className="rounded-xl resize-none"
+                value={form.values.notes || ''}
+                onChange={(e) => form.setValue('notes', e.target.value)}
+                className={`rounded-xl resize-none${form.errors.notes ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 rows={2}
                 placeholder="ملاحظات إضافية (اختياري)"
               />
+              {form.errors.notes && (
+                <p className="text-sm text-destructive">{form.errors.notes}</p>
+              )}
             </div>
 
             <Button
               onClick={handleRecordPayment}
-              disabled={paymentSubmitting || !paymentAmount}
+              disabled={paymentSubmitting || !form.values.amount}
               className="w-full gap-2 rounded-xl btn-ripple"
             >
               {paymentSubmitting ? (

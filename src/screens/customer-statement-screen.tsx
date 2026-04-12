@@ -6,6 +6,8 @@ import { exportToCSV } from '@/lib/export-csv'
 import { formatDateShortMonth, formatDateTime } from '@/lib/date-utils'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { z } from 'zod'
+import { useFormValidation } from '@/hooks/use-form-validation'
 import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -105,6 +107,10 @@ function TypeBadge({ type }: { type: string }) {
   }
 }
 
+const statementFormSchema = z.object({
+  customerId: z.string().min(1, 'يرجى اختيار عميل'),
+})
+
 // ─── Main Screen Component ───────────────────────────────────────────
 export function CustomerStatementScreen() {
   const { formatCurrency, symbol } = useCurrency()
@@ -124,6 +130,7 @@ export function CustomerStatementScreen() {
   const [loading, setLoading] = useState(false)
   const [customersLoading, setCustomersLoading] = useState(true)
   const printRef = useRef<HTMLDivElement>(null)
+  const statementValidation = useFormValidation({ schema: statementFormSchema })
 
   // ── Fetch customers list ───────────────────────────────────────────
   useEffect(() => {
@@ -144,10 +151,7 @@ export function CustomerStatementScreen() {
 
   // ── Generate statement ─────────────────────────────────────────────
   const generateStatement = useCallback(async () => {
-    if (!selectedCustomerId) {
-      toast.error('يرجى اختيار عميل')
-      return
-    }
+    if (!statementValidation.validate({ customerId: selectedCustomerId })) return
 
     setLoading(true)
     setStatement(null)
@@ -170,7 +174,7 @@ export function CustomerStatementScreen() {
     } finally {
       setLoading(false)
     }
-  }, [selectedCustomerId, startDate, endDate, get])
+  }, [selectedCustomerId, startDate, endDate, get, statementValidation])
 
   // ── Print statement ────────────────────────────────────────────────
   const handlePrint = () => {
@@ -275,9 +279,12 @@ export function CustomerStatementScreen() {
               ) : (
                 <Select
                   value={selectedCustomerId}
-                  onValueChange={setSelectedCustomerId}
+                  onValueChange={(val) => {
+                    setSelectedCustomerId(val)
+                    statementValidation.clearFieldError('customerId')
+                  }}
                 >
-                  <SelectTrigger className="h-10 rounded-xl">
+                  <SelectTrigger className={`h-10 rounded-xl ${statementValidation.errors.customerId ? 'border-destructive focus:ring-destructive' : ''}`}>
                     <SelectValue placeholder="اختر العميل..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -295,6 +302,9 @@ export function CustomerStatementScreen() {
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+              {statementValidation.errors.customerId && (
+                <p className="text-xs text-destructive">{statementValidation.errors.customerId}</p>
               )}
             </div>
 

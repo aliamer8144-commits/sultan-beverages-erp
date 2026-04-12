@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createLoyaltyTransactionSchema } from '@/lib/validations'
 import { EmptyState } from '@/components/empty-state'
 import { formatDate, formatTime } from '@/lib/date-utils'
 import { useTranslation } from '@/lib/translations'
@@ -189,6 +191,7 @@ function TransactionSkeleton() {
 export function LoyaltyScreen() {
   const { t, isRTL, lang } = useTranslation()
   const { get, post } = useApi()
+  const adjustValidation = useFormValidation({ schema: createLoyaltyTransactionSchema })
 
   // ── State ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true)
@@ -277,6 +280,7 @@ export function LoyaltyScreen() {
     setAdjustPoints('')
     setAdjustReason('')
     setAdjustType('add')
+    adjustValidation.clearAllErrors()
 
     const result = await get<CustomerOption[]>('/api/customers')
     if (result) {
@@ -286,21 +290,19 @@ export function LoyaltyScreen() {
 
   // ── Submit Adjust Points ───────────────────────────────────────
   const handleSubmitAdjust = async () => {
-    if (!adjustCustomerId || !adjustPoints || !adjustReason) {
-      toast.error(t('common.required'))
-      return
-    }
-
     const pointsValue = parseInt(adjustPoints)
-    if (isNaN(pointsValue) || pointsValue <= 0) {
-      toast.error(t('common.required'))
-      return
-    }
+    const finalPoints = adjustType === 'add' ? pointsValue : -pointsValue
+
+    const isValid = adjustValidation.validate({
+      customerId: adjustCustomerId,
+      points: finalPoints,
+      transactionType: 'adjusted',
+      description: adjustReason,
+    })
+    if (!isValid) return
 
     setSubmittingAdjust(true)
     try {
-      const finalPoints = adjustType === 'add' ? pointsValue : -pointsValue
-
       const result = await post<{ transaction: unknown; newPointsBalance: number }>('/api/loyalty', {
         customerId: adjustCustomerId,
         points: finalPoints,
@@ -809,8 +811,11 @@ export function LoyaltyScreen() {
             {/* Customer Select */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">{t('loyalty.selectCustomer')} <span className="text-destructive">*</span></Label>
-              <Select value={adjustCustomerId} onValueChange={setAdjustCustomerId}>
-                <SelectTrigger className="h-10">
+              <Select value={adjustCustomerId} onValueChange={(val) => {
+                setAdjustCustomerId(val)
+                adjustValidation.clearFieldError('customerId')
+              }}>
+                <SelectTrigger className={`h-10 ${adjustValidation.errors.customerId ? 'border-destructive' : ''}`}>
                   <SelectValue placeholder={t('loyalty.selectCustomer')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -821,6 +826,9 @@ export function LoyaltyScreen() {
                   ))}
                 </SelectContent>
               </Select>
+              {adjustValidation.errors.customerId && (
+                <p className="text-sm text-destructive">{adjustValidation.errors.customerId}</p>
+              )}
             </div>
 
             {/* Type Toggle */}
@@ -862,10 +870,16 @@ export function LoyaltyScreen() {
                 min="1"
                 placeholder="0"
                 value={adjustPoints}
-                onChange={(e) => setAdjustPoints(e.target.value)}
-                className="h-10 text-sm tabular-nums"
+                onChange={(e) => {
+                  setAdjustPoints(e.target.value)
+                  adjustValidation.clearFieldError('points')
+                }}
+                className={`h-10 text-sm tabular-nums ${adjustValidation.errors.points ? 'border-destructive' : ''}`}
                 dir="ltr"
               />
+              {adjustValidation.errors.points && (
+                <p className="text-sm text-destructive">{adjustValidation.errors.points}</p>
+              )}
             </div>
 
             {/* Reason */}
@@ -875,9 +889,15 @@ export function LoyaltyScreen() {
                 type="text"
                 placeholder={t('loyalty.reason')}
                 value={adjustReason}
-                onChange={(e) => setAdjustReason(e.target.value)}
-                className="h-10 text-sm"
+                onChange={(e) => {
+                  setAdjustReason(e.target.value)
+                  adjustValidation.clearFieldError('description')
+                }}
+                className={`h-10 text-sm ${adjustValidation.errors.description ? 'border-destructive' : ''}`}
               />
+              {adjustValidation.errors.description && (
+                <p className="text-sm text-destructive">{adjustValidation.errors.description}</p>
+              )}
             </div>
           </div>
 

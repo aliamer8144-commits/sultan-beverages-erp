@@ -53,6 +53,8 @@ import {
 } from '@/components/chart-utils'
 import { formatDate } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createExpenseSchema } from '@/lib/validations'
 import { Pagination, EmptyState } from '@/components/empty-state'
 import {
   Receipt,
@@ -195,6 +197,9 @@ export function ExpenseScreen() {
   const deleteConfirm = useConfirm()
   const [deleteTarget, setDeleteTarget] = useState<ExpenseItem | null>(null)
 
+  // Validation
+  const v = useFormValidation({ schema: createExpenseSchema })
+
   // ── Fetch Data ─────────────────────────────────────────────────
 
   const fetchData = useCallback(async (page = 1, showRefresh = false) => {
@@ -236,18 +241,14 @@ export function ExpenseScreen() {
   // ── Handlers ───────────────────────────────────────────────────
 
   const handleAddExpense = async () => {
-    if (!newCategory) {
-      toast.error('الرجاء اختيار فئة المصروف')
-      return
-    }
-    if (!newAmount || parseFloat(newAmount) <= 0) {
-      toast.error('الرجاء إدخال مبلغ صحيح')
-      return
-    }
-    if (!newDescription.trim()) {
-      toast.error('الرجاء إدخال وصف المصروف')
-      return
-    }
+    if (!v.validate({
+      category: newCategory,
+      amount: newAmount,
+      description: newDescription.trim(),
+      date: newDate,
+      recurring: newRecurring,
+      recurringPeriod: newRecurring ? newRecurringPeriod : undefined,
+    })) return
 
     setSubmitting(true)
     const result = await post('/api/expenses', {
@@ -286,6 +287,7 @@ export function ExpenseScreen() {
     setNewDate(new Date().toISOString().split('T')[0])
     setNewRecurring(false)
     setNewRecurringPeriod('')
+    v.clearAllErrors()
   }
 
   const handleExportCSV = () => {
@@ -944,7 +946,10 @@ export function ExpenseScreen() {
                     <button
                       key={cat.value}
                       type="button"
-                      onClick={() => setNewCategory(cat.value)}
+                      onClick={() => {
+                        setNewCategory(cat.value)
+                        v.clearFieldError('category')
+                      }}
                       className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
                         isSelected
                           ? `${cat.borderClass} ${cat.bgClass} shadow-sm scale-[1.02]`
@@ -962,6 +967,9 @@ export function ExpenseScreen() {
                 })}
               </div>
             </div>
+            {v.errors.category && (
+              <p className="text-sm text-destructive mt-1">{v.errors.category}</p>
+            )}
 
             {/* Amount */}
             <div className="space-y-1.5">
@@ -972,10 +980,16 @@ export function ExpenseScreen() {
                 min="0"
                 placeholder="0.00"
                 value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                className="h-10 text-sm tabular-nums text-left"
+                onChange={(e) => {
+                  setNewAmount(e.target.value)
+                  v.clearFieldError('amount')
+                }}
+                className={`h-10 text-sm tabular-nums text-left ${v.errors.amount ? 'border-destructive' : ''}`}
                 dir="ltr"
               />
+              {v.errors.amount && (
+                <p className="text-sm text-destructive mt-1">{v.errors.amount}</p>
+              )}
             </div>
 
             {/* Date */}
@@ -995,10 +1009,16 @@ export function ExpenseScreen() {
               <textarea
                 placeholder="أدخل وصف المصروف أو ملاحظات إضافية..."
                 value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
+                onChange={(e) => {
+                  setNewDescription(e.target.value)
+                  v.clearFieldError('description')
+                }}
                 rows={3}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/60"
+                className={`w-full rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground/60 ${v.errors.description ? 'border-destructive' : 'border-input'}`}
               />
+              {v.errors.description && (
+                <p className="text-sm text-destructive mt-1">{v.errors.description}</p>
+              )}
             </div>
 
             {/* Recurring Toggle */}

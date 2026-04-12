@@ -96,7 +96,7 @@ export const createCustomerSchema = z.object({
 export const updateCustomerSchema = z.object({
   name: z.string().min(1, 'اسم العميل مطلوب').max(200).optional(),
   phone: z.string().max(20).nullable().optional(),
-  debt: z.number().min(0).optional(),
+  debt: z.coerce.number().min(0).optional(),
   category: z.string().max(50).optional(),
   notes: z.string().max(500).nullable().optional(),
 })
@@ -128,16 +128,16 @@ export const updateSupplierSchema = z.object({
 
 export const invoiceItemSchema = z.object({
   productId: z.string().min(1, 'معرف المنتج مطلوب'),
-  quantity: z.number().int().positive('الكمية مطلوبة'),
-  price: z.number().positive('السعر مطلوب'),
+  quantity: z.coerce.number().int().positive('الكمية مطلوبة'),
+  price: z.coerce.number().positive('السعر مطلوب'),
 })
 
 export const createInvoiceSchema = z.object({
   type: z.enum(['sale', 'purchase']),
   customerId: z.string().min(1).nullable().optional(),
   supplierId: z.string().min(1).nullable().optional(),
-  discount: z.number().min(0).default(0),
-  paidAmount: z.number().min(0).default(0),
+  discount: z.coerce.number().min(0).default(0),
+  paidAmount: z.coerce.number().min(0).default(0),
   items: z.array(invoiceItemSchema).min(1, 'يجب إضافة عنصر واحد على الأقل'),
 })
 
@@ -145,7 +145,7 @@ export const createInvoiceSchema = z.object({
 
 export const createLoyaltyTransactionSchema = z.object({
   customerId: z.string().min(1, 'معرف العميل مطلوب'),
-  points: z.number().int('النقاط مطلوبة'),
+  points: z.coerce.number().int('النقاط مطلوبة'),
   transactionType: z.enum(['earned', 'redeemed', 'adjusted'], { message: 'نوع العملية غير صالح' }),
   invoiceId: z.string().nullable().optional(),
   description: z.string().min(1, 'الوصف مطلوب').max(500),
@@ -166,14 +166,14 @@ export const createAuditLogSchema = z.object({
 
 export const createSalesTargetSchema = z.object({
   type: z.enum(['daily', 'weekly', 'monthly'], 'نوع الهدف غير صالح'),
-  targetAmount: z.number().positive('مبلغ الهدف يجب أن يكون أكبر من صفر'),
+  targetAmount: z.coerce.number().positive('مبلغ الهدف يجب أن يكون أكبر من صفر'),
   startDate: z.string().optional(),
   endDate: z.string().nullable().optional(),
 })
 
 export const updateSalesTargetSchema = z.object({
   id: z.string().min(1, 'معرف الهدف مطلوب'),
-  targetAmount: z.number().positive().optional(),
+  targetAmount: z.coerce.number().positive().optional(),
   type: z.enum(['daily', 'weekly', 'monthly']).optional(),
   isActive: z.boolean().optional(),
 })
@@ -185,18 +185,18 @@ export const createProductVariantSchema = z.object({
   name: z.string().min(1, 'اسم المتغير مطلوب').max(200),
   sku: z.string().max(100).nullable().optional(),
   barcode: z.string().max(100).nullable().optional(),
-  costPrice: z.number().min(0).optional(),
-  sellPrice: z.number().min(0).optional(),
-  stock: z.number().int().min(0).optional(),
+  costPrice: z.coerce.number().min(0).optional(),
+  sellPrice: z.coerce.number().min(0).optional(),
+  stock: z.coerce.number().int().min(0).optional(),
 })
 
 export const updateProductVariantSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   sku: z.string().max(100).nullable().optional(),
   barcode: z.string().max(100).nullable().optional(),
-  costPrice: z.number().min(0).optional(),
-  sellPrice: z.number().min(0).optional(),
-  stock: z.number().int().min(0).optional(),
+  costPrice: z.coerce.number().min(0).optional(),
+  sellPrice: z.coerce.number().min(0).optional(),
+  stock: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -204,7 +204,7 @@ export const updateProductVariantSchema = z.object({
 
 export const createSupplierPaymentSchema = z.object({
   supplierId: z.string().min(1, 'معرف المورد مطلوب'),
-  amount: z.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
+  amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
   method: z.string().max(50).default('cash'),
   notes: z.string().max(500).nullable().optional(),
 })
@@ -213,7 +213,7 @@ export const createSupplierPaymentSchema = z.object({
 
 export const createCustomerPaymentSchema = z.object({
   customerId: z.string().min(1, 'معرف العميل مطلوب'),
-  amount: z.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
+  amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
   method: z.string().max(50).default('cash'),
   notes: z.string().max(500).nullable().optional(),
 })
@@ -222,7 +222,7 @@ export const createCustomerPaymentSchema = z.object({
 
 export const createSupplierReviewSchema = z.object({
   supplierId: z.string().min(1, 'معرف المورد مطلوب'),
-  rating: z.number().int().min(1).max(5, 'التقييم يجب أن يكون بين 1 و 5'),
+  rating: z.coerce.number().int().min(1).max(5, 'التقييم يجب أن يكون بين 1 و 5'),
   review: z.string().max(500).nullable().optional(),
 })
 
@@ -231,7 +231,7 @@ export const createSupplierReviewSchema = z.object({
 export const createReturnSchema = z.object({
   invoiceId: z.string().min(1, 'رقم الفاتورة مطلوب'),
   productId: z.string().min(1, 'المنتج مطلوب'),
-  quantity: z.number().int().positive('الكمية مطلوبة'),
+  quantity: z.coerce.number().int().positive('الكمية مطلوبة'),
   reason: z.string().max(500).optional(),
 })
 
@@ -244,7 +244,7 @@ export const updateReturnSchema = z.object({
 
 export const createExpenseSchema = z.object({
   category: z.string().min(1, 'الفئة مطلوبة'),
-  amount: z.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
+  amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
   description: z.string().min(1, 'الوصف مطلوب').max(500),
   date: z.string().optional(),
   recurring: z.boolean().optional(),
@@ -264,7 +264,7 @@ export const createExpenseCategorySchema = z.object({
   description: z.string().max(300).nullable().optional(),
   icon: z.string().max(50).optional(),
   color: z.string().max(7).optional(),
-  monthlyBudget: z.number().min(0).nullable().optional(),
+  monthlyBudget: z.coerce.number().min(0).nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -274,7 +274,7 @@ export const updateExpenseCategorySchema = z.object({
   description: z.string().max(300).nullable().optional(),
   icon: z.string().max(50).optional(),
   color: z.string().max(7).optional(),
-  monthlyBudget: z.number().min(0).nullable().optional(),
+  monthlyBudget: z.coerce.number().min(0).nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -285,10 +285,56 @@ const VALID_ADJUSTMENT_TYPES = ['in', 'out', 'adjustment', 'sale', 'purchase', '
 export const createStockAdjustmentSchema = z.object({
   productId: z.string().min(1, 'المنتج مطلوب'),
   type: z.enum(VALID_ADJUSTMENT_TYPES as [string, ...string[]], { message: 'نوع التعديل غير صالح' }),
-  quantity: z.number().int().min(0, 'الكمية يجب أن تكون صفر أو أكبر'),
+  quantity: z.coerce.number().int().min(0, 'الكمية يجب أن تكون صفر أو أكبر'),
   reason: z.string().max(500).optional(),
   reference: z.string().max(100).nullable().optional(),
   referenceType: z.string().max(50).nullable().optional(),
+})
+
+// ── User ────────────────────────────────────────────────────────────
+
+export const createUserSchema = z.object({
+  username: z.string().min(1, 'اسم المستخدم مطلوب'),
+  password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'),
+  name: z.string().min(1, 'الاسم الكامل مطلوب'),
+})
+
+export const editUserSchema = z.object({
+  name: z.string().min(1, 'الاسم الكامل مطلوب'),
+  password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل').optional().or(z.literal('')),
+})
+
+// ── POS Screen (client-side field validation) ───────────────────────
+
+export const posDiscountPercentSchema = z.object({
+  value: z.coerce
+    .number({ message: 'يرجى إدخال قيمة صحيحة' })
+    .positive('يرجى إدخال قيمة صحيحة')
+    .max(100, 'نسبة الخصم لا يمكن أن تتجاوز 100%'),
+})
+
+export const posDiscountAmountBaseSchema = z.object({
+  value: z.coerce
+    .number({ message: 'يرجى إدخال قيمة صحيحة' })
+    .positive('يرجى إدخال قيمة صحيحة'),
+})
+
+export const posPaidAmountSchema = z.object({
+  paidAmount: z.coerce
+    .number({ message: 'يرجى إدخال مبلغ صحيح' })
+    .min(0, 'يرجى إدخال مبلغ صحيح'),
+})
+
+export const posSplitCashSchema = z.object({
+  splitCash: z.coerce
+    .number({ message: 'يرجى إدخال مبلغ صحيح' })
+    .min(0, 'يرجى إدخال مبلغ صحيح'),
+})
+
+export const posSplitCardSchema = z.object({
+  splitCard: z.coerce
+    .number({ message: 'يرجى إدخال مبلغ صحيح' })
+    .min(0, 'يرجى إدخال مبلغ صحيح'),
 })
 
 // ── Validate Helper ─────────────────────────────────────────────────

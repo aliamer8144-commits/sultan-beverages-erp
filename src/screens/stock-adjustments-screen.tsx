@@ -28,6 +28,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import { createStockAdjustmentSchema } from '@/lib/validations'
 import {
   SlidersHorizontal,
   Search,
@@ -56,6 +59,11 @@ import { EmptyState } from '@/components/empty-state'
 import { formatDate, formatTime, formatShortDate, formatDateFull } from '@/lib/date-utils'
 import type { StockAdjustmentItem, ProductItem, AdjustmentStats, StockAdjustmentsResponse } from './stock-adjustments/types'
 import { typeConfig } from './stock-adjustments/types'
+
+// ─── Inline schema for create adjustment dialog ──────────────
+const createAdjustmentFormSchema = createStockAdjustmentSchema.extend({
+  quantity: z.coerce.number().int().positive('الكمية مطلوبة'),
+})
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 // formatDate, formatTime, formatShortDate imported from @/lib/date-utils
@@ -95,6 +103,9 @@ export function StockAdjustmentsScreen() {
   const [adjReason, setAdjReason] = useState('')
   const [adjReference, setAdjReference] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // ─── Form Validation ──────────────────────────────────────────
+  const adjValidation = useFormValidation({ schema: createAdjustmentFormSchema })
 
   const hasActiveFilters = search.trim() || typeFilter !== 'all' || dateFrom || dateTo
 
@@ -179,6 +190,7 @@ export function StockAdjustmentsScreen() {
     setAdjReason('')
     setAdjReference('')
     setSubmitting(false)
+    adjValidation.clearAllErrors()
 
     setProductsLoading(true)
     try {
@@ -196,26 +208,29 @@ export function StockAdjustmentsScreen() {
     const product = products.find((p) => p.id === productId)
     setSelectedProduct(product || null)
     setAdjQuantity(1)
+    adjValidation.clearFieldError('productId')
+    adjValidation.clearFieldError('quantity')
   }
 
   const handleSubmitAdjustment = async () => {
-    if (!selectedProductId || !adjType || !adjQuantity || adjQuantity <= 0) {
-      toast.error('يرجى اختيار المنتج والنوع والكمية')
-      return
-    }
+    // Schema validation (productId, type, quantity)
+    if (!adjValidation.validate({ productId: selectedProductId, type: adjType, quantity: adjQuantity })) return
 
+    // Keep !user as toast.error (non-field error)
     if (!user) {
       toast.error('يرجى تسجيل الدخول أولاً')
       return
     }
 
+    // Cross-field: adjustment type quantity check
     if (adjType === 'adjustment' && adjQuantity < 0) {
-      toast.error('الكمية في حالة التعديل يجب أن تكون صفر أو أكثر')
+      adjValidation.setErrorMap({ quantity: 'الكمية في حالة التعديل يجب أن تكون صفر أو أكثر' })
       return
     }
 
+    // Cross-field: stock availability check
     if (adjType === 'out' && selectedProduct && adjQuantity > selectedProduct.quantity) {
-      toast.error(`الكمية المطلوبة (${adjQuantity}) أكبر من المخزون المتاح (${selectedProduct.quantity})`)
+      adjValidation.setErrorMap({ quantity: `الكمية المطلوبة (${adjQuantity}) أكبر من المخزون المتاح (${selectedProduct.quantity})` })
       return
     }
 
@@ -234,6 +249,7 @@ export function StockAdjustmentsScreen() {
 
       if (result) {
         setNewAdjOpen(false)
+        adjValidation.clearAllErrors()
          
         fetchAdjustments()
       }
@@ -706,7 +722,7 @@ export function StockAdjustmentsScreen() {
       )}
 
       {/* New Adjustment Dialog */}
-      <Dialog open={newAdjOpen} onOpenChange={setNewAdjOpen}>
+      <Dialog open={newAdjOpen} onOpenChange={(open) => { setNewAdjOpen(open); if (!open) adjValidation.clearAllErrors() }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col glass-card" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -724,7 +740,7 @@ export function StockAdjustmentsScreen() {
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">المنتج *</Label>
                 <Select value={selectedProductId} onValueChange={handleSelectProduct}>
-                  <SelectTrigger className="w-full h-10">
+                  <SelectTrigger className={`w-full h-10 ${adjValidation.errors.productId ? 'border-destructive' : ''}`}>
                     <SelectValue placeholder={productsLoading ? 'جاري التحميل...' : 'اختر منتج...'} />
                   </SelectTrigger>
                   <SelectContent>
@@ -746,6 +762,12 @@ export function StockAdjustmentsScreen() {
                     )}
                   </SelectContent>
                 </Select>
+                {adjValidation.errors.productId && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {adjValidation.errors.productId}
+                  </p>
+                )}
               </div>
 
               {/* Selected Product Info */}
@@ -821,11 +843,17 @@ export function StockAdjustmentsScreen() {
                   type="number"
                   min={adjType === 'adjustment' ? 0 : 1}
                   value={adjQuantity}
-                  onChange={(e) => setAdjQuantity(parseInt(e.target.value) || 0)}
-                  className="h-10 text-sm input-glass"
+                  onChange={(e) => { setAdjQuantity(parseInt(e.target.value) || 0); adjValidation.clearFieldError('quantity') }}
+                  className={`h-10 text-sm input-glass ${adjValidation.errors.quantity ? 'border-destructive' : ''}`}
                   placeholder={adjType === 'adjustment' ? 'أدخل الكمية الجديدة...' : 'أدخل الكمية...'}
                 />
-                {adjType === 'out' && selectedProduct && adjQuantity > selectedProduct.quantity && (
+                {adjValidation.errors.quantity && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {adjValidation.errors.quantity}
+                  </p>
+                )}
+                {adjType === 'out' && selectedProduct && adjQuantity > selectedProduct.quantity && !adjValidation.errors.quantity && (
                   <p className="text-[10px] text-destructive flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
                     الكمية تتجاوز المخزون المتاح ({selectedProduct.quantity})

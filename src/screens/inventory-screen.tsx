@@ -17,6 +17,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { useFormValidation } from '@/hooks/use-form-validation'
 import {
   Search, Plus, Pencil, Trash2, AlertTriangle, Package, Filter, Loader2,
   PackageX, X, History, PackagePlus, Download, ChevronLeft,
@@ -38,6 +40,15 @@ import { ProductFormDialog } from './inventory/product-form-dialog'
 import { StockAdjustmentDialog } from './inventory/stock-adjustment-dialog'
 import { ProductVariantsDialog } from './inventory/product-variants-dialog'
 import { CategoryManager } from './inventory/category-manager'
+
+// ─── Inline schemas for batch dialog validation ────────────────
+const batchPriceSchema = z.object({
+  priceChangeValue: z.coerce.number().positive('يرجى إدخال قيمة صحيحة'),
+})
+
+const batchCategorySchema = z.object({
+  categoryId: z.string().min(1, 'يرجى اختيار التصنيف'),
+})
 
 export function InventoryScreen() {
   // API hook
@@ -115,6 +126,10 @@ export function InventoryScreen() {
 
   // ─── Category Management State ─────────────────────────────────
   const [catMgmtOpen, setCatMgmtOpen] = useState(false)
+
+  // ─── Form Validation ──────────────────────────────────────────
+  const batchPriceValidation = useFormValidation({ schema: batchPriceSchema })
+  const batchCategoryValidation = useFormValidation({ schema: batchCategorySchema })
 
   // ─── Per-product stock history fetch ─────────────────────────
   const fetchProductMovements = useCallback(async (productId: string) => {
@@ -313,10 +328,7 @@ export function InventoryScreen() {
 
   const handleBatchPriceChange = async () => {
     if (selectedIds.size === 0) return
-    if (!batchPriceValue || Number(batchPriceValue) <= 0) {
-      toast.error('يرجى إدخال قيمة صحيحة')
-      return
-    }
+    if (!batchPriceValidation.validate({ priceChangeValue: batchPriceValue })) return
 
     setBatchSubmitting(true)
     try {
@@ -338,6 +350,7 @@ export function InventoryScreen() {
         toast.success(`تم تغيير سعر ${result.count} منتج بنجاح`)
         setBatchPriceOpen(false)
         setBatchPriceValue('')
+        batchPriceValidation.clearAllErrors()
         clearSelection()
         fetchProducts()
       }
@@ -350,10 +363,7 @@ export function InventoryScreen() {
 
   const handleBatchCategoryChange = async () => {
     if (selectedIds.size === 0) return
-    if (!batchNewCategoryId) {
-      toast.error('يرجى اختيار التصنيف')
-      return
-    }
+    if (!batchCategoryValidation.validate({ categoryId: batchNewCategoryId })) return
 
     setBatchSubmitting(true)
     try {
@@ -365,6 +375,7 @@ export function InventoryScreen() {
         toast.success(`تم نقل ${result.count} منتج إلى التصنيف الجديد`)
         setBatchCategoryOpen(false)
         setBatchNewCategoryId('')
+        batchCategoryValidation.clearAllErrors()
         clearSelection()
         fetchProducts()
       }
@@ -848,6 +859,7 @@ export function InventoryScreen() {
                   setBatchPriceType('fixed')
                   setBatchPriceValue('')
                   setBatchPercentDir('increase')
+                  batchPriceValidation.clearAllErrors()
                   setBatchPriceOpen(true)
                 }}
                 className="gap-1.5 rounded-lg whitespace-nowrap text-xs shrink-0"
@@ -860,6 +872,7 @@ export function InventoryScreen() {
                 size="sm"
                 onClick={() => {
                   setBatchNewCategoryId('')
+                  batchCategoryValidation.clearAllErrors()
                   setBatchCategoryOpen(true)
                 }}
                 className="gap-1.5 rounded-lg whitespace-nowrap text-xs shrink-0"
@@ -1189,7 +1202,7 @@ export function InventoryScreen() {
       </Dialog>
 
       {/* ─── Batch Price Change Dialog ────────────────────────── */}
-      <Dialog open={batchPriceOpen} onOpenChange={(open) => { setBatchPriceOpen(open); if (!open) setBatchPriceValue('') }}>
+      <Dialog open={batchPriceOpen} onOpenChange={(open) => { setBatchPriceOpen(open); if (!open) { setBatchPriceValue(''); batchPriceValidation.clearAllErrors() } }}>
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -1245,8 +1258,8 @@ export function InventoryScreen() {
                     min="0"
                     placeholder="0.00"
                     value={batchPriceValue}
-                    onChange={(e) => setBatchPriceValue(e.target.value)}
-                    className="h-10 rounded-lg text-left tabular-nums pl-14"
+                    onChange={(e) => { setBatchPriceValue(e.target.value); batchPriceValidation.clearFieldError('priceChangeValue') }}
+                    className={`h-10 rounded-lg text-left tabular-nums pl-14 ${batchPriceValidation.errors.priceChangeValue ? 'border-destructive' : ''}`}
                     dir="ltr"
                     autoFocus
                   />
@@ -1262,8 +1275,8 @@ export function InventoryScreen() {
                       max="1000"
                       placeholder="0"
                       value={batchPriceValue}
-                      onChange={(e) => setBatchPriceValue(e.target.value)}
-                      className="h-10 rounded-lg text-left tabular-nums pl-8"
+                      onChange={(e) => { setBatchPriceValue(e.target.value); batchPriceValidation.clearFieldError('priceChangeValue') }}
+                      className={`h-10 rounded-lg text-left tabular-nums pl-8 ${batchPriceValidation.errors.priceChangeValue ? 'border-destructive' : ''}`}
                       dir="ltr"
                       autoFocus
                     />
@@ -1296,6 +1309,12 @@ export function InventoryScreen() {
                 </div>
               )}
             </div>
+            {batchPriceValidation.errors.priceChangeValue && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {batchPriceValidation.errors.priceChangeValue}
+              </p>
+            )}
 
             {/* Preview table for percentage mode */}
             {batchPriceType === 'percentage' && batchPriceValue && Number(batchPriceValue) > 0 && (
@@ -1348,7 +1367,7 @@ export function InventoryScreen() {
       </Dialog>
 
       {/* ─── Batch Category Change Dialog ─────────────────────── */}
-      <Dialog open={batchCategoryOpen} onOpenChange={(open) => { setBatchCategoryOpen(open); if (!open) setBatchNewCategoryId('') }}>
+      <Dialog open={batchCategoryOpen} onOpenChange={(open) => { setBatchCategoryOpen(open); if (!open) { setBatchNewCategoryId(''); batchCategoryValidation.clearAllErrors() } }}>
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -1376,8 +1395,8 @@ export function InventoryScreen() {
 
             <div className="space-y-2">
               <Label className="text-sm font-medium">التصنيف الجديد</Label>
-              <Select value={batchNewCategoryId} onValueChange={setBatchNewCategoryId}>
-                <SelectTrigger className="h-10 rounded-lg">
+              <Select value={batchNewCategoryId} onValueChange={(val) => { setBatchNewCategoryId(val); batchCategoryValidation.clearFieldError('categoryId') }}>
+                <SelectTrigger className={`h-10 rounded-lg ${batchCategoryValidation.errors.categoryId ? 'border-destructive' : ''}`}>
                   <SelectValue placeholder="اختر التصنيف الجديد" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1388,6 +1407,12 @@ export function InventoryScreen() {
                   ))}
                 </SelectContent>
               </Select>
+              {batchCategoryValidation.errors.categoryId && (
+                <p className="text-sm text-destructive flex items-center gap-1 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {batchCategoryValidation.errors.categoryId}
+                </p>
+              )}
             </div>
           </div>
 

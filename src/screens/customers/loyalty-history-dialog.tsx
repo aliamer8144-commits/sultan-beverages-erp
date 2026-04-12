@@ -17,6 +17,9 @@ import { toast } from 'sonner'
 import { Star, Plus, Minus } from 'lucide-react'
 import { formatShortDate } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createLoyaltyTransactionSchema } from '@/lib/validations'
+import { validateFormClient } from '@/lib/validation-utils'
 
 import type { Customer, LoyaltyTransaction } from './types'
 
@@ -26,6 +29,14 @@ interface LoyaltyHistoryDialogProps {
   customer: Customer | null
   formatCurrency: (amount: number) => string
   onSuccess: () => void
+}
+
+/** Stable defaults so useZodForm.reset reference stays constant */
+const ADJUST_DEFAULTS = {
+  customerId: '',
+  points: '',
+  transactionType: 'adjusted',
+  description: '',
 }
 
 export function LoyaltyHistoryDialog({
@@ -42,11 +53,15 @@ export function LoyaltyHistoryDialog({
 
   // ── Adjust state ──
   const [loyaltyMode, setLoyaltyMode] = useState<'grant' | 'deduct'>('grant')
-  const [loyaltyPointsInput, setLoyaltyPointsInput] = useState('')
-  const [loyaltyDescription, setLoyaltyDescription] = useState('')
   const [loyaltySubmitting, setLoyaltySubmitting] = useState(false)
   const [openAdjustDialog, setOpenAdjustDialog] = useState(false)
   const [adjustCustomer, setAdjustCustomer] = useState<Customer | null>(null)
+
+  // ── Adjust form (self-contained, useZodForm) ──
+  const adjustForm = useZodForm({
+    schema: createLoyaltyTransactionSchema,
+    defaultValues: ADJUST_DEFAULTS,
+  })
 
   // ── Fetch loyalty history when dialog opens ──
   useEffect(() => {
@@ -70,24 +85,40 @@ export function LoyaltyHistoryDialog({
   const openLoyaltyAdjust = (c: Customer, mode: 'grant' | 'deduct') => {
     setAdjustCustomer(c)
     setLoyaltyMode(mode)
-    setLoyaltyPointsInput('')
-    setLoyaltyDescription('')
+    adjustForm.reset({ ...ADJUST_DEFAULTS, customerId: c.id })
     setOpenAdjustDialog(true)
   }
 
   // ── Submit loyalty adjustment ──
   const handleLoyaltyAdjust = async () => {
     if (!adjustCustomer) return
-    const points = parseInt(loyaltyPointsInput)
-    if (!points || points <= 0) {
-      toast.error('يرجى إدخال عدد نقاط صحيح')
-      return
+
+    // Build payload with description default (schema requires non-empty description)
+    const defaultDesc = loyaltyMode === 'grant' ? 'منح نقاط يدوي' : 'خصم نقاط يدوي'
+    const desc = adjustForm.values.description.trim() || defaultDesc
+
+    // Validate against schema (points will be coerced from string to int)
+    const dataToValidate = {
+      customerId: adjustCustomer.id,
+      points: adjustForm.values.points,
+      transactionType: 'adjusted' as const,
+      description: desc,
     }
-    if (loyaltyMode === 'deduct' && points > adjustCustomer.loyaltyPoints) {
-      toast.error('النقاط المطلوبة أكبر من رصيد العميل')
+
+    const fieldErrors = validateFormClient(createLoyaltyTransactionSchema, dataToValidate)
+    if (fieldErrors) {
+      adjustForm.setErrorMap(fieldErrors)
       return
     }
 
+    // Cross-field: deduct must not exceed balance
+    const points = parseInt(String(adjustForm.values.points))
+    if (loyaltyMode === 'deduct' && points > adjustCustomer.loyaltyPoints) {
+      adjustForm.setError('points', 'النقاط المطلوبة أكبر من رصيد العميل')
+      return
+    }
+
+    adjustForm.clearErrors()
     setLoyaltySubmitting(true)
     try {
       const action = loyaltyMode === 'grant' ? 'منح' : 'خصم'
@@ -95,7 +126,7 @@ export function LoyaltyHistoryDialog({
         customerId: adjustCustomer.id,
         points: loyaltyMode === 'grant' ? points : -points,
         transactionType: 'adjusted',
-        description: loyaltyDescription.trim() || (loyaltyMode === 'grant' ? 'منح نقاط يدوي' : 'خصم نقاط يدوي'),
+        description: desc,
       }, {
         showSuccessToast: true,
         successMessage: `تم ${action} ${points} نقطة ${loyaltyMode === 'grant' ? 'لـ' : 'من'} ${adjustCustomer.name}`,
@@ -260,13 +291,20 @@ export function LoyaltyHistoryDialog({
                   type="number"
                   min={1}
                   max={loyaltyMode === 'deduct' ? adjustCustomer.loyaltyPoints : undefined}
-                  value={loyaltyPointsInput}
-                  onChange={(e) => setLoyaltyPointsInput(e.target.value)}
+                  value={adjustForm.values.points || ''}
+                  onChange={(e) => adjustForm.setValue('points', e.target.value)}
                   placeholder="أدخل عدد النقاط"
-                  className="tabular-nums"
+                  className={`tabular-nums${
+                    adjustForm.errors.points
+                      ? ' border-destructive focus-visible:ring-destructive'
+                      : ''
+                  }`}
                   dir="ltr"
                   autoFocus
                 />
+                {adjustForm.errors.points && (
+                  <p className="text-sm text-destructive">{adjustForm.errors.points}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -281,8 +319,8 @@ export function LoyaltyHistoryDialog({
                       ? 'سبب منح النقاط...'
                       : 'سبب الخصم...'
                   }
-                  value={loyaltyDescription}
-                  onChange={(e) => setLoyaltyDescription(e.target.value)}
+                  value={adjustForm.values.description || ''}
+                  onChange={(e) => adjustForm.setValue('description', e.target.value)}
                   rows={2}
                   className="resize-none"
                 />
@@ -292,7 +330,7 @@ export function LoyaltyHistoryDialog({
           <DialogFooter className="flex gap-2 sm:justify-start">
             <Button
               onClick={handleLoyaltyAdjust}
-              disabled={loyaltySubmitting || !loyaltyPointsInput}
+              disabled={loyaltySubmitting || !adjustForm.values.points}
               className={`btn-ripple ${loyaltyMode === 'grant' ? '' : 'bg-orange-500 hover:bg-orange-600'}`}
             >
               {loyaltySubmitting ? 'جارٍ التنفيذ...' : loyaltyMode === 'grant' ? 'منح' : 'خصم'}

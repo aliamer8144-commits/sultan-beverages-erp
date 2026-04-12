@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,12 @@ import {
   ReceiptText,
 } from 'lucide-react'
 import { peekNextReceiptNumber } from '@/lib/receipt-utils'
+import { useFormValidation } from '@/hooks/use-form-validation'
+import {
+  posPaidAmountSchema,
+  posSplitCashSchema,
+  posSplitCardSchema,
+} from '@/lib/validations'
 import type { CartItem } from '@/types'
 
 interface PaymentDialogProps {
@@ -67,6 +74,34 @@ export function PaymentDialog({
   const splitTotal = splitCashNum + splitCardNum
   const splitRemaining = Math.max(0, grandTotal - splitTotal)
   const isSplitValid = splitTotal >= grandTotal && splitCashNum >= 0 && splitCardNum >= 0
+
+  // Dynamic schema based on active payment tab
+  const paymentSchema = useMemo(() => {
+    if (paymentTab === 'full') {
+      return posPaidAmountSchema
+    }
+    return posSplitCashSchema.merge(posSplitCardSchema)
+  }, [paymentTab])
+
+  const v = useFormValidation({ schema: paymentSchema })
+
+  // Clear all errors when dialog opens or tab changes
+  useEffect(() => {
+    if (open) v.clearAllErrors()
+  }, [open, v.clearAllErrors])
+
+  useEffect(() => {
+    v.clearAllErrors()
+  }, [paymentTab, v.clearAllErrors])
+
+  const handleConfirm = () => {
+    if (paymentTab === 'full') {
+      if (!v.validate({ paidAmount })) return
+    } else {
+      if (!v.validate({ splitCash, splitCard })) return
+    }
+    onConfirmPayment()
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,7 +160,7 @@ export function PaymentDialog({
           </div>
 
           {/* Payment method tabs */}
-          <Tabs value={paymentTab} onValueChange={(v) => setPaymentTab(v as 'full' | 'split')} className="w-full">
+          <Tabs value={paymentTab} onValueChange={(t) => setPaymentTab(t as 'full' | 'split')} className="w-full">
             <TabsList className="w-full h-10">
               <TabsTrigger value="full" className="flex-1 gap-1.5 text-xs">
                 <Banknote className="w-3.5 h-3.5" />
@@ -147,13 +182,19 @@ export function PaymentDialog({
                     min={0}
                     step={0.5}
                     value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
+                    onChange={(e) => {
+                      setPaidAmount(e.target.value)
+                      v.clearFieldError('paidAmount')
+                    }}
                     placeholder="0.00"
-                    className="h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums"
+                    className={`h-12 rounded-xl text-lg font-bold pr-4 pl-14 tabular-nums ${v.errors.paidAmount ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     autoFocus
                   />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">{symbol}</span>
                 </div>
+                {v.errors.paidAmount && (
+                  <p className="text-sm text-destructive">{v.errors.paidAmount}</p>
+                )}
               </div>
 
               {/* Quick amount buttons */}
@@ -206,13 +247,19 @@ export function PaymentDialog({
                     min={0}
                     step={0.5}
                     value={splitCash}
-                    onChange={(e) => setSplitCash(e.target.value)}
+                    onChange={(e) => {
+                      setSplitCash(e.target.value)
+                      v.clearFieldError('splitCash')
+                    }}
                     placeholder="0.00"
-                    className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
+                    className={`h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums ${v.errors.splitCash ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     autoFocus
                   />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
                 </div>
+                {v.errors.splitCash && (
+                  <p className="text-sm text-destructive">{v.errors.splitCash}</p>
+                )}
                 <div className="flex gap-1.5 flex-wrap">
                   {[10, 20, 50, 100, 200, 500].filter(a => a <= grandTotal).map((amt) => (
                     <button
@@ -248,12 +295,18 @@ export function PaymentDialog({
                     min={0}
                     step={0.5}
                     value={splitCard}
-                    onChange={(e) => setSplitCard(e.target.value)}
+                    onChange={(e) => {
+                      setSplitCard(e.target.value)
+                      v.clearFieldError('splitCard')
+                    }}
                     placeholder="0.00"
-                    className="h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums"
+                    className={`h-11 rounded-xl text-base font-bold pr-4 pl-14 tabular-nums ${v.errors.splitCard ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                   />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">{symbol}</span>
                 </div>
+                {v.errors.splitCard && (
+                  <p className="text-sm text-destructive">{v.errors.splitCard}</p>
+                )}
                 <button
                   onClick={() => setSplitCard(splitRemaining.toFixed(2))}
                   className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-all duration-150"
@@ -317,7 +370,7 @@ export function PaymentDialog({
             إلغاء
           </Button>
           <Button
-            onClick={onConfirmPayment}
+            onClick={handleConfirm}
             disabled={
               processingPayment ||
               (paymentTab === 'full' ? (!paidAmount || parseFloat(paidAmount) < grandTotal) : !isSplitValid)

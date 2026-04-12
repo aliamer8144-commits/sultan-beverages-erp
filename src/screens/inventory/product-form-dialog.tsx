@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Loader2, ImagePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useApi } from '@/hooks/use-api'
+import { useZodForm } from '@/hooks/use-zod-form'
+import { createProductSchema } from '@/lib/validations'
 import { compressImage } from '@/lib/image-utils'
 
-import type { Product, Category, ProductFormData } from './types'
+import type { Product, Category } from './types'
 import { emptyForm } from './types'
 
 export interface ProductFormDialogProps {
@@ -26,15 +28,17 @@ export interface ProductFormDialogProps {
 export function ProductFormDialog({ open, onOpenChange, editingProduct, categories, onSaved }: ProductFormDialogProps) {
   const { post, put } = useApi()
 
-  const [form, setForm] = useState<ProductFormData>(emptyForm)
-  const [submitting, setSubmitting] = useState(false)
+  const form = useZodForm({
+    schema: createProductSchema,
+    defaultValues: emptyForm,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset form when dialog opens or editing product changes
   useEffect(() => {
     if (open) {
       if (editingProduct) {
-        setForm({
+        form.reset({
           name: editingProduct.name,
           categoryId: editingProduct.categoryId,
           price: String(editingProduct.price),
@@ -45,13 +49,13 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
           image: editingProduct.image || '',
         })
       } else {
-        setForm(emptyForm)
+        form.reset()
       }
     }
-  }, [open, editingProduct])
+  }, [open, editingProduct, form.reset])
 
   // Image upload handler with compression
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('يرجى اختيار ملف صورة فقط')
       return
@@ -63,38 +67,24 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
     try {
       toast.loading('جاري ضغط الصورة...', { id: 'image-compress' })
       const compressed = await compressImage(file, 400, 0.75)
-      setForm((prev) => ({ ...prev, image: compressed }))
+      form.setValue('image', compressed)
       toast.success('تم تحميل الصورة بنجاح', { id: 'image-compress' })
     } catch {
       toast.error('فشل في تحميل الصورة', { id: 'image-compress' })
     }
-  }, [])
+  }
 
-  const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      toast.error('يرجى إدخال اسم المنتج')
-      return
-    }
-    if (!form.categoryId) {
-      toast.error('يرجى اختيار التصنيف')
-      return
-    }
-    if (!form.price || Number(form.price) <= 0) {
-      toast.error('يرجى إدخال سعر البيع')
-      return
-    }
-
-    setSubmitting(true)
+  const handleSubmit = form.handleSubmit(async (values) => {
     try {
       const payload = {
-        name: form.name.trim(),
-        categoryId: form.categoryId,
-        price: Number(form.price),
-        costPrice: Number(form.costPrice) || 0,
-        quantity: Number(form.quantity) || 0,
-        minQuantity: Number(form.minQuantity) || 5,
-        barcode: form.barcode.trim() || null,
-        image: form.image.trim() || null,
+        name: values.name.trim(),
+        categoryId: values.categoryId,
+        price: values.price,
+        costPrice: values.costPrice || 0,
+        quantity: values.quantity || 0,
+        minQuantity: values.minQuantity || 5,
+        barcode: values.barcode?.trim() || null,
+        image: values.image?.trim() || null,
       }
 
       let result: Product | null
@@ -118,10 +108,8 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
       onSaved()
     } catch {
       // handled by useApi
-    } finally {
-      setSubmitting(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -145,11 +133,14 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
               <Input
                 id="product-name"
                 placeholder="مثال: بيبسي 330مل"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-10 rounded-lg"
+                value={form.values.name}
+                onChange={(e) => form.setValue('name', e.target.value)}
+                className={`h-10 rounded-lg${form.errors.name ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 autoFocus
               />
+              {form.errors.name && (
+                <p className="text-sm text-destructive">{form.errors.name}</p>
+              )}
             </div>
 
             {/* Category */}
@@ -158,10 +149,10 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                 التصنيف <span className="required-asterisk">*</span>
               </label>
               <Select
-                value={form.categoryId}
-                onValueChange={(val) => setForm({ ...form, categoryId: val })}
+                value={form.values.categoryId}
+                onValueChange={(val) => form.setValue('categoryId', val)}
               >
-                <SelectTrigger className="h-10 rounded-lg">
+                <SelectTrigger className={`h-10 rounded-lg${form.errors.categoryId ? ' border-destructive focus:ring-destructive' : ''}`}>
                   <SelectValue placeholder="اختر التصنيف" />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,6 +163,9 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                   ))}
                 </SelectContent>
               </Select>
+              {form.errors.categoryId && (
+                <p className="text-sm text-destructive">{form.errors.categoryId}</p>
+              )}
             </div>
 
             {/* Price & Cost - side by side */}
@@ -186,8 +180,8 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={form.costPrice}
-                  onChange={(e) => setForm({ ...form, costPrice: e.target.value })}
+                  value={form.values.costPrice}
+                  onChange={(e) => form.setValue('costPrice', e.target.value)}
                   className="h-10 rounded-lg text-left"
                 />
               </div>
@@ -201,10 +195,13 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  className="h-10 rounded-lg text-left"
+                  value={form.values.price}
+                  onChange={(e) => form.setValue('price', e.target.value)}
+                  className={`h-10 rounded-lg text-left${form.errors.price ? ' border-destructive focus-visible:ring-destructive' : ''}`}
                 />
+                {form.errors.price && (
+                  <p className="text-sm text-destructive">{form.errors.price}</p>
+                )}
               </div>
             </div>
 
@@ -219,8 +216,8 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                   type="number"
                   min="0"
                   placeholder="0"
-                  value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                  value={form.values.quantity}
+                  onChange={(e) => form.setValue('quantity', e.target.value)}
                   className="h-10 rounded-lg text-left"
                 />
               </div>
@@ -233,8 +230,8 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                   type="number"
                   min="0"
                   placeholder="5"
-                  value={form.minQuantity}
-                  onChange={(e) => setForm({ ...form, minQuantity: e.target.value })}
+                  value={form.values.minQuantity}
+                  onChange={(e) => form.setValue('minQuantity', e.target.value)}
                   className="h-10 rounded-lg text-left"
                 />
               </div>
@@ -248,8 +245,8 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
               <Input
                 id="barcode"
                 placeholder="أدخل رقم الباركود"
-                value={form.barcode}
-                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                value={form.values.barcode}
+                onChange={(e) => form.setValue('barcode', e.target.value)}
                 className="h-10 rounded-lg font-mono"
                 dir="ltr"
               />
@@ -264,16 +261,16 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                 onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleImageUpload(file) }}
                 onDragOver={(e) => e.preventDefault()}
                 className={`image-upload-zone relative rounded-xl border-2 border-dashed ${
-                  form.image
+                  form.values.image
                     ? 'border-primary/30 bg-primary/5'
                     : 'border-border'
                 }`}
               >
-                {form.image ? (
+                {form.values.image ? (
                   <div className="relative p-3">
                     <div className="product-image-lg w-full h-32 mx-auto">
                       <img
-                        src={form.image}
+                        src={form.values.image}
                         alt="صورة المنتج"
                         className="w-full h-full object-cover"
                       />
@@ -281,7 +278,7 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
                     <div className="flex justify-center mt-2">
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, image: '' })}
+                        onClick={() => form.setValue('image', '')}
                         className="image-remove-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -334,17 +331,17 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, categori
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={submitting}
+            disabled={form.isSubmitting}
             className="rounded-lg"
           >
             إلغاء
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={form.isSubmitting}
             className="gap-2 rounded-lg shadow-md shadow-primary/20"
           >
-            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {form.isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
             {editingProduct ? 'تحديث المنتج' : 'إضافة المنتج'}
           </Button>
         </DialogFooter>
