@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { withAuth, getRequestUser } from '@/lib/auth-middleware'
-import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { successResponse, errorResponse } from '@/lib/api-response'
 import { validateBody, createAuditLogSchema } from '@/lib/validations'
+import { tryCatch } from '@/lib/api-error-handler'
 
 // ── Seed sample audit log data ──────────────────────────────────────
 async function seedSampleData() {
@@ -37,130 +37,122 @@ async function seedSampleData() {
 }
 
 // ── GET: Paginated audit logs with filters ──────────────────────────
-export const GET = withAuth(async (request: NextRequest) => {
-  try {
-    // Seed sample data if empty
-    await seedSampleData()
+export const GET = withAuth(tryCatch(async (request) => {
+  // Seed sample data if empty
+  await seedSampleData()
 
-    const { searchParams } = new URL(request.url)
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
-    const action = searchParams.get('action') || ''
-    const entity = searchParams.get('entity') || ''
-    const search = searchParams.get('search') || ''
-    const startDate = searchParams.get('startDate') || ''
-    const endDate = searchParams.get('endDate') || ''
+  const { searchParams } = new URL(request.url)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+  const action = searchParams.get('action') || ''
+  const entity = searchParams.get('entity') || ''
+  const search = searchParams.get('search') || ''
+  const startDate = searchParams.get('startDate') || ''
+  const endDate = searchParams.get('endDate') || ''
 
-    // Build where clause
-    const where: Record<string, unknown> = {}
+  // Build where clause
+  const where: Record<string, unknown> = {}
 
-    if (action) {
-      where.action = action
-    }
-
-    if (entity) {
-      where.entity = entity
-    }
-
-    if (search) {
-      where.OR = [
-        { userName: { contains: search } },
-        { details: { contains: search } },
-        { entityId: { contains: search } },
-      ]
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {}
-      if (startDate) {
-        ;(where.createdAt as Record<string, unknown>).gte = new Date(startDate + 'T00:00:00.000Z')
-      }
-      if (endDate) {
-        ;(where.createdAt as Record<string, unknown>).lte = new Date(endDate + 'T23:59:59.999Z')
-      }
-    }
-
-    const skip = (page - 1) * limit
-
-    const [logs, total] = await Promise.all([
-      db.auditLog.findMany({
-        where: Object.keys(where).length > 0 ? where : undefined,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      db.auditLog.count({
-        where: Object.keys(where).length > 0 ? where : undefined,
-      }),
-    ])
-
-    const totalPages = Math.ceil(total / limit)
-
-    // Format logs
-    const formattedLogs = logs.map((log) => {
-      let parsedDetails: Record<string, unknown> | null = null
-      try {
-        parsedDetails = log.details ? JSON.parse(log.details) : null
-      } catch {
-        parsedDetails = null
-      }
-
-      return {
-        id: log.id,
-        action: log.action,
-        entity: log.entity,
-        entityId: log.entityId,
-        details: parsedDetails,
-        userName: log.userName,
-        ipAddress: log.ipAddress,
-        createdAt: log.createdAt.toLocaleString('ar-SA', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        }),
-        createdAtRaw: log.createdAt.toISOString(),
-      }
-    })
-
-    return successResponse({
-      logs: formattedLogs,
-      total,
-      page,
-      totalPages,
-    })
-  } catch {
-    return serverError('فشل في جلب سجل المراجعة')
+  if (action) {
+    where.action = action
   }
-})
+
+  if (entity) {
+    where.entity = entity
+  }
+
+  if (search) {
+    where.OR = [
+      { userName: { contains: search } },
+      { details: { contains: search } },
+      { entityId: { contains: search } },
+    ]
+  }
+
+  if (startDate || endDate) {
+    where.createdAt = {}
+    if (startDate) {
+      ;(where.createdAt as Record<string, unknown>).gte = new Date(startDate + 'T00:00:00.000Z')
+    }
+    if (endDate) {
+      ;(where.createdAt as Record<string, unknown>).lte = new Date(endDate + 'T23:59:59.999Z')
+    }
+  }
+
+  const skip = (page - 1) * limit
+
+  const [logs, total] = await Promise.all([
+    db.auditLog.findMany({
+      where: Object.keys(where).length > 0 ? where : undefined,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    db.auditLog.count({
+      where: Object.keys(where).length > 0 ? where : undefined,
+    }),
+  ])
+
+  const totalPages = Math.ceil(total / limit)
+
+  // Format logs
+  const formattedLogs = logs.map((log) => {
+    let parsedDetails: Record<string, unknown> | null = null
+    try {
+      parsedDetails = log.details ? JSON.parse(log.details) : null
+    } catch {
+      parsedDetails = null
+    }
+
+    return {
+      id: log.id,
+      action: log.action,
+      entity: log.entity,
+      entityId: log.entityId,
+      details: parsedDetails,
+      userName: log.userName,
+      ipAddress: log.ipAddress,
+      createdAt: log.createdAt.toLocaleString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }),
+      createdAtRaw: log.createdAt.toISOString(),
+    }
+  })
+
+  return successResponse({
+    logs: formattedLogs,
+    total,
+    page,
+    totalPages,
+  })
+}, 'فشل في جلب سجل المراجعة'))
 
 // ── POST: Create a new audit log entry (admin only) ─────────────────
-export const POST = withAuth(async (request: NextRequest) => {
-  try {
-    const body = await request.json()
-    const validation = validateBody(createAuditLogSchema, body)
-    if (!validation.success) {
-      return errorResponse(validation.error)
-    }
-
-    const { action, entity, entityId, details, userName, ipAddress } = validation.data
-    const user = getRequestUser(request)
-
-    const log = await db.auditLog.create({
-      data: {
-        action,
-        entity,
-        entityId: entityId || null,
-        details: details ? JSON.stringify(details) : null,
-        userName: userName || user?.username || null,
-        ipAddress: ipAddress || null,
-      },
-    })
-
-    return successResponse(log, 201)
-  } catch {
-    return serverError('فشل في إنشاء سجل مراجعة')
+export const POST = withAuth(tryCatch(async (request) => {
+  const body = await request.json()
+  const validation = validateBody(createAuditLogSchema, body)
+  if (!validation.success) {
+    return errorResponse(validation.error)
   }
-}, { requireAdmin: true })
+
+  const { action, entity, entityId, details, userName, ipAddress } = validation.data
+  const user = getRequestUser(request)
+
+  const log = await db.auditLog.create({
+    data: {
+      action,
+      entity,
+      entityId: entityId || null,
+      details: details ? JSON.stringify(details) : null,
+      userName: userName || user?.username || null,
+      ipAddress: ipAddress || null,
+    },
+  })
+
+  return successResponse(log, 201)
+}, 'فشل في إنشاء سجل مراجعة'), { requireAdmin: true })

@@ -1,87 +1,83 @@
-import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { withAuth, getRequestUser } from '@/lib/auth-middleware'
-import { successResponse, serverError } from '@/lib/api-response'
+import { successResponse } from '@/lib/api-response'
 import { logAction } from '@/lib/audit-logger'
+import { tryCatch } from '@/lib/api-error-handler'
 
 // GET /api/backup — Export all data as a JSON backup (admin only)
-export const GET = withAuth(async (request: NextRequest) => {
-  try {
-    const user = getRequestUser(request)
+export const GET = withAuth(tryCatch(async (request) => {
+  const user = getRequestUser(request)
 
-    const [users, categories, products, customers, suppliers, invoices, invoiceItems, payments] =
-      await Promise.all([
-        // SECURITY: Exclude password field from backup export
-        db.user.findMany({
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            role: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
+  const [users, categories, products, customers, suppliers, invoices, invoiceItems, payments] =
+    await Promise.all([
+      // SECURITY: Exclude password field from backup export
+      db.user.findMany({
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      db.category.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.product.findMany({
+        orderBy: { createdAt: 'asc' },
+        include: { category: { select: { id: true, name: true, icon: true } } },
+      }),
+      db.customer.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.supplier.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.invoice.findMany({
+        orderBy: { createdAt: 'asc' },
+        include: {
+          items: {
+            include: { product: { select: { id: true, name: true } } },
           },
-        }),
-        db.category.findMany({ orderBy: { createdAt: 'asc' } }),
-        db.product.findMany({
-          orderBy: { createdAt: 'asc' },
-          include: { category: { select: { id: true, name: true, icon: true } } },
-        }),
-        db.customer.findMany({ orderBy: { createdAt: 'asc' } }),
-        db.supplier.findMany({ orderBy: { createdAt: 'asc' } }),
-        db.invoice.findMany({
-          orderBy: { createdAt: 'asc' },
-          include: {
-            items: {
-              include: { product: { select: { id: true, name: true } } },
-            },
-          },
-        }),
-        db.invoiceItem.findMany(),
-        db.payment.findMany({ orderBy: { createdAt: 'asc' } }),
-      ])
+        },
+      }),
+      db.invoiceItem.findMany(),
+      db.payment.findMany({ orderBy: { createdAt: 'asc' } }),
+    ])
 
-    // Serialize dates to ISO strings for JSON
-    const serialize = (obj: unknown) => JSON.parse(JSON.stringify(obj))
+  // Serialize dates to ISO strings for JSON
+  const serialize = (obj: unknown) => JSON.parse(JSON.stringify(obj))
 
-    const backup = {
-      backupDate: new Date().toISOString(),
-      version: '1.0.0',
-      app: 'السلطان للمشروبات',
-      data: {
-        users: serialize(users),
-        categories: serialize(categories),
-        products: serialize(products),
-        customers: serialize(customers),
-        suppliers: serialize(suppliers),
-        invoices: serialize(invoices),
-        invoiceItems: serialize(invoiceItems),
-        payments: serialize(payments),
-      },
-      summary: {
-        users: users.length,
-        categories: categories.length,
-        products: products.length,
-        customers: customers.length,
-        suppliers: suppliers.length,
-        invoices: invoices.length,
-        invoiceItems: invoiceItems.length,
-        payments: payments.length,
-      },
-    }
-
-    logAction({
-      action: 'backup',
-      entity: 'System',
-      userId: user?.userId,
-      userName: user?.username,
-      details: { type: 'manual', summary: backup.summary },
-    })
-
-    return successResponse(backup)
-  } catch {
-    return serverError('فشل في إنشاء النسخة الاحتياطية')
+  const backup = {
+    backupDate: new Date().toISOString(),
+    version: '1.0.0',
+    app: 'السلطان للمشروبات',
+    data: {
+      users: serialize(users),
+      categories: serialize(categories),
+      products: serialize(products),
+      customers: serialize(customers),
+      suppliers: serialize(suppliers),
+      invoices: serialize(invoices),
+      invoiceItems: serialize(invoiceItems),
+      payments: serialize(payments),
+    },
+    summary: {
+      users: users.length,
+      categories: categories.length,
+      products: products.length,
+      customers: customers.length,
+      suppliers: suppliers.length,
+      invoices: invoices.length,
+      invoiceItems: invoiceItems.length,
+      payments: payments.length,
+    },
   }
-}, { requireAdmin: true })
+
+  logAction({
+    action: 'backup',
+    entity: 'System',
+    userId: user?.userId,
+    userName: user?.username,
+    details: { type: 'manual', summary: backup.summary },
+  })
+
+  return successResponse(backup)
+}, 'فشل في إنشاء النسخة الاحتياطية'), { requireAdmin: true })

@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { hashPassword } from '@/lib/auth'
+import { db } from "@/lib/db"
+import { hashPassword } from "@/lib/auth"
+import { tryCatch } from "@/lib/api-error-handler"
+import { successResponse } from "@/lib/api-response"
+import { withAuth } from "@/lib/auth-middleware"
 
 /**
  * POST /api/auth/seed-passwords
@@ -8,10 +10,10 @@ import { hashPassword } from '@/lib/auth'
  * One-time migration endpoint: hashes all plaintext passwords in the DB.
  * Run once after deploying the auth system, then delete this file.
  *
- * ⚠️ This endpoint is PUBLIC by design — it should only exist temporarily.
+ * Protected with admin-only auth so it can't be called by non-admin users.
  */
-export async function POST() {
-  try {
+export const POST = withAuth(
+  tryCatch(async () => {
     const users = await db.user.findMany({
       select: { id: true, username: true, password: true },
     })
@@ -19,7 +21,7 @@ export async function POST() {
     const results: Array<{ username: string; hashed: boolean }> = []
 
     for (const user of users) {
-      if (user.password.startsWith('$2')) {
+      if (user.password.startsWith("$2")) {
         results.push({ username: user.username, hashed: false })
         continue
       }
@@ -31,16 +33,13 @@ export async function POST() {
       results.push({ username: user.username, hashed: true })
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `تمت عملية تهيئة كلمات المرور`,
+    return successResponse({
+      message: "تمت عملية تهيئة كلمات المرور",
       processed: results.length,
       hashed: results.filter((r) => r.hashed).length,
       alreadyHashed: results.filter((r) => !r.hashed).length,
       details: results,
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to seed passwords'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
-  }
-}
+  }, "فشل في تهيئة كلمات المرور"),
+  { requireAdmin: true }
+)

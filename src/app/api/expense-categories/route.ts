@@ -1,10 +1,10 @@
-import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { withAuth, getRequestUser } from '@/lib/auth-middleware'
-import { successResponse, errorResponse, serverError } from '@/lib/api-response'
+import { successResponse, errorResponse } from '@/lib/api-response'
 import { validateBody } from '@/lib/validations'
 import { createExpenseCategorySchema, updateExpenseCategorySchema } from '@/lib/validations'
 import { logAction } from '@/lib/audit-logger'
+import { tryCatch } from '@/lib/api-error-handler'
 
 const DEFAULT_CATEGORIES = [
   { name: 'إيجار', icon: 'Home', color: '#3b82f6', monthlyBudget: 500000 },
@@ -16,33 +16,29 @@ const DEFAULT_CATEGORIES = [
   { name: 'متنوع', icon: 'MoreHorizontal', color: '#6b7280', monthlyBudget: 100000 },
 ]
 
-export const GET = withAuth(async () => {
-  try {
-    const categories = await db.expenseCategory.findMany({
-      include: { _count: { select: { expenses: true } } },
-      orderBy: { createdAt: 'asc' },
-    })
+export const GET = withAuth(tryCatch(async () => {
+  const categories = await db.expenseCategory.findMany({
+    include: { _count: { select: { expenses: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
 
-    return successResponse(categories)
-  } catch {
-    return serverError('فشل في تحميل فئات المصروفات')
+  return successResponse(categories)
+}, 'فشل في تحميل فئات المصروفات'))
+
+export const POST = withAuth(tryCatch(async (request) => {
+  const body = await request.json()
+  const user = getRequestUser(request)
+  const userId = user?.userId || ''
+  const userName = user?.username
+
+  const validation = validateBody(createExpenseCategorySchema, body)
+  if (!validation.success) {
+    return errorResponse(validation.error)
   }
-})
 
-export const POST = withAuth(async (request: NextRequest) => {
+  const { name, description, icon, color, monthlyBudget, isActive } = validation.data
+
   try {
-    const body = await request.json()
-    const user = getRequestUser(request)
-    const userId = user?.userId || ''
-    const userName = user?.username
-
-    const validation = validateBody(createExpenseCategorySchema, body)
-    if (!validation.success) {
-      return errorResponse(validation.error)
-    }
-
-    const { name, description, icon, color, monthlyBudget, isActive } = validation.data
-
     const category = await db.expenseCategory.create({
       data: {
         name: name.trim(),
@@ -69,35 +65,32 @@ export const POST = withAuth(async (request: NextRequest) => {
     if (error instanceof Error && error.message.includes('Unique constraint')) {
       return errorResponse('هذه الفئة موجودة بالفعل', 409)
     }
-    if (error instanceof Error) {
-      return errorResponse(error.message)
-    }
-    return serverError('فشل في إنشاء فئة المصروفات')
+    throw error
   }
-})
+}, 'فشل في إنشاء فئة المصروفات'))
 
-export const PUT = withAuth(async (request: NextRequest) => {
+export const PUT = withAuth(tryCatch(async (request) => {
+  const body = await request.json()
+  const user = getRequestUser(request)
+  const userId = user?.userId || ''
+  const userName = user?.username
+
+  const validation = validateBody(updateExpenseCategorySchema, body)
+  if (!validation.success) {
+    return errorResponse(validation.error)
+  }
+
+  const { id, name, description, icon, color, monthlyBudget, isActive } = validation.data
+
+  const data: Record<string, unknown> = {}
+  if (name !== undefined) data.name = name.trim()
+  if (description !== undefined) data.description = description?.trim() || null
+  if (icon !== undefined) data.icon = icon
+  if (color !== undefined) data.color = color
+  if (monthlyBudget !== undefined) data.monthlyBudget = monthlyBudget ? Number(monthlyBudget) : null
+  if (isActive !== undefined) data.isActive = isActive
+
   try {
-    const body = await request.json()
-    const user = getRequestUser(request)
-    const userId = user?.userId || ''
-    const userName = user?.username
-
-    const validation = validateBody(updateExpenseCategorySchema, body)
-    if (!validation.success) {
-      return errorResponse(validation.error)
-    }
-
-    const { id, name, description, icon, color, monthlyBudget, isActive } = validation.data
-
-    const data: Record<string, unknown> = {}
-    if (name !== undefined) data.name = name.trim()
-    if (description !== undefined) data.description = description?.trim() || null
-    if (icon !== undefined) data.icon = icon
-    if (color !== undefined) data.color = color
-    if (monthlyBudget !== undefined) data.monthlyBudget = monthlyBudget ? Number(monthlyBudget) : null
-    if (isActive !== undefined) data.isActive = isActive
-
     const category = await db.expenseCategory.update({
       where: { id },
       data,
@@ -118,46 +111,36 @@ export const PUT = withAuth(async (request: NextRequest) => {
     if (error instanceof Error && error.message.includes('Unique constraint')) {
       return errorResponse('هذه الفئة موجودة بالفعل', 409)
     }
-    if (error instanceof Error) {
-      return errorResponse(error.message)
-    }
-    return serverError('فشل في تحديث فئة المصروفات')
+    throw error
   }
-})
+}, 'فشل في تحديث فئة المصروفات'))
 
-export const DELETE = withAuth(async (request: NextRequest) => {
-  try {
-    const user = getRequestUser(request)
-    const userId = user?.userId || ''
-    const userName = user?.username
+export const DELETE = withAuth(tryCatch(async (request) => {
+  const user = getRequestUser(request)
+  const userId = user?.userId || ''
+  const userName = user?.username
 
-    const body = await request.json()
-    const { id } = body
+  const body = await request.json()
+  const { id } = body
 
-    if (!id) {
-      return errorResponse('معرف الفئة مطلوب')
-    }
-
-    const expenseCount = await db.expense.count({ where: { categoryId: id } })
-    if (expenseCount > 0) {
-      return errorResponse(`لا يمكن حذف هذه الفئة لأنها مرتبطة بـ ${expenseCount} مصروف`)
-    }
-
-    await db.expenseCategory.delete({ where: { id } })
-
-    await logAction({
-      action: 'delete',
-      entity: 'ExpenseCategory',
-      entityId: id,
-      userId,
-      userName,
-    })
-
-    return successResponse({ message: 'تم حذف الفئة بنجاح' })
-  } catch (error) {
-    if (error instanceof Error) {
-      return errorResponse(error.message)
-    }
-    return serverError('فشل في حذف فئة المصروفات')
+  if (!id) {
+    return errorResponse('معرف الفئة مطلوب')
   }
-})
+
+  const expenseCount = await db.expense.count({ where: { categoryId: id } })
+  if (expenseCount > 0) {
+    return errorResponse(`لا يمكن حذف هذه الفئة لأنها مرتبطة بـ ${expenseCount} مصروف`)
+  }
+
+  await db.expenseCategory.delete({ where: { id } })
+
+  await logAction({
+    action: 'delete',
+    entity: 'ExpenseCategory',
+    entityId: id,
+    userId,
+    userName,
+  })
+
+  return successResponse({ message: 'تم حذف الفئة بنجاح' })
+}, 'فشل في حذف فئة المصروفات'))

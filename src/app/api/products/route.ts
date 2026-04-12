@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logAction } from "@/lib/audit-logger";
 import { withAuth, getRequestUser } from "@/lib/auth-middleware";
@@ -10,253 +9,234 @@ import {
   deleteProductsSchema,
 } from "@/lib/validations";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { tryCatch } from "@/lib/api-error-handler";
 
 /**
  * GET /api/products — List products with filters
  */
-export const GET = withAuth(async (request: NextRequest) => {
-  try {
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
-    const categoryId = searchParams.get("categoryId") || "";
-    const lowStock = searchParams.get("lowStock") === "true";
-    const barcode = searchParams.get("barcode") || "";
+export const GET = withAuth(tryCatch(async (request) => {
+  const { searchParams } = new URL(request.url);
+  const search = searchParams.get("search") || "";
+  const categoryId = searchParams.get("categoryId") || "";
+  const lowStock = searchParams.get("lowStock") === "true";
+  const barcode = searchParams.get("barcode") || "";
 
-    const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {};
 
-    if (search) where.name = { contains: search };
-    if (categoryId) where.categoryId = categoryId;
-    if (lowStock) {
-      where.quantity = { lte: 5 };
-      where.isActive = true;
-    }
-    if (barcode) where.barcode = barcode;
-
-    const products = await db.product.findMany({
-      where: Object.keys(where).length > 0 ? where : undefined,
-      include: {
-        category: true,
-        _count: { select: { variants: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return successResponse(products);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في تحميل المنتجات";
-    return errorResponse(message, 500);
+  if (search) where.name = { contains: search };
+  if (categoryId) where.categoryId = categoryId;
+  if (lowStock) {
+    where.quantity = { lte: 5 };
+    where.isActive = true;
   }
-});
+  if (barcode) where.barcode = barcode;
+
+  const products = await db.product.findMany({
+    where: Object.keys(where).length > 0 ? where : undefined,
+    include: {
+      category: true,
+      _count: { select: { variants: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return successResponse(products);
+}, 'فشل في تحميل المنتجات'));
 
 /**
  * POST /api/products — Create single product OR bulk import
  */
-export const POST = withAuth(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const user = getRequestUser(request);
+export const POST = withAuth(tryCatch(async (request) => {
+  const body = await request.json();
+  const user = getRequestUser(request);
 
-    // ── Bulk import ──
-    const bulkCheck = validateBody(bulkImportSchema, body);
-    if (bulkCheck.success) {
-      const { products } = bulkCheck.data;
-      let created = 0;
-      let skipped = 0;
+  // ── Bulk import ──
+  const bulkCheck = validateBody(bulkImportSchema, body);
+  if (bulkCheck.success) {
+    const { products } = bulkCheck.data;
+    let created = 0;
+    let skipped = 0;
 
-      const existingProducts = await db.product.findMany({ select: { name: true } });
-      const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
+    const existingProducts = await db.product.findMany({ select: { name: true } });
+    const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
 
-      for (const item of products) {
-        const name = item.name.trim();
-        if (!name || existingNames.has(name.toLowerCase())) {
-          skipped++;
-          continue;
-        }
-
-        try {
-          await db.product.create({
-            data: {
-              name,
-              categoryId: item.categoryId || '',
-              price: item.price,
-              costPrice: item.costPrice || 0,
-              quantity: item.quantity || 0,
-              minQuantity: 5,
-              barcode: item.barcode?.trim() || null,
-            },
-          });
-          existingNames.add(name.toLowerCase());
-          created++;
-        } catch {
-          skipped++;
-        }
+    for (const item of products) {
+      const name = item.name.trim();
+      if (!name || existingNames.has(name.toLowerCase())) {
+        skipped++;
+        continue;
       }
 
-      logAction({
-        action: "bulk_import",
-        entity: "Product",
-        userId: user?.userId,
-        userName: user?.username,
-        details: { created, skipped, total: products.length },
-      });
-
-      return successResponse({ created, skipped }, 201);
+      try {
+        await db.product.create({
+          data: {
+            name,
+            categoryId: item.categoryId || '',
+            price: item.price,
+            costPrice: item.costPrice || 0,
+            quantity: item.quantity || 0,
+            minQuantity: 5,
+            barcode: item.barcode?.trim() || null,
+          },
+        });
+        existingNames.add(name.toLowerCase());
+        created++;
+      } catch {
+        skipped++;
+      }
     }
 
-    // ── Single product creation ──
-    const validation = validateBody(createProductSchema, body);
-    if (!validation.success) return errorResponse(validation.error, 422);
-
-    const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = validation.data;
-
-    const product = await db.product.create({
-      data: {
-        name,
-        categoryId: categoryId || '',
-        price,
-        costPrice,
-        quantity: quantity ?? 0,
-        minQuantity: minQuantity ?? 5,
-        barcode,
-        image,
-      },
-    });
-
     logAction({
-      action: "create",
+      action: "bulk_import",
       entity: "Product",
-      entityId: product.id,
       userId: user?.userId,
       userName: user?.username,
-      details: { name, price, costPrice, quantity: quantity ?? 0 },
+      details: { created, skipped, total: products.length },
     });
 
-    return successResponse(product, 201);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في إنشاء المنتج";
-    return errorResponse(message, 500);
+    return successResponse({ created, skipped }, 201);
   }
-});
+
+  // ── Single product creation ──
+  const validation = validateBody(createProductSchema, body);
+  if (!validation.success) return errorResponse(validation.error, 422);
+
+  const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = validation.data;
+
+  const product = await db.product.create({
+    data: {
+      name,
+      categoryId: categoryId || '',
+      price,
+      costPrice,
+      quantity: quantity ?? 0,
+      minQuantity: minQuantity ?? 5,
+      barcode,
+      image,
+    },
+  });
+
+  logAction({
+    action: "create",
+    entity: "Product",
+    entityId: product.id,
+    userId: user?.userId,
+    userName: user?.username,
+    details: { name, price, costPrice, quantity: quantity ?? 0 },
+  });
+
+  return successResponse(product, 201);
+}, 'فشل في إنشاء المنتج'));
 
 /**
  * PATCH /api/products — Batch update (price change, category change, status)
  */
-export const PATCH = withAuth(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const user = getRequestUser(request);
-    const validation = validateBody(batchUpdateSchema, body);
-    if (!validation.success) return errorResponse(validation.error, 422);
+export const PATCH = withAuth(tryCatch(async (request) => {
+  const body = await request.json();
+  const user = getRequestUser(request);
+  const validation = validateBody(batchUpdateSchema, body);
+  if (!validation.success) return errorResponse(validation.error, 422);
 
-    const { ids, price, categoryId, isActive, priceChangeType, priceChangeValue } = validation.data;
+  const { ids, price, categoryId, isActive, priceChangeType, priceChangeValue } = validation.data;
 
-    // Build update data dynamically
-    const updateData: Record<string, unknown> = {};
+  // Build update data dynamically
+  const updateData: Record<string, unknown> = {};
 
-    if (priceChangeType && priceChangeValue !== undefined) {
-      if (priceChangeType === "fixed") {
-        updateData.price = Number(priceChangeValue);
-      } else if (priceChangeType === "percentage") {
-        const currentProducts = await db.product.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, price: true },
-        });
-
-        const priceUpdates = currentProducts.map((p) => {
-          const newPrice = Math.max(0, Number((p.price * (1 + Number(priceChangeValue) / 100)).toFixed(2)));
-          return db.product.update({ where: { id: p.id }, data: { price: newPrice } });
-        });
-
-        await Promise.all(priceUpdates);
-
-        logAction({
-          action: "batch_update",
-          entity: "Product",
-          userId: user?.userId,
-          userName: user?.username,
-          details: { ids, count: ids.length, priceChangeType, priceChangeValue },
-        });
-
-        return successResponse({ count: ids.length });
-      }
-    } else if (price !== undefined) {
-      updateData.price = Number(price);
-    }
-
-    if (categoryId) updateData.categoryId = categoryId;
-    if (isActive !== undefined) updateData.isActive = isActive;
-
-    let count = 0;
-    if (Object.keys(updateData).length > 0) {
-      const result = await db.product.updateMany({
+  if (priceChangeType && priceChangeValue !== undefined) {
+    if (priceChangeType === "fixed") {
+      updateData.price = Number(priceChangeValue);
+    } else if (priceChangeType === "percentage") {
+      const currentProducts = await db.product.findMany({
         where: { id: { in: ids } },
-        data: updateData,
+        select: { id: true, price: true },
       });
-      count = result.count;
-    } else {
-      return errorResponse("لا توجد تغييرات للتطبيق");
+
+      const priceUpdates = currentProducts.map((p) => {
+        const newPrice = Math.max(0, Number((p.price * (1 + Number(priceChangeValue) / 100)).toFixed(2)));
+        return db.product.update({ where: { id: p.id }, data: { price: newPrice } });
+      });
+
+      await Promise.all(priceUpdates);
+
+      logAction({
+        action: "batch_update",
+        entity: "Product",
+        userId: user?.userId,
+        userName: user?.username,
+        details: { ids, count: ids.length, priceChangeType, priceChangeValue },
+      });
+
+      return successResponse({ count: ids.length });
     }
-
-    logAction({
-      action: "batch_update",
-      entity: "Product",
-      userId: user?.userId,
-      userName: user?.username,
-      details: { ids, count, priceChangeType: priceChangeType || null, newCategoryId: categoryId || null, newIsActive: isActive ?? null },
-    });
-
-    return successResponse({ count });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في تحديث المنتجات";
-    return errorResponse(message, 500);
+  } else if (price !== undefined) {
+    updateData.price = Number(price);
   }
-});
+
+  if (categoryId) updateData.categoryId = categoryId;
+  if (isActive !== undefined) updateData.isActive = isActive;
+
+  let count = 0;
+  if (Object.keys(updateData).length > 0) {
+    const result = await db.product.updateMany({
+      where: { id: { in: ids } },
+      data: updateData,
+    });
+    count = result.count;
+  } else {
+    return errorResponse("لا توجد تغييرات للتطبيق");
+  }
+
+  logAction({
+    action: "batch_update",
+    entity: "Product",
+    userId: user?.userId,
+    userName: user?.username,
+    details: { ids, count, priceChangeType: priceChangeType || null, newCategoryId: categoryId || null, newIsActive: isActive ?? null },
+  });
+
+  return successResponse({ count });
+}, 'فشل في تحديث المنتجات'));
 
 /**
  * DELETE /api/products — Bulk delete (single ID or array of IDs)
  */
-export const DELETE = withAuth(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const user = getRequestUser(request);
-    const validation = validateBody(deleteProductsSchema, body);
-    if (!validation.success) return errorResponse(validation.error);
+export const DELETE = withAuth(tryCatch(async (request) => {
+  const body = await request.json();
+  const user = getRequestUser(request);
+  const validation = validateBody(deleteProductsSchema, body);
+  if (!validation.success) return errorResponse(validation.error);
 
-    const { id, ids } = validation.data;
+  const { id, ids } = validation.data;
 
-    if (ids && ids.length > 0) {
-      const result = await db.product.deleteMany({ where: { id: { in: ids } } });
+  if (ids && ids.length > 0) {
+    const result = await db.product.deleteMany({ where: { id: { in: ids } } });
 
-      logAction({
-        action: "bulk_delete",
-        entity: "Product",
-        userId: user?.userId,
-        userName: user?.username,
-        details: { reason: `حذف ${result.count} منتج دفعة واحدة`, ids },
-      });
+    logAction({
+      action: "bulk_delete",
+      entity: "Product",
+      userId: user?.userId,
+      userName: user?.username,
+      details: { reason: `حذف ${result.count} منتج دفعة واحدة`, ids },
+    });
 
-      return successResponse({ count: result.count });
-    }
-
-    if (id) {
-      const existing = await db.product.findUnique({ where: { id } });
-      await db.product.delete({ where: { id } });
-
-      logAction({
-        action: "delete",
-        entity: "Product",
-        entityId: id,
-        userId: user?.userId,
-        userName: user?.username,
-        details: { name: existing?.name },
-      });
-
-      return successResponse({ deleted: true });
-    }
-
-    return errorResponse("يرجى تحديد منتج واحد على الأقل");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "فشل في حذف المنتج(ات)";
-    return errorResponse(message, 500);
+    return successResponse({ count: result.count });
   }
-});
+
+  if (id) {
+    const existing = await db.product.findUnique({ where: { id } });
+    await db.product.delete({ where: { id } });
+
+    logAction({
+      action: "delete",
+      entity: "Product",
+      entityId: id,
+      userId: user?.userId,
+      userName: user?.username,
+      details: { name: existing?.name },
+    });
+
+    return successResponse({ deleted: true });
+  }
+
+  return errorResponse("يرجى تحديد منتج واحد على الأقل");
+}, 'فشل في حذف المنتج(ات)'));
