@@ -44,3 +44,72 @@ Stage Summary:
 - 5 dialog components extracted with full internal state management
 - customers-screen.tsx reduced from 1571 to 719 lines
 - All styling, class names, and behavior preserved exactly
+
+---
+Task ID: 3-b
+Agent: Main
+Task: Extract dialogs from purchases-screen.tsx into separate files
+
+Work Log:
+- Created 4 new dialog files in src/screens/purchases/:
+  - supplier-form-dialog.tsx (176 lines) — merged Add/Edit supplier form
+  - supplier-payment-dialog.tsx (159 lines) — Record payment with API calls
+  - payment-history-dialog.tsx (97 lines) — Payment history with fetch on open
+  - rating-dialog.tsx (136 lines) — Supplier rating with star selection
+- Updated purchases-screen.tsx: 1352 → 828 lines (39% reduction)
+- Removed unused imports (Textarea, Dialog components, Banknote, Globe, Phone, Star)
+- Fixed react-hooks/set-state-in-effect lint error using async IIFE pattern
+
+Stage Summary:
+- 4 dialog components extracted with internal state management
+- purchases-screen.tsx reduced from 1352 to 828 lines
+
+---
+Task ID: 3-c
+Agent: Main
+Task: Extract dialogs from invoices-screen.tsx into separate files
+
+Work Log:
+- Created 3 new files in src/screens/invoices/:
+  - print-invoice.ts (258 lines) — Print template generation function (not a component)
+  - invoice-detail-dialog.tsx (186 lines) — Invoice detail view with print button
+  - return-dialog.tsx (165 lines) — Return processing with product selection
+- Updated invoices-screen.tsx: 1132 → 480 lines (58% reduction)
+- Moved all invoice-specific types/functions to the subdirectory
+- Print template now uses settings from useAppStore
+
+Stage Summary:
+- 3 files extracted (1 helper function, 2 dialog components)
+- invoices-screen.tsx reduced from 1132 to 480 lines
+- This was the biggest reduction percentage of the 3 screens
+
+---
+Task ID: 4
+Agent: Main
+Task: Verify Phase 11 with TypeScript and lint checks
+
+Work Log:
+- Ran `npx tsc --noEmit` — 0 errors
+- Ran `bun run lint` — initially 1 error (set-state-in-effect in purchases/payment-history-dialog.tsx)
+- Fixed using async IIFE pattern consistent with existing customer dialogs
+- Re-ran lint — 0 errors
+- Started dev server — compiles clean, no runtime errors
+
+Stage Summary:
+- All 12 new files compile cleanly
+- All 3 updated screens compile cleanly
+- tsc: 0 errors, lint: 0 errors
+
+---
+Task ID: 6
+Agent: Main
+Task: Push Phase 11 to GitHub
+
+Work Log:
+- Committed all 18 changed files with detailed commit message
+- Pushed to origin/main: 3a5fe1e..125b1ed
+- Total reduction: 4055 → 2027 lines (-50%)
+
+Stage Summary:
+- Phase 11 complete and pushed to GitHub
+- Ready for Phase 12 (form validation extraction)
