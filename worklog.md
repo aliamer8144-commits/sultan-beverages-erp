@@ -173,3 +173,41 @@ Stage Summary:
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
 - Total: 4304 insertions, 4503 deletions (net -199 lines of boilerplate)
 - Pushed to GitHub as commit f64f21c
+
+---
+Task ID: 14
+Agent: Main + 8 Sub-agents
+Task: Phase 14 — Prisma Query Performance Optimization
+
+Work Log:
+- Phase 14-A: Fixed critical N+1 loops (5 files):
+  - expenses/route.ts: 36 sequential queries → 3 parallel groupBy
+  - invoices/route.ts POST: N+1 loop → pre-fetch + batch update (60→3)
+  - products/route.ts bulk: N creates → createMany (100→1)
+  - restore/route.ts: 950+ sequential INSERTs → createMany per entity (~10)
+  - sales-targets/route.ts: N+1 aggregates → single fetch + in-memory
+- Phase 14-B: Added pagination + fixed duplicates (7 API + 3 frontend):
+  - invoices, products, customers, suppliers: page/limit/total/totalPages
+  - customer-payments, supplier-payments: page/limit/total/totalPages
+  - daily-close: 3 duplicate invoice queries → 1 findMany
+  - supplier-rating: findMany for avg → aggregate with _avg
+  - backup: duplicate invoiceItem fetch removed
+  - global-search: 4 sequential → parallel Promise.all
+- Phase 14-C: Dashboard + Analytics optimization (4 files):
+  - dashboard: 9 sequential → 2 Promise.all blocks + SQL aggregation
+  - dashboard: unbounded salesByCategoryRaw → groupBy + take(100)
+  - dashboard: unbounded monthlyInvoices → $queryRaw SQL aggregation
+  - analytics: raw data fetch → 8 targeted SQL aggregations
+  - customer-statement, loyalty: sequential → Promise.all
+- Phase 14-D: Medium/low optimizations (3 files):
+  - supplier-payments POST: sequential updates → pre-compute + Promise.all
+  - stock-alerts: fetch all + filter → $queryRaw WHERE
+  - customer-payments GET: added pagination
+
+Stage Summary:
+- 20 API route files optimized
+- 7 frontend files updated for pagination
+- 27 files total changed
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- Total: 1227 insertions, 743 deletions
+- Pushed to GitHub as commit 24c0a4c
