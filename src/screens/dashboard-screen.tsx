@@ -7,15 +7,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
+import { VerticalBarChart, HorizontalBarChart, DonutChart } from '@/components/charts'
 import { DollarSign, TrendingUp, FileText, AlertTriangle, RefreshCw, Download, Target, Clock, Flame } from 'lucide-react'
 import { ExchangeRateWidget } from '@/components/exchange-rate-widget'
 import { exportToCSV } from '@/lib/export-csv'
 import {
   formatCurrency,
-  ChartTooltip,
-  PieTooltip,
-  CustomLegend,
+  ChartTooltipContent,
   SummaryCardSkeleton,
   ChartSkeleton,
   StatCard,
@@ -78,19 +76,6 @@ interface DashboardData {
   recentSales: RecentSale[]
   monthlySales: MonthlySale[]
   salesByCategory: CategorySale[]
-}
-
-function TopProductTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload?: { name?: string } }> }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload?.name}</p>
-      <p className="text-sm font-bold text-foreground">
-        {item.value} وحدة
-      </p>
-    </div>
-  )
 }
 
 // ─── Sales Target Widget ─────────────────────────────────────────
@@ -377,34 +362,16 @@ export function DashboardScreen() {
                 <p className="text-xs text-muted-foreground">إجمالي المبيعات خلال آخر 6 أشهر</p>
               </CardHeader>
               <CardContent className="p-6 pt-2">
-                <div className="h-[280px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.monthlySales} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'oklch(0.55 0.2 260 / 8%)' }} />
-                      <Bar
-                        dataKey="total"
-                        radius={[8, 8, 0, 0]}
-                        maxBarSize={50}
-                        fill="#3b5bdb"
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <VerticalBarChart
+                  data={data.monthlySales}
+                  dataKey="total"
+                  labelKey="month"
+                  color="#3b5bdb"
+                  height={280}
+                  emptyIcon={TrendingUp}
+                  emptyTitle="لا توجد بيانات مبيعات بعد"
+                  emptyDescription="ستظهر المبيعات الشهرية هنا بعد تسجيل أول عملية بيع"
+                />
               </CardContent>
             </Card>
             </div>
@@ -417,56 +384,19 @@ export function DashboardScreen() {
                 <p className="text-xs text-muted-foreground">أكثر 5 منتجات مبيعاً حسب الكمية</p>
               </CardHeader>
               <CardContent className="p-6 pt-2">
-                <div className="h-[280px] w-full">
-                  {data.topProducts.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={data.topProducts}
-                        layout="vertical"
-                        margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" horizontal={false} />
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          tick={{ fontSize: 11, fill: 'oklch(0.35 0.01 260)' }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={100}
-                        />
-                        <Tooltip content={<TopProductTooltip />} cursor={{ fill: 'oklch(0.55 0.2 260 / 8%)' }} />
-                        <Bar
-                          dataKey="quantity"
-                          radius={[0, 8, 8, 0]}
-                          maxBarSize={30}
-                          animationDuration={800}
-                          animationEasing="ease-out"
-                          animationBegin={200}
-                        >
-                          {data.topProducts.map((_, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState
-                      icon={TrendingUp}
-                      title="لا توجد بيانات مبيعات بعد"
-                      description="ستظهر أفضل المنتجات مبيعاً هنا بعد تسجيل أول عملية بيع"
-                      className="h-full"
-                    />
-                  )}
-                </div>
+                <HorizontalBarChart
+                  data={data.topProducts}
+                  dataKey="quantity"
+                  labelKey="name"
+                  colors={CHART_COLORS}
+                  height={280}
+                  maxBarSize={30}
+                  animationBegin={200}
+                  tooltipSuffix="وحدة"
+                  emptyIcon={TrendingUp}
+                  emptyTitle="لا توجد بيانات مبيعات بعد"
+                  emptyDescription="ستظهر أفضل المنتجات مبيعاً هنا بعد تسجيل أول عملية بيع"
+                />
               </CardContent>
             </Card>
             </div>
@@ -489,40 +419,16 @@ export function DashboardScreen() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-2">
-                <div className="h-[320px] w-full">
-                  {data.salesByCategory && data.salesByCategory.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={data.salesByCategory}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={3}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {data.salesByCategory.map((_, index) => (
-                            <Cell
-                              key={`pie-cell-${index}`}
-                              fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<PieTooltip />} />
-                        <Legend content={<CustomLegend />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState
-                      icon={DollarSign}
-                      title="لا توجد بيانات مبيعات بعد"
-                      description="سيظهر توزيع المبيعات حسب الفئة هنا بعد تسجيل أول عملية بيع"
-                      className="h-full"
-                    />
-                  )}
-                </div>
+                <DonutChart
+                  data={data.salesByCategory ?? []}
+                  dataKey="value"
+                  nameKey="name"
+                  colors={CHART_COLORS}
+                  height={320}
+                  emptyIcon={DollarSign}
+                  emptyTitle="لا توجد بيانات مبيعات بعد"
+                  emptyDescription="سيظهر توزيع المبيعات حسب الفئة هنا بعد تسجيل أول عملية بيع"
+                />
               </CardContent>
             </Card>
           </div>

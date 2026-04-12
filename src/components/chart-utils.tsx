@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatWithSettings, formatDualCurrency } from '@/lib/currency'
 import { useAppStore } from '@/store/app-store'
+import type { LucideIcon } from 'lucide-react'
 
 // ─── Animated Number Hook ────────────────────────────────────────────
 export function useAnimatedNumber(target: number, duration = 1200) {
@@ -53,93 +54,88 @@ export function dualFormat(amount: number): { primary: string; secondary: string
 // ─── Currency Format ─────────────────────────────────────────────────
 export const formatCurrency = formatWithSettings
 
-// ─── Chart Tooltip Components ─────────────────────────────────────────
+// ─── Color Palettes ──────────────────────────────────────────────────
 
+export const CHART_COLORS = [
+  '#3b5bdb', '#364fc7', '#5c7cfa', '#e03131', '#c92a2a',
+  '#0ca678', '#f08c00', '#9c36b5', '#1c7ed6', '#e8590c',
+]
+
+export const EXPENSE_COLORS = ['#e03131', '#f08c00', '#9c36b5', '#e8590c', '#1c7ed6', '#c92a2a', '#364fc7']
+
+// ─── Unified Chart Tooltip ───────────────────────────────────────────
+// Handles all tooltip types: currency, plain numbers with suffix, pie labels
 interface TooltipPayloadItem {
   value: number
-  payload?: { name?: string }
+  name?: string
+  dataKey?: string
+  payload?: Record<string, unknown>
 }
 
-export function ChartTooltip({
+export function ChartTooltipContent({
   active,
   payload,
   label,
+  suffix,
 }: {
   active?: boolean
-  payload?: Array<{ value: number; payload?: { name?: string } }>
+  payload?: TooltipPayloadItem[]
   label?: string
+  /** e.g. "وحدة" — switches to plain number formatting */
+  suffix?: string
 }) {
   if (!active || !payload?.length) return null
-  const dual = dualFormat(payload[0].value)
+  const item = payload[0]
+  const displayLabel = label ?? item.name ?? ''
+  const displayValue = suffix
+    ? `${item.value.toLocaleString('ar-SA')} ${suffix}`
+    : dualFormat(item.value).display
+
   return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{dual.display}</p>
+    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
+      {displayLabel && <p className="text-xs font-medium text-muted-foreground mb-1">{displayLabel}</p>}
+      <p className="text-sm font-bold text-foreground">{displayValue}</p>
     </div>
   )
 }
 
-export function PieTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean
-  payload?: Array<{ name: string; value: number; payload: { name: string; value: number } }>
-}) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  const dual = dualFormat(item.value)
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload.name}</p>
-      <p className="text-sm font-bold text-foreground">{dual.display}</p>
-    </div>
-  )
-}
+/** Backward-compatible alias */
+export const ChartTooltip = ChartTooltipContent
 
-export function BarTooltip({
-  active,
-  payload,
-  label,
-}: {
+/** Backward-compatible alias — Pie uses item.name from nameKey */
+export const PieTooltip = ChartTooltipContent
+
+// ─── Comparison Tooltip (multi-series bars) ──────────────────────────
+interface ComparisonTooltipProps {
   active?: boolean
-  payload?: Array<{ value: number; payload?: { name?: string } }>
+  payload?: Array<{ value: number; dataKey: string }>
   label?: string
-}) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">
-        {item.payload?.name || label}
-      </p>
-      <p className="text-sm font-bold text-foreground">{item.value} وحدة</p>
-    </div>
-  )
+  /** Override default Arabic labels */
+  labels?: Record<string, string>
 }
 
 export function ComparisonTooltip({
   active,
   payload,
   label,
-}: {
-  active?: boolean
-  payload?: Array<{ value: number; dataKey: string }>
-  label?: string
-}) {
+  labels,
+}: ComparisonTooltipProps) {
   if (!active || !payload?.length) return null
+  const defaultLabels: Record<string, string> = { sales: 'المبيعات', purchases: 'المشتريات' }
+  const resolvedLabels = { ...defaultLabels, ...labels }
   return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
+    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
       <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="text-sm font-bold text-foreground">
-          {item.dataKey === 'sales' ? 'المبيعات' : 'المشتريات'}: {dualFormat(item.value).display}
+          {resolvedLabels[item.dataKey] ?? item.dataKey}: {dualFormat(item.value).display}
         </p>
       ))}
     </div>
   )
 }
 
+// ─── Custom Legend ───────────────────────────────────────────────────
 export function CustomLegend({
   payload,
 }: {
@@ -147,7 +143,7 @@ export function CustomLegend({
 }) {
   if (!payload) return null
   return (
-    <div className="flex flex-wrap gap-3 justify-center mt-2">
+    <div className="flex flex-wrap gap-3 justify-center mt-2" dir="rtl">
       {payload.map((entry, index) => (
         <div key={index} className="flex items-center gap-1.5">
           <span
@@ -160,13 +156,6 @@ export function CustomLegend({
     </div>
   )
 }
-
-// ─── Chart Color Palette ─────────────────────────────────────────────
-
-export const CHART_COLORS = [
-  '#3b5bdb', '#364fc7', '#5c7cfa', '#e03131', '#c92a2a',
-  '#0ca678', '#f08c00', '#9c36b5', '#1c7ed6', '#e8590c',
-]
 
 // ─── Skeleton Components ─────────────────────────────────────────────
 
@@ -219,7 +208,6 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
 }
 
 // ─── Stat Card with Animated Number ──────────────────────────────────
-import type { LucideIcon } from 'lucide-react'
 
 export function StatCard({
   label,

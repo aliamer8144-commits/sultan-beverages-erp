@@ -26,27 +26,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import {
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  Legend,
-} from 'recharts'
+import { AreaTrendChart, DonutChart } from '@/components/charts'
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
 import { exportToCSV } from '@/lib/export-csv'
 import {
   formatCurrency,
-  ChartTooltip,
-  PieTooltip,
-  CustomLegend,
   SummaryCardSkeleton,
   ChartSkeleton,
   TableSkeleton,
@@ -114,8 +99,6 @@ function getDateRange(range: string): { from: string; to: string } {
 
   return { from, to }
 }
-
-// ── Chart tooltips & legends imported from @/components/chart-utils ──
 
 // ── Category Icon Component ────────────────────────────────────────
 
@@ -549,37 +532,17 @@ export function ExpenseScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {categoryChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {categoryChartData.map((entry, index) => (
-                          <Cell key={`pie-cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<PieTooltip />} />
-                      <Legend content={<CustomLegend />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    icon={Wallet}
-                    title="لا توجد مصروفات بعد"
-                    description="سيظهر توزيع المصروفات حسب الفئة هنا"
-                    className="h-full"
-                  />
-                )}
-              </div>
+              <DonutChart
+                data={categoryChartData}
+                dataKey="value"
+                nameKey="name"
+                height={280}
+                innerRadius={55}
+                outerRadius={85}
+                emptyIcon={Wallet}
+                emptyTitle="لا توجد مصروفات بعد"
+                emptyDescription="سيظهر توزيع المصروفات حسب الفئة هنا"
+              />
             </CardContent>
           </Card>
 
@@ -598,53 +561,22 @@ export function ExpenseScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {dailyTrendData.length > 0 && dailyTrendData.some((d) => d.total > 0) ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dailyTrendData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                      <defs>
-                        <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval={4}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val)}
-                      />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#3b82f6"
-                        strokeWidth={2.5}
-                        fill="url(#expenseGradient)"
-                        animationDuration={1000}
-                        animationEasing="ease-out"
-                        dot={false}
-                        activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    icon={TrendingDown}
-                    title="لا توجد بيانات كافية"
-                    description="سيظهر اتجاه المصروفات اليومي هنا"
-                    className="h-full"
-                  />
-                )}
-              </div>
+              <AreaTrendChart
+                data={dailyTrendData}
+                dataKey="total"
+                labelKey="date"
+                color="#3b82f6"
+                gradientId="expenseGradient"
+                height={280}
+                strokeWidth={2.5}
+                animationDuration={1000}
+                showDot
+                xAxisInterval={4}
+                yAxisFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val)}
+                emptyIcon={TrendingDown}
+                emptyTitle="لا توجد بيانات كافية"
+                emptyDescription="سيظهر اتجاه المصروفات اليومي هنا"
+              />
             </CardContent>
           </Card>
         </div>

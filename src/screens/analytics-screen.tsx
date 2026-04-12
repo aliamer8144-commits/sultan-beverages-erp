@@ -14,21 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
-} from 'recharts'
+import { AreaTrendChart, HorizontalBarChart, DonutChart } from '@/components/charts'
 import {
   BarChart3,
   RefreshCw,
@@ -46,11 +32,9 @@ import {
   Medal,
   ArrowUpDown,
 } from 'lucide-react'
-import { formatCurrency, CHART_COLORS, SummaryCardSkeleton, ChartSkeleton, TableSkeleton } from '@/components/chart-utils'
+import { formatCurrency, CHART_COLORS, EXPENSE_COLORS, SummaryCardSkeleton, ChartSkeleton, TableSkeleton } from '@/components/chart-utils'
 import { EmptyState } from '@/components/empty-state'
 import { useApi } from '@/hooks/use-api'
-
-const EXPENSE_COLORS = ['#e03131', '#f08c00', '#9c36b5', '#e8590c', '#1c7ed6', '#c92a2a', '#364fc7']
 
 // ─── Types ────────────────────────────────────────────────────────
 interface SalesByDayItem {
@@ -154,55 +138,6 @@ function getRankBadge(index: number) {
     </span>
   )
 }
-
-// ─── Custom Tooltips ──────────────────────────────────────────────
-function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(payload[0].value)}</p>
-    </div>
-  )
-}
-
-function BarTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload?: { category?: string } }> }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.payload?.category}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
-    </div>
-  )
-}
-
-function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {
-  if (!active || !payload?.length) return null
-  const item = payload[0]
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg" dir="rtl">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{item.name}</p>
-      <p className="text-sm font-bold text-foreground">{formatCurrency(item.value)}</p>
-    </div>
-  )
-}
-
-function CustomLegend({ payload }: { payload?: Array<{ value: string; color: string }> }) {
-  if (!payload) return null
-  return (
-    <div className="flex flex-wrap gap-3 justify-center mt-2">
-      {payload.map((entry, index) => (
-        <div key={index} className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Skeleton Components (imported from @/components/chart-utils) ───
 
 // ─── Main Component ──────────────────────────────────────────────
 export function AnalyticsScreen() {
@@ -473,52 +408,21 @@ export function AnalyticsScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              <div className="h-[320px] w-full">
-                {data.salesByDay.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data.salesByDay} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="analyticsSalesGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b5bdb" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3b5bdb" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatShortDate}
-                        tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip content={<AreaTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="#3b5bdb"
-                        strokeWidth={2}
-                        fill="url(#analyticsSalesGrad)"
-                        animationDuration={1000}
-                        name="المبيعات"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    icon={TrendingUp}
-                    title="لا توجد بيانات مبيعات"
-                    description="ستظهر بيانات المبيعات بعد تسجيل عمليات البيع"
-                    className="h-full"
-                  />
-                )}
-              </div>
+              <AreaTrendChart
+                data={data.salesByDay}
+                dataKey="amount"
+                labelKey="date"
+                color="#3b5bdb"
+                gradientId="analyticsSalesGrad"
+                height={320}
+                strokeWidth={2}
+                animationDuration={1000}
+                xAxisTickFormatter={(v) => formatShortDate(String(v))}
+                xAxisInterval="preserveStartEnd"
+                emptyIcon={TrendingUp}
+                emptyTitle="لا توجد بيانات مبيعات"
+                emptyDescription="ستظهر بيانات المبيعات بعد تسجيل عمليات البيع"
+              />
               {/* Legend */}
               <div className="flex items-center justify-center gap-6 mt-3">
                 <div className="flex items-center gap-2">
@@ -550,54 +454,18 @@ export function AnalyticsScreen() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-2">
-                <div className="h-[320px] w-full">
-                  {data.salesByCategory.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={data.salesByCategory}
-                        layout="vertical"
-                        margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" horizontal={false} />
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="category"
-                          tick={{ fontSize: 11, fill: 'oklch(0.35 0.01 260)' }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={80}
-                        />
-                        <Tooltip content={<BarTooltip />} cursor={{ fill: 'oklch(0.55 0.2 260 / 8%)' }} />
-                        <Bar
-                          dataKey="amount"
-                          radius={[0, 8, 8, 0]}
-                          maxBarSize={28}
-                          animationDuration={800}
-                        >
-                          {data.salesByCategory.map((_, index) => (
-                            <Cell
-                              key={`cat-cell-${index}`}
-                              fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState
-                      icon={Package}
-                      title="لا توجد بيانات فئات"
-                      className="h-full"
-                    />
-                  )}
-                </div>
+                <HorizontalBarChart
+                  data={data.salesByCategory}
+                  dataKey="amount"
+                  labelKey="category"
+                  colors={CHART_COLORS}
+                  height={320}
+                  maxBarSize={28}
+                  yAxisWidth={80}
+                  margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
+                  emptyIcon={Package}
+                  emptyTitle="لا توجد بيانات فئات"
+                />
               </CardContent>
             </Card>
 
@@ -618,41 +486,18 @@ export function AnalyticsScreen() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-2">
-                <div className="h-[320px] w-full">
-                  {data.expenseBreakdown.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={data.expenseBreakdown}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={3}
-                          dataKey="amount"
-                          nameKey="category"
-                          stroke="none"
-                        >
-                          {data.expenseBreakdown.map((_, index) => (
-                            <Cell
-                              key={`exp-cell-${index}`}
-                              fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<PieTooltip />} />
-                        <Legend content={<CustomLegend />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState
-                      icon={ShoppingCart}
-                      title="لا توجد مصروفات"
-                      description="لم يتم تسجيل مصروفات في هذه الفترة"
-                      className="h-full"
-                    />
-                  )}
-                </div>
+                <DonutChart
+                  data={data.expenseBreakdown}
+                  dataKey="amount"
+                  nameKey="category"
+                  colors={EXPENSE_COLORS}
+                  height={320}
+                  innerRadius={60}
+                  outerRadius={100}
+                  emptyIcon={ShoppingCart}
+                  emptyTitle="لا توجد مصروفات"
+                  emptyDescription="لم يتم تسجيل مصروفات في هذه الفترة"
+                />
               </CardContent>
             </Card>
           </div>

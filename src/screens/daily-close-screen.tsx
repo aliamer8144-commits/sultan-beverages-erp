@@ -6,16 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useConfirm, ConfirmDialog } from '@/components/confirm-dialog'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+import { VerticalBarChart, GroupedBarChart } from '@/components/charts'
 import {
   CalendarCheck,
   DollarSign,
@@ -37,7 +28,6 @@ import { useApi } from '@/hooks/use-api'
 import {
   dualFormat,
   formatCurrency,
-  ComparisonTooltip,
   SummaryCardSkeleton,
   ChartSkeleton,
   StatCard,
@@ -86,19 +76,6 @@ function getTodayArabic(): string {
   } catch {
     return now.toLocaleDateString('ar')
   }
-}
-
-// ─── Chart Tooltip ─────────────────────────────────────────────────
-function HourlyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-xl px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">
-        {dualFormat(payload[0].value).display}
-      </p>
-    </div>
-  )
 }
 
 // ─── Print Styles (thermal receipt) ────────────────────────────────
@@ -425,47 +402,20 @@ export function DailyCloseScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                {data.hourlyBreakdown.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.hourlyBreakdown} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 10, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        interval={0}
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip content={<HourlyTooltip />} cursor={{ fill: 'oklch(0.55 0.2 260 / 8%)' }} />
-                      <Bar
-                        dataKey="total"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={40}
-                        fill="#3b5bdb"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center space-y-2">
-                      <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto">
-                        <Calendar className="w-5 h-5 text-muted-foreground/40" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">لا توجد مبيعات بعد</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <VerticalBarChart
+                data={data.hourlyBreakdown}
+                dataKey="total"
+                labelKey="label"
+                color="#3b5bdb"
+                height={280}
+                barRadius={[6, 6, 0, 0]}
+                maxBarSize={40}
+                xAxisInterval={0}
+                xAxisAngle={-45}
+                xAxisHeight={60}
+                emptyIcon={Calendar}
+                emptyTitle="لا توجد مبيعات بعد"
+              />
             </CardContent>
           </Card>
           </div>
@@ -485,32 +435,17 @@ export function DailyCloseScreen() {
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={comparisonData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.005 260)" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 12, fill: 'oklch(0.5 0.01 260)' }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: 'oklch(0.5 0.01 260)' }}
-                      axisLine={false}
-                      tickLine={false}
-                      tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip content={<ComparisonTooltip />} />
-                    <Legend
-                      formatter={(value) => (value === 'sales' ? 'المبيعات' : 'المشتريات')}
-                      wrapperStyle={{ fontSize: '12px' }}
-                    />
-                    <Bar dataKey="sales" fill="#3b5bdb" radius={[6, 6, 0, 0]} maxBarSize={50} name="sales" />
-                    <Bar dataKey="purchases" fill="#e03131" radius={[6, 6, 0, 0]} maxBarSize={50} name="purchases" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <GroupedBarChart
+                data={comparisonData}
+                bars={[
+                  { dataKey: 'sales', name: 'sales', color: '#3b5bdb', radius: [6, 6, 0, 0], maxBarSize: 50 },
+                  { dataKey: 'purchases', name: 'purchases', color: '#e03131', radius: [6, 6, 0, 0], maxBarSize: 50 },
+                ]}
+                labelKey="name"
+                height={280}
+                tooltipLabels={{ sales: 'المبيعات', purchases: 'المشتريات' }}
+                legendFormatter={(value) => (value === 'sales' ? 'المبيعات' : 'المشتريات')}
+              />
             </CardContent>
           </Card>
           </div>
