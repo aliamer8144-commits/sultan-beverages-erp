@@ -113,3 +113,28 @@ Work Log:
 Stage Summary:
 - Phase 11 complete and pushed to GitHub
 - Ready for Phase 12 (form validation extraction)
+
+---
+Task ID: 12
+Agent: Main + 10 Sub-agents
+Task: Phase 12 — Form Validation Extraction & Unification
+
+Work Log:
+- Created validation infrastructure:
+  - src/lib/validation-utils.ts — validateFormClient(), validateField(), getFirstError()
+  - src/hooks/use-zod-form.ts — Full form management hook (state + validation + submission)
+  - src/hooks/use-form-validation.ts — Lightweight error-only hook for controlled forms
+- Updated src/lib/validations.ts: Changed 16 z.number() to z.coerce.number() for client-side compatibility
+- Added new schemas: createUserSchema, editUserSchema, posDiscountPercentSchema, posDiscountAmountBaseSchema, posPaidAmountSchema, posSplitCashSchema, posSplitCardSchema
+- Migrated 27 files across 5 sub-phases:
+  - Phase 12-B (dialogs): 11 files — customer-payment, loyalty-history, customer-form, supplier-payment, rating, supplier-form, category-manager, product-form, stock-adjustment, product-variants, return-dialog
+  - Phase 12-C (screens): 8 files — expense, users, settings, returns, loyalty, sales-targets, customer-statement, product-variants-screen
+  - Phase 12-D (main screens): 4 files — customers-screen, purchases-screen, inventory-screen, stock-adjustments-screen
+  - Phase 12-E (POS): 3 files — pos-screen, custom-discount-dialog, payment-dialog
+
+Stage Summary:
+- 27 files migrated from manual toast.error to Zod schema validation
+- Field-level error display added across all forms
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- Total: 1182 insertions, 608 deletions (cleaner, more maintainable code)
+- Ready to push to GitHub
