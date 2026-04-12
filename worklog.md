@@ -336,3 +336,46 @@ Stage Summary:
 - Login screen is production-safe (no credential shortcuts)
 - exchange-rate POST now uses type-safe Zod validation (422 on invalid input)
 - tsc --noEmit: 0 errors
+
+---
+Task ID: 17
+Agent: Main + 2 Sub-agents
+Task: Phase 17 — Security Hardening (تحسين الأمان)
+
+Work Log:
+- Level 1 (Critical): Rate limiting + middleware fix + auth route security
+  - Created src/lib/rate-limit.ts: sliding window in-memory rate limiter
+    - checkRateLimit(key, config) returns { success, remaining, resetAt }
+    - LOGIN_RATE_LIMIT: 5 attempts/minute, LOGIN_RATE_LIMIT_SLOW: 15/5min
+    - Auto-cleanup every 5 minutes to prevent memory leaks
+  - middleware.ts: JWT_SECRET missing now returns 500 (was allowing ALL requests)
+  - middleware.ts: Added security headers to ALL responses:
+    - X-Content-Type-Options: nosniff
+    - X-Frame-Options: DENY
+    - X-XSS-Protection: 1; mode=block
+    - Referrer-Policy: strict-origin-when-cross-origin
+    - Content-Security-Policy (script, style, img, font, connect, frame-ancestors)
+  - auth/route.ts: Added Zod loginSchema validation (username: 1-50, password: 1-100)
+  - auth/route.ts: Rate limiting on login (429 with Retry-After header)
+  - auth/route.ts: Token removed from response body (httpOnly cookie only)
+  - auth/route.ts: Auto-hash plaintext passwords on first successful login
+- Level 2 (High): RBAC + validation + data filtering
+  - 6 routes secured with requireAdmin: analytics, audit-log GET, sales-targets CRUD, daily-close, quick-stats, expense-categories CUD
+  - exchange-rate POST: Zod schema with withValidation wrapper
+  - products/search: costPrice returns undefined for non-admin users
+  - global-search: Removed costPrice from product select (was unused)
+  - login-screen: Quick-login buttons wrapped with NODE_ENV === 'development'
+- Level 3 (Medium): Config + error handling
+  - next.config.ts: allowedDevOrigins restricted to localhost:3000 (was wildcard)
+  - api-error-handler.ts: Non-Prisma errors return generic fallback (no detail leak)
+  - api-error-handler.ts: Added isValidationError() for proper 422 handling
+- Level 4 (Cleanup):
+  - seed-passwords: Returns 403 in production (was always available to admin)
+
+Stage Summary:
+- Commit: fb61ab7, pushed to GitHub
+- 17 files changed: 1 new (rate-limit.ts), 16 modified
+- 396 insertions(+), 74 deletions(-)
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- Manual tests: login ✓, token not in body ✓, unauth 401 ✓, page loads ✓
+- System now protected against: brute-force, missing JWT_SECRET, costPrice leak, unauthorized admin access
