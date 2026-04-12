@@ -7,15 +7,23 @@ export const GET = withAuth(tryCatch(async () => {
   const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
   const endOfDay = new Date(new Date().setHours(23, 59, 59, 999))
 
-  // 1. Total Sales: sum of sale invoices for today
-  const salesResult = await db.invoice.aggregate({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay, lte: endOfDay },
+  const saleInvoiceWhere = {
+    type: 'sale' as const,
+    createdAt: { gte: startOfDay, lte: endOfDay },
+  }
+
+  // Single query for today's sale invoices — replaces 3 duplicate queries
+  const todaySaleInvoices = await db.invoice.findMany({
+    where: saleInvoiceWhere,
+    select: {
+      totalAmount: true,
+      paidAmount: true,
+      createdAt: true,
     },
-    _sum: { totalAmount: true },
   })
-  const totalSales = salesResult._sum.totalAmount ?? 0
+
+  // 1. Total Sales: sum from single query result
+  const totalSales = todaySaleInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0)
 
   // 2. Total Profit: (sell_price - cost_price) * quantity for today's sale items
   const todaySaleItems = await db.invoiceItem.findMany({
@@ -53,13 +61,8 @@ export const GET = withAuth(tryCatch(async () => {
   // 5. Net Profit = Total Sales - Total Purchases
   const netProfit = totalSales - totalPurchases
 
-  // 6. Invoice Count: number of sale invoices today
-  const invoiceCount = await db.invoice.count({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay, lte: endOfDay },
-    },
-  })
+  // 6. Invoice Count from single query
+  const invoiceCount = todaySaleInvoices.length
 
   // 7. Items Sold: total quantity
   const itemsSold = todaySaleItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -89,18 +92,7 @@ export const GET = withAuth(tryCatch(async () => {
 
   const topSellingProduct = topSellingProducts[0] ?? null
 
-  // 10. Payment Methods: Cash (paid >= total) vs Credit (remaining > 0)
-  const todaySaleInvoices = await db.invoice.findMany({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay, lte: endOfDay },
-    },
-    select: {
-      totalAmount: true,
-      paidAmount: true,
-    },
-  })
-
+  // 10. Payment Methods: Cash (paid >= total) vs Credit (remaining > 0) — from single query
   let cashTotal = 0
   let creditTotal = 0
   let cashCount = 0
@@ -117,24 +109,13 @@ export const GET = withAuth(tryCatch(async () => {
     }
   }
 
-  // 11. Hourly Breakdown: sales per hour
+  // 11. Hourly Breakdown: sales per hour — from single query
   const hourlyMap = new Map<number, number>()
   for (let h = 0; h < 24; h++) {
     hourlyMap.set(h, 0)
   }
 
-  const hourlyInvoices = await db.invoice.findMany({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay, lte: endOfDay },
-    },
-    select: {
-      totalAmount: true,
-      createdAt: true,
-    },
-  })
-
-  for (const inv of hourlyInvoices) {
+  for (const inv of todaySaleInvoices) {
     const hour = inv.createdAt.getHours()
     hourlyMap.set(hour, (hourlyMap.get(hour) ?? 0) + inv.totalAmount)
   }

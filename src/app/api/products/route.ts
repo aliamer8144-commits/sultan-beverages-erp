@@ -20,6 +20,8 @@ export const GET = withAuth(tryCatch(async (request) => {
   const categoryId = searchParams.get("categoryId") || "";
   const lowStock = searchParams.get("lowStock") === "true";
   const barcode = searchParams.get("barcode") || "";
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
   const where: Record<string, unknown> = {};
 
@@ -31,16 +33,23 @@ export const GET = withAuth(tryCatch(async (request) => {
   }
   if (barcode) where.barcode = barcode;
 
-  const products = await db.product.findMany({
-    where: Object.keys(where).length > 0 ? where : undefined,
-    include: {
-      category: true,
-      _count: { select: { variants: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const whereClause = Object.keys(where).length > 0 ? where : undefined;
 
-  return successResponse(products);
+  const [products, total] = await Promise.all([
+    db.product.findMany({
+      where: whereClause,
+      include: {
+        category: { select: { id: true, name: true, icon: true } },
+        _count: { select: { variants: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    db.product.count({ where: whereClause }),
+  ]);
+
+  return successResponse({ products, total, page, totalPages: Math.ceil(total / limit) });
 }, 'فشل في تحميل المنتجات'));
 
 /**
@@ -60,31 +69,31 @@ export const POST = withAuth(tryCatch(async (request) => {
     const existingProducts = await db.product.findMany({ select: { name: true } });
     const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
 
-    for (const item of products) {
-      const name = item.name.trim();
-      if (!name || existingNames.has(name.toLowerCase())) {
-        skipped++;
-        continue;
-      }
+    const validProducts = products
+      .map((item) => ({
+        ...item,
+        name: item.name.trim(),
+      }))
+      .filter(
+        (item) => item.name && !existingNames.has(item.name.toLowerCase())
+      );
 
-      try {
-        await db.product.create({
-          data: {
-            name,
-            categoryId: item.categoryId || '',
-            price: item.price,
-            costPrice: item.costPrice || 0,
-            quantity: item.quantity || 0,
-            minQuantity: 5,
-            barcode: item.barcode?.trim() || null,
-          },
-        });
-        existingNames.add(name.toLowerCase());
-        created++;
-      } catch {
-        skipped++;
-      }
+    if (validProducts.length > 0) {
+      await db.product.createMany({
+        data: validProducts.map((item) => ({
+          name: item.name,
+          categoryId: item.categoryId || '',
+          price: item.price,
+          costPrice: item.costPrice || 0,
+          quantity: item.quantity || 0,
+          minQuantity: 5,
+          barcode: item.barcode?.trim() || null,
+        })),
+        skipDuplicates: true,
+      });
+      created = validProducts.length;
     }
+    skipped = products.length - created;
 
     logAction({
       action: "bulk_import",

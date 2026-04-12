@@ -79,52 +79,71 @@ export const GET = withAuth(tryCatch(async (request) => {
     }),
   ])
 
-  // Monthly trend (last 6 months)
+  // Monthly trend (last 6 months) + Daily trend (last 30 days) + Recurring
+  const monthlyStart = new Date()
+  monthlyStart.setMonth(monthlyStart.getMonth() - 5)
+  monthlyStart.setDate(1)
+  monthlyStart.setHours(0, 0, 0, 0)
+
+  const dailyStart = new Date()
+  dailyStart.setDate(dailyStart.getDate() - 29)
+  dailyStart.setHours(0, 0, 0, 0)
+
+  const [monthlyRaw, dailyRaw, recurringExpenses] = await Promise.all([
+    db.expense.groupBy({
+      by: ['date'],
+      where: { date: { gte: monthlyStart } },
+      _sum: { amount: true },
+    }),
+    db.expense.groupBy({
+      by: ['date'],
+      where: { date: { gte: dailyStart } },
+      _sum: { amount: true },
+    }),
+    db.expense.findMany({
+      where: { recurring: true },
+      orderBy: { date: 'desc' },
+      distinct: ['category'],
+    }),
+  ])
+
+  // Build monthly trend from groupBy result
+  const monthlyMap = new Map<string, number>()
+  for (const row of monthlyRaw) {
+    const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`
+    monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
+  }
+
   const monthlyTrend: { month: string; total: number }[] = []
   for (let i = 5; i >= 0; i--) {
     const d = new Date()
     d.setMonth(d.getMonth() - i)
-    const mStart = new Date(d.getFullYear(), d.getMonth(), 1)
-    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const monthName = d.toLocaleDateString('ar-SA', { month: 'short' })
-
-    const result = await db.expense.aggregate({
-      where: { date: { gte: mStart, lte: mEnd } },
-      _sum: { amount: true },
-    })
-
     monthlyTrend.push({
       month: monthName,
-      total: Math.round((result._sum.amount ?? 0) * 100) / 100,
+      total: Math.round((monthlyMap.get(key) ?? 0) * 100) / 100,
     })
   }
 
-  // ── Daily Trend (last 30 days) ────────────────────────────────
+  // Build daily trend from groupBy result
+  const dailyMap = new Map<string, number>()
+  for (const row of dailyRaw) {
+    const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}-${String(row.date.getDate()).padStart(2, '0')}`
+    dailyMap.set(key, (dailyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
+  }
+
   const dailyTrend: { date: string; total: number }[] = []
   for (let i = 29; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
-    const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const dayLabel = d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })
-
-    const result = await db.expense.aggregate({
-      where: { date: { gte: dayStart, lte: dayEnd } },
-      _sum: { amount: true },
-    })
-
     dailyTrend.push({
       date: dayLabel,
-      total: Math.round((result._sum.amount ?? 0) * 100) / 100,
+      total: Math.round((dailyMap.get(key) ?? 0) * 100) / 100,
     })
   }
-
-  // ── Recurring Expenses Summary ─────────────────────────────────
-  const recurringExpenses = await db.expense.findMany({
-    where: { recurring: true },
-    orderBy: { date: 'desc' },
-    distinct: ['category'],
-  })
 
   const recurringSummary = recurringExpenses.map((e) => {
     let nextDue: Date

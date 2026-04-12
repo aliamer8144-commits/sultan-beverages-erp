@@ -37,18 +37,27 @@ export const GET = withAuth(tryCatch(async (request) => {
       }),
     ])
 
-    // Get points activity over last 30 days
+    // Get points activity over last 30 days + recent transactions (parallelized)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const dailyActivity = await db.loyaltyTransaction.groupBy({
-      by: ['createdAt'],
-      where: {
-        createdAt: { gte: thirtyDaysAgo },
-      },
-      _sum: { points: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    const [dailyActivity, recentTransactions] = await Promise.all([
+      db.loyaltyTransaction.groupBy({
+        by: ['createdAt'],
+        where: {
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _sum: { points: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      db.loyaltyTransaction.findMany({
+        include: {
+          customer: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+    ])
 
     // Group by date
     const activityByDate: Record<string, { earned: number; redeemed: number }> = {}
@@ -65,15 +74,6 @@ export const GET = withAuth(tryCatch(async (request) => {
         }
       }
     }
-
-    // Get recent transactions
-    const recentTransactions = await db.loyaltyTransaction.findMany({
-      include: {
-        customer: { select: { name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
 
     return successResponse({
       totalEarned: totalEarned._sum.points || 0,

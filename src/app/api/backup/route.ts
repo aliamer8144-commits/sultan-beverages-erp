@@ -8,7 +8,7 @@ import { tryCatch } from '@/lib/api-error-handler'
 export const GET = withAuth(tryCatch(async (request) => {
   const user = getRequestUser(request)
 
-  const [users, categories, products, customers, suppliers, invoices, invoiceItems, payments] =
+  const [users, categories, products, customers, suppliers, invoices, payments] =
     await Promise.all([
       // SECURITY: Exclude password field from backup export
       db.user.findMany({
@@ -38,9 +38,11 @@ export const GET = withAuth(tryCatch(async (request) => {
           },
         },
       }),
-      db.invoiceItem.findMany(),
       db.payment.findMany({ orderBy: { createdAt: 'asc' } }),
     ])
+
+  // Extract invoice items from the nested invoices for backward compatibility
+  const invoiceItems = invoices.flatMap((inv) => inv.items)
 
   // Serialize dates to ISO strings for JSON
   const serialize = (obj: unknown) => JSON.parse(JSON.stringify(obj))

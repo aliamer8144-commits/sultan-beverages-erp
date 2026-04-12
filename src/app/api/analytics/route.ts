@@ -52,180 +52,163 @@ export const GET = withAuth(tryCatch(async (request) => {
     }
   }
 
-  // Fetch all sale invoices within the date range with items
-  const invoices = await db.invoice.findMany({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startDate, lte: endDate },
-    },
-    include: {
-      items: {
-        include: {
-          product: {
-            include: { category: { select: { name: true } } },
-          },
-        },
-      },
-      customer: { select: { id: true, name: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+  // ── Parallel batch: all independent SQL aggregations ─────────────
+  const [
+    salesKpi,
+    profitKpi,
+    expenseAgg,
+    salesByDayRaw,
+    salesByCategoryRaw,
+    topProductsRaw,
+    topCustomersRaw,
+    expenseBreakdownRaw,
+  ] = await Promise.all([
+    // KPI: Total Sales + Invoice Count
+    db.$queryRaw<Array<{ totalSales: number; invoicesCount: number }>>`
+      SELECT COALESCE(SUM("totalAmount"), 0)::float as "totalSales", COUNT(id)::int as "invoicesCount"
+      FROM "Invoice"
+      WHERE "type" = 'sale' AND "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+    `,
 
-  // Fetch expenses within the date range
-  const expenses = await db.expense.findMany({
-    where: {
-      date: { gte: startDate, lte: endDate },
-    },
-  })
+    // KPI: Total Profit (sum of (item.price - product.costPrice) * item.quantity)
+    db.$queryRaw<Array<{ totalProfit: number }>>`
+      SELECT COALESCE(SUM((ii.price - p."costPrice") * ii.quantity), 0)::float as "totalProfit"
+      FROM "InvoiceItem" ii
+      JOIN "Invoice" i ON i.id = ii."invoiceId"
+      JOIN "Product" p ON p.id = ii."productId"
+      WHERE i."type" = 'sale' AND i."createdAt" >= ${startDate} AND i."createdAt" <= ${endDate}
+    `,
 
-  // ─── KPI: Total Sales, Profit, Expenses, Net Profit ───────────
-  let totalSales = 0
-  let totalProfit = 0
-  let totalExpenses = 0
+    // KPI: Total Expenses
+    db.expense.aggregate({
+      where: { date: { gte: startDate, lte: endDate } },
+      _sum: { amount: true },
+    }),
 
-  for (const inv of invoices) {
-    totalSales += inv.totalAmount
-    for (const item of inv.items) {
-      totalProfit += (item.price - item.product.costPrice) * item.quantity
-    }
-  }
+    // Sales by Day — SQL aggregation
+    db.$queryRaw<Array<{ date: string; amount: number }>>`
+      SELECT TO_CHAR("createdAt", 'YYYY-MM-DD') as date, COALESCE(SUM("totalAmount"), 0)::float as amount
+      FROM "Invoice"
+      WHERE "type" = 'sale' AND "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+      GROUP BY TO_CHAR("createdAt", 'YYYY-MM-DD')
+      ORDER BY date
+    `,
 
-  for (const exp of expenses) {
-    totalExpenses += exp.amount
-  }
+    // Sales by Category — SQL aggregation with product+category join
+    db.$queryRaw<Array<{ category: string; amount: number; count: number }>>`
+      SELECT
+        COALESCE(c.name, 'أخرى') as category,
+        COALESCE(SUM(ii.price * ii.quantity), 0)::float as amount,
+        COALESCE(SUM(ii.quantity), 0)::int as count
+      FROM "InvoiceItem" ii
+      JOIN "Invoice" i ON i.id = ii."invoiceId"
+      JOIN "Product" p ON p.id = ii."productId"
+      LEFT JOIN "Category" c ON c.id = p."categoryId"
+      WHERE i."type" = 'sale' AND i."createdAt" >= ${startDate} AND i."createdAt" <= ${endDate}
+      GROUP BY c.name
+      ORDER BY amount DESC
+    `,
 
+    // Top Products (top 10 by revenue)
+    db.$queryRaw<Array<{ name: string; category: string; quantity: number; revenue: number; profit: number }>>`
+      SELECT
+        p.name,
+        COALESCE(c.name, 'أخرى') as category,
+        COALESCE(SUM(ii.quantity), 0)::int as quantity,
+        COALESCE(SUM(ii.price * ii.quantity), 0)::float as revenue,
+        COALESCE(SUM((ii.price - p."costPrice") * ii.quantity), 0)::float as profit
+      FROM "InvoiceItem" ii
+      JOIN "Invoice" i ON i.id = ii."invoiceId"
+      JOIN "Product" p ON p.id = ii."productId"
+      LEFT JOIN "Category" c ON c.id = p."categoryId"
+      WHERE i."type" = 'sale' AND i."createdAt" >= ${startDate} AND i."createdAt" <= ${endDate}
+      GROUP BY p.id, p.name, c.name, p."costPrice"
+      ORDER BY revenue DESC
+      LIMIT 10
+    `,
+
+    // Top Customers (top 10 by spending)
+    db.$queryRaw<Array<{ name: string; totalSpent: number; invoiceCount: number }>>`
+      SELECT
+        cu.name,
+        COALESCE(SUM(i."totalAmount"), 0)::float as "totalSpent",
+        COUNT(i.id)::int as "invoiceCount"
+      FROM "Invoice" i
+      JOIN "Customer" cu ON cu.id = i."customerId"
+      WHERE i."type" = 'sale' AND i."createdAt" >= ${startDate} AND i."createdAt" <= ${endDate} AND i."customerId" IS NOT NULL
+      GROUP BY cu.id, cu.name
+      ORDER BY "totalSpent" DESC
+      LIMIT 10
+    `,
+
+    // Expense Breakdown by Category
+    db.expense.groupBy({
+      by: ['category'],
+      where: { date: { gte: startDate, lte: endDate } },
+      _sum: { amount: true },
+    }),
+  ])
+
+  // ─── Compute KPIs ───────────────────────────────────────────────
+  const totalSales = Number(salesKpi[0]?.totalSales ?? 0)
+  const totalProfit = Number(profitKpi[0]?.totalProfit ?? 0)
+  const totalExpenses = expenseAgg._sum.amount ?? 0
   const netProfit = totalProfit - totalExpenses
+  const invoicesCount = salesKpi[0]?.invoicesCount ?? 0
+  const averageInvoice = invoicesCount > 0 ? Math.round((totalSales / invoicesCount) * 100) / 100 : 0
+  const netProfitPercent = totalSales > 0 ? Math.round((netProfit / totalSales) * 10000) / 100 : 0
 
-  // ─── 1. Sales by Day ──────────────────────────────────────────
-  const dailyMap = new Map<string, number>()
+  // ─── 1. Sales by Day (fill missing dates with 0) ────────────────
+  const dayMap = new Map<string, number>()
   const dayIter = new Date(startDate)
   while (dayIter <= endDate) {
     const key = `${dayIter.getFullYear()}-${String(dayIter.getMonth() + 1).padStart(2, '0')}-${String(dayIter.getDate()).padStart(2, '0')}`
-    dailyMap.set(key, 0)
+    dayMap.set(key, 0)
     dayIter.setDate(dayIter.getDate() + 1)
   }
 
-  for (const inv of invoices) {
-    const key = `${inv.createdAt.getFullYear()}-${String(inv.createdAt.getMonth() + 1).padStart(2, '0')}-${String(inv.createdAt.getDate()).padStart(2, '0')}`
-    const entry = dailyMap.get(key)
+  for (const row of salesByDayRaw) {
+    const entry = dayMap.get(row.date)
     if (entry !== undefined) {
-      dailyMap.set(key, entry + inv.totalAmount)
+      dayMap.set(row.date, entry + Number(row.amount))
     }
   }
 
-  const salesByDay = Array.from(dailyMap.entries()).map(([date, amount]) => ({
+  const salesByDay = Array.from(dayMap.entries()).map(([date, amount]) => ({
     date,
     amount: Math.round(amount * 100) / 100,
   }))
 
-  // ─── 2. Sales by Category ─────────────────────────────────────
-  const categoryMap = new Map<string, { category: string; amount: number; count: number }>()
+  // ─── 2. Sales by Category ───────────────────────────────────────
+  const salesByCategory = salesByCategoryRaw.map((c) => ({
+    category: c.category,
+    amount: Math.round(Number(c.amount) * 100) / 100,
+    count: c.count,
+  }))
 
-  for (const inv of invoices) {
-    for (const item of inv.items) {
-      const catName = item.product.category?.name ?? 'أخرى'
-      const existing = categoryMap.get(catName)
-      const itemRevenue = item.price * item.quantity
-      if (existing) {
-        existing.amount += itemRevenue
-        existing.count += item.quantity
-      } else {
-        categoryMap.set(catName, { category: catName, amount: itemRevenue, count: item.quantity })
-      }
-    }
-  }
+  // ─── 3. Top Products ────────────────────────────────────────────
+  const topProducts = topProductsRaw.map((p) => ({
+    name: p.name,
+    category: p.category,
+    quantity: p.quantity,
+    revenue: Math.round(Number(p.revenue) * 100) / 100,
+    profit: Math.round(Number(p.profit) * 100) / 100,
+  }))
 
-  const salesByCategory = Array.from(categoryMap.values())
-    .map((c) => ({
-      ...c,
-      amount: Math.round(c.amount * 100) / 100,
-    }))
-    .sort((a, b) => b.amount - a.amount)
+  // ─── 4. Top Customers ───────────────────────────────────────────
+  const topCustomers = topCustomersRaw.map((c) => ({
+    name: c.name,
+    totalSpent: Math.round(Number(c.totalSpent) * 100) / 100,
+    invoiceCount: c.invoiceCount,
+  }))
 
-  // ─── 3. Top Products (top 10 by revenue) ─────────────────────
-  const productMap = new Map<string, { name: string; category: string; quantity: number; revenue: number; profit: number }>()
-
-  for (const inv of invoices) {
-    for (const item of inv.items) {
-      const existing = productMap.get(item.productId)
-      const itemRevenue = item.price * item.quantity
-      const itemProfit = (item.price - item.product.costPrice) * item.quantity
-      const catName = item.product.category?.name ?? 'أخرى'
-      if (existing) {
-        existing.quantity += item.quantity
-        existing.revenue += itemRevenue
-        existing.profit += itemProfit
-      } else {
-        productMap.set(item.productId, {
-          name: item.product.name,
-          category: catName,
-          quantity: item.quantity,
-          revenue: itemRevenue,
-          profit: itemProfit,
-        })
-      }
-    }
-  }
-
-  const topProducts = Array.from(productMap.values())
-    .map((p) => ({
-      ...p,
-      revenue: Math.round(p.revenue * 100) / 100,
-      profit: Math.round(p.profit * 100) / 100,
-    }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10)
-
-  // ─── 4. Top Customers (top 10 by spending) ──────────────────
-  const customerMap = new Map<string, { name: string; totalSpent: number; invoiceCount: number }>()
-
-  for (const inv of invoices) {
-    if (inv.customerId && inv.customer) {
-      const existing = customerMap.get(inv.customerId)
-      if (existing) {
-        existing.totalSpent += inv.totalAmount
-        existing.invoiceCount += 1
-      } else {
-        customerMap.set(inv.customerId, {
-          name: inv.customer.name,
-          totalSpent: inv.totalAmount,
-          invoiceCount: 1,
-        })
-      }
-    }
-  }
-
-  const topCustomers = Array.from(customerMap.values())
-    .map((c) => ({
-      ...c,
-      totalSpent: Math.round(c.totalSpent * 100) / 100,
-    }))
-    .sort((a, b) => b.totalSpent - a.totalSpent)
-    .slice(0, 10)
-
-  // ─── 5. Expense Breakdown by Category ────────────────────────
-  const expenseCatMap = new Map<string, number>()
-
-  for (const exp of expenses) {
-    const existing = expenseCatMap.get(exp.category)
-    if (existing !== undefined) {
-      expenseCatMap.set(exp.category, existing + exp.amount)
-    } else {
-      expenseCatMap.set(exp.category, exp.amount)
-    }
-  }
-
-  const expenseBreakdown = Array.from(expenseCatMap.entries())
-    .map(([category, amount]) => ({
+  // ─── 5. Expense Breakdown ───────────────────────────────────────
+  const expenseBreakdown = expenseBreakdownRaw
+    .map(({ category, _sum }) => ({
       category,
-      amount: Math.round(amount * 100) / 100,
+      amount: Math.round((_sum.amount ?? 0) * 100) / 100,
     }))
     .sort((a, b) => b.amount - a.amount)
-
-  // ─── Derived KPIs ────────────────────────────────────────────
-  const invoicesCount = invoices.length
-  const averageInvoice = invoicesCount > 0 ? Math.round((totalSales / invoicesCount) * 100) / 100 : 0
-  const netProfitPercent = totalSales > 0 ? Math.round((netProfit / totalSales) * 10000) / 100 : 0
 
   return successResponse({
     totalSales: Math.round(totalSales * 100) / 100,

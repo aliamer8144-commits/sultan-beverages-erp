@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
-import { Search, FileText, Printer, ChevronDown, ChevronUp, Calendar, Eye, Loader2, Filter, X, Download, RotateCcw } from 'lucide-react'
+import { Search, FileText, Printer, ChevronDown, ChevronUp, Calendar, Eye, Loader2, Filter, X, Download, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatShortDate } from '@/lib/date-utils'
 import type { Invoice } from './invoices/types'
@@ -37,6 +37,9 @@ export function InvoicesScreen() {
   // Data
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   // Expanded rows
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -51,28 +54,42 @@ export function InvoicesScreen() {
 
   // ── Fetch Invoices ─────────────────────────────────────────────────────
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = useCallback(async (p = 1) => {
     setLoading(true)
     try {
-      const result = await get<Invoice[]>('/api/invoices', {
+      const result = await get<{ invoices: Invoice[]; total: number; page: number; totalPages: number }>('/api/invoices', {
         type: activeTab,
         search: search.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        page: p,
+        limit: 20,
       }, { showErrorToast: false })
       if (result) {
-        setInvoices(result)
+        setInvoices(result.invoices)
+        setTotal(result.total)
+        setPage(result.page)
+        setTotalPages(result.totalPages)
       } else {
         setInvoices([])
+        setTotal(0)
+        setTotalPages(1)
       }
     } finally {
       setLoading(false)
     }
   }, [activeTab, search, dateFrom, dateTo, get])
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    fetchInvoices()
-  }, [fetchInvoices])
+    setPage(1)
+    fetchInvoices(1)
+  }, [activeTab, search, dateFrom, dateTo])
+
+  const goToPage = (p: number) => {
+    if (p < 1 || p > totalPages) return
+    fetchInvoices(p)
+  }
 
   // ── Handlers ───────────────────────────────────────────────────────────
 
@@ -246,7 +263,7 @@ export function InvoicesScreen() {
       <div className="px-4 md:px-6 pb-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            {loading ? 'جاري التحميل...' : `${invoices.length} فاتورة`}
+            {loading ? 'جاري التحميل...' : `${total} فاتورة`}
           </p>
         </div>
       </div>
@@ -461,6 +478,61 @@ export function InvoicesScreen() {
           </ScrollArea>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && !loading && (
+        <div className="px-4 md:px-6 py-3 flex-shrink-0 border-t border-border/50">
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page <= 1}
+              onClick={() => goToPage(page - 1)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => {
+                // Show first, last, current, and adjacent pages
+                if (p === 1 || p === totalPages) return true
+                if (Math.abs(p - page) <= 1) return true
+                return false
+              })
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) {
+                  acc.push('ellipsis')
+                }
+                acc.push(p)
+                return acc
+              }, [])
+              .map((item, idx) =>
+                item === 'ellipsis' ? (
+                  <span key={`e-${idx}`} className="text-xs text-muted-foreground px-1">...</span>
+                ) : (
+                  <Button
+                    key={item}
+                    variant={item === page ? 'default' : 'outline'}
+                    size="icon"
+                    className="h-8 w-8 text-xs"
+                    onClick={() => goToPage(item)}
+                  >
+                    {item}
+                  </Button>
+                ),
+              )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page >= totalPages}
+              onClick={() => goToPage(page + 1)}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ── Extracted Dialogs ── */}
       <InvoiceDetailDialog

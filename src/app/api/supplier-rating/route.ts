@@ -28,13 +28,14 @@ export const POST = withAuth(tryCatch(async (request) => {
     },
   })
 
-  // Calculate new average rating from all reviews
-  const allReviews = await db.supplierReview.findMany({
+  // Calculate new average rating using aggregate
+  const agg = await db.supplierReview.aggregate({
     where: { supplierId },
-    select: { rating: true },
+    _avg: { rating: true },
+    _count: { id: true },
   })
-  const totalCount = allReviews.length
-  const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0)
+  const totalCount = agg._count.id
+  const totalRating = agg._avg.rating ?? 0
   const newAverage = Math.round((totalRating / totalCount) * 10) / 10
 
   const updated = await db.supplier.update({

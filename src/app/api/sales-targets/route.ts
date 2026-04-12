@@ -116,13 +116,76 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   if (all) {
     // Return all targets with computed fields
-    const targets = await db.salesTarget.findMany({
+    // Optimized: fetch ALL invoices once, then compute target data in-memory
+    const allTargets = await db.salesTarget.findMany({
       orderBy: { createdAt: 'desc' },
     })
 
-    const targetsWithData = await Promise.all(
-      targets.map((t) => computeTargetData(t))
-    )
+    if (allTargets.length === 0) return successResponse([])
+
+    // Find the earliest date range across all targets
+    let earliestDate = new Date()
+    for (const t of allTargets) {
+      const { rangeStart } = getDateRange(t.type, t.startDate, t.endDate)
+      if (rangeStart < earliestDate) earliestDate = rangeStart
+    }
+
+    // Fetch ALL relevant invoices in ONE query
+    const invoices = await db.invoice.findMany({
+      where: { type: 'sale', createdAt: { gte: earliestDate } },
+      select: { totalAmount: true, createdAt: true },
+    })
+
+    // Compute target data in-memory (no DB queries per target)
+    const targetsWithData = allTargets.map((target) => {
+      const { rangeStart, rangeEnd } = getDateRange(target.type, target.startDate, target.endDate)
+      const currentAmount = invoices
+        .filter(inv => inv.createdAt >= rangeStart && inv.createdAt <= rangeEnd)
+        .reduce((sum, inv) => sum + inv.totalAmount, 0)
+
+      const targetAmount = target.targetAmount
+      const progressPercent = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0
+      const remainingAmount = Math.max(targetAmount - currentAmount, 0)
+
+      // Calculate days/hours remaining
+      let daysRemaining = 0
+      let hoursRemaining = 0
+      const now = new Date()
+
+      if (target.endDate) {
+        const end = new Date(target.endDate)
+        const diffMs = end.getTime() - now.getTime()
+        if (diffMs > 0) {
+          daysRemaining = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+          hoursRemaining = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        }
+      } else {
+        // Rolling target: remaining time in the period
+        const { rangeEnd: re } = getDateRange(target.type, target.startDate, null)
+        const diffMs = re.getTime() - now.getTime()
+        if (diffMs > 0) {
+          hoursRemaining = Math.floor(diffMs / (1000 * 60 * 60))
+          daysRemaining = Math.floor(hoursRemaining / 24)
+          hoursRemaining = hoursRemaining % 24
+        }
+      }
+
+      // Calculate daily target needed
+      let dailyTargetNeeded = 0
+      if (remainingAmount > 0 && daysRemaining > 0) {
+        dailyTargetNeeded = Math.round((remainingAmount / daysRemaining) * 100) / 100
+      }
+
+      return {
+        ...target,
+        currentAmount: Math.round(currentAmount * 100) / 100,
+        progressPercentage: Math.round(progressPercent * 10) / 10,
+        remainingAmount: Math.round(remainingAmount * 100) / 100,
+        daysRemaining,
+        hoursRemaining,
+        dailyTargetNeeded,
+      }
+    })
 
     return successResponse(targetsWithData)
   }

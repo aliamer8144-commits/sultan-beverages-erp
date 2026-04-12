@@ -21,8 +21,9 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   const counts: Record<string, number> = {};
 
-  // ── Search Products ──────────────────────────────────────────
-  if (category === "all" || category === "products") {
+  // ── Search helpers (pure functions that return data, no side effects) ──
+
+  const searchProducts = async () => {
     const [products, productCount] = await Promise.all([
       db.product.findMany({
         where: {
@@ -56,26 +57,22 @@ export const GET = withAuth(tryCatch(async (request) => {
       }),
     ]);
 
-    counts.products = productCount;
-    if (products.length > 0) {
-      results.push({
-        category: "products",
-        items: products.map((p) => ({
-          id: p.id,
-          name: p.name,
-          subtitle: p.category?.name || "بدون تصنيف",
-          detail: `${p.price} ر.ي`,
-          meta: `المخزون: ${p.quantity}`,
-          lowStock: p.quantity <= p.minQuantity,
-          outOfStock: p.quantity <= 0,
-          image: p.image,
-        })),
-      });
-    }
-  }
+    return {
+      count: productCount,
+      items: products.length > 0 ? products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        subtitle: p.category?.name || "بدون تصنيف",
+        detail: `${p.price} ر.ي`,
+        meta: `المخزون: ${p.quantity}`,
+        lowStock: p.quantity <= p.minQuantity,
+        outOfStock: p.quantity <= 0,
+        image: p.image,
+      })) : null,
+    };
+  };
 
-  // ── Search Customers ─────────────────────────────────────────
-  if (category === "all" || category === "customers") {
+  const searchCustomers = async () => {
     const [customers, customerCount] = await Promise.all([
       db.customer.findMany({
         where: {
@@ -108,24 +105,20 @@ export const GET = withAuth(tryCatch(async (request) => {
       }),
     ]);
 
-    counts.customers = customerCount;
-    if (customers.length > 0) {
-      results.push({
-        category: "customers",
-        items: customers.map((c) => ({
-          id: c.id,
-          name: c.name,
-          subtitle: c.phone || "بدون رقم",
-          detail: c.debt > 0 ? `مديونية: ${c.debt.toLocaleString()} ر.ي` : "لا ديون",
-          meta: `${c.totalPurchases.toLocaleString()} ر.ي مشتريات · ${c.visitCount} زيارة`,
-          hasDebt: c.debt > 0,
-        })),
-      });
-    }
-  }
+    return {
+      count: customerCount,
+      items: customers.length > 0 ? customers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        subtitle: c.phone || "بدون رقم",
+        detail: c.debt > 0 ? `مديونية: ${c.debt.toLocaleString()} ر.ي` : "لا ديون",
+        meta: `${c.totalPurchases.toLocaleString()} ر.ي مشتريات · ${c.visitCount} زيارة`,
+        hasDebt: c.debt > 0,
+      })) : null,
+    };
+  };
 
-  // ── Search Invoices ──────────────────────────────────────────
-  if (category === "all" || category === "invoices") {
+  const searchInvoices = async () => {
     const invoiceWhere: Prisma.InvoiceWhereInput = {
       OR: [
         { invoiceNo: { contains: q, mode: "insensitive" } },
@@ -154,30 +147,26 @@ export const GET = withAuth(tryCatch(async (request) => {
       db.invoice.count({ where: invoiceWhere }),
     ]);
 
-    counts.invoices = invoiceCount;
-    if (invoices.length > 0) {
-      results.push({
-        category: "invoices",
-        items: invoices.map((inv) => {
-          const entityName = inv.customer?.name || inv.supplier?.name || "عميل نقدي";
-          const remaining = inv.totalAmount - inv.paidAmount;
-          return {
-            id: inv.id,
-            name: `${inv.invoiceNo}`,
-            subtitle: inv.type === "sale" ? "فاتورة بيع" : "فاتورة شراء",
-            detail: `${inv.totalAmount.toLocaleString()} ر.ي`,
-            meta: `${entityName} · ${remaining > 0 ? `متبقي: ${remaining.toLocaleString()}` : "مدفوعة"}`,
-            isSale: inv.type === "sale",
-            hasRemaining: remaining > 0,
-            date: inv.createdAt.toISOString().split("T")[0],
-          };
-        }),
-      });
-    }
-  }
+    return {
+      count: invoiceCount,
+      items: invoices.length > 0 ? invoices.map((inv) => {
+        const entityName = inv.customer?.name || inv.supplier?.name || "عميل نقدي";
+        const remaining = inv.totalAmount - inv.paidAmount;
+        return {
+          id: inv.id,
+          name: `${inv.invoiceNo}`,
+          subtitle: inv.type === "sale" ? "فاتورة بيع" : "فاتورة شراء",
+          detail: `${inv.totalAmount.toLocaleString()} ر.ي`,
+          meta: `${entityName} · ${remaining > 0 ? `متبقي: ${remaining.toLocaleString()}` : "مدفوعة"}`,
+          isSale: inv.type === "sale",
+          hasRemaining: remaining > 0,
+          date: inv.createdAt.toISOString().split("T")[0],
+        };
+      }) : null,
+    };
+  };
 
-  // ── Search Suppliers ─────────────────────────────────────────
-  if (category === "all" || category === "suppliers") {
+  const searchSuppliers = async () => {
     const [suppliers, supplierCount] = await Promise.all([
       db.supplier.findMany({
         where: {
@@ -211,19 +200,49 @@ export const GET = withAuth(tryCatch(async (request) => {
       }),
     ]);
 
-    counts.suppliers = supplierCount;
-    if (suppliers.length > 0) {
-      results.push({
-        category: "suppliers",
-        items: suppliers.map((s) => ({
-          id: s.id,
-          name: s.name,
-          subtitle: s.phone || s.phone2 || "بدون رقم",
-          detail: `التقييم: ${s.rating > 0 ? `${s.rating}/5` : "لم يتم التقييم"}`,
-          meta: `${s.paymentTerms} · ${s.ratingCount} تقييم`,
-        })),
-      });
-    }
+    return {
+      count: supplierCount,
+      items: suppliers.length > 0 ? suppliers.map((s) => ({
+        id: s.id,
+        name: s.name,
+        subtitle: s.phone || s.phone2 || "بدون رقم",
+        detail: `التقييم: ${s.rating > 0 ? `${s.rating}/5` : "لم يتم التقييم"}`,
+        meta: `${s.paymentTerms} · ${s.ratingCount} تقييم`,
+      })) : null,
+    };
+  };
+
+  // ── Run searches in parallel when category === "all", or single search ──
+
+  if (category === "all") {
+    const [productsResult, customersResult, invoicesResult, suppliersResult] =
+      await Promise.all([searchProducts(), searchCustomers(), searchInvoices(), searchSuppliers()]);
+
+    counts.products = productsResult.count;
+    counts.customers = customersResult.count;
+    counts.invoices = invoicesResult.count;
+    counts.suppliers = suppliersResult.count;
+
+    if (productsResult.items) results.push({ category: "products", items: productsResult.items });
+    if (customersResult.items) results.push({ category: "customers", items: customersResult.items });
+    if (invoicesResult.items) results.push({ category: "invoices", items: invoicesResult.items });
+    if (suppliersResult.items) results.push({ category: "suppliers", items: suppliersResult.items });
+  } else if (category === "products") {
+    const r = await searchProducts();
+    counts.products = r.count;
+    if (r.items) results.push({ category: "products", items: r.items });
+  } else if (category === "customers") {
+    const r = await searchCustomers();
+    counts.customers = r.count;
+    if (r.items) results.push({ category: "customers", items: r.items });
+  } else if (category === "invoices") {
+    const r = await searchInvoices();
+    counts.invoices = r.count;
+    if (r.items) results.push({ category: "invoices", items: r.items });
+  } else if (category === "suppliers") {
+    const r = await searchSuppliers();
+    counts.suppliers = r.count;
+    if (r.items) results.push({ category: "suppliers", items: r.items });
   }
 
   // Calculate total results

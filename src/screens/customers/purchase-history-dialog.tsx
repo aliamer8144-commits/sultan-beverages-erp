@@ -38,9 +38,9 @@ export function PurchaseHistoryDialog({
       setPurchaseLoading(true)
       ;(async () => {
         try {
-          const result = await get<CustomerInvoice[]>('/api/invoices', { customerId: customer.id, type: 'sale' }, { showErrorToast: false })
+          const result = await get<{ invoices: CustomerInvoice[] }>('/api/invoices', { customerId: customer.id, type: 'sale' }, { showErrorToast: false })
           if (result) {
-            setCustomerInvoices(result.slice(0, 10))
+            setCustomerInvoices(result.invoices.slice(0, 10))
           }
         } finally {
           setPurchaseLoading(false)

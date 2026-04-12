@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -40,6 +40,8 @@ import {
   StickyNote,
   ShoppingBag,
   Crown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
@@ -60,6 +62,9 @@ export function CustomersScreen() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
 
   // ── Form dialog state (shared for add/edit) ──
   const [openAddDialog, setOpenAddDialog] = useState(false)
@@ -89,30 +94,49 @@ export function CustomersScreen() {
   const [purchaseCustomer, setPurchaseCustomer] = useState<Customer | null>(null)
 
   // ─── Fetch Customers ───────────────────────────────────────────────
-  const fetchCustomers = async (query = '', category = 'all') => {
+  const doFetchCustomers = useCallback(async (q: string, cat: string, p: number) => {
     setLoading(true)
     try {
-      const result = await get<Customer[]>('/api/customers', {
-        search: query || undefined,
-        category: category !== 'all' ? category : undefined,
+      const result = await get<{ customers: Customer[]; total: number; page: number; totalPages: number }>('/api/customers', {
+        search: q || undefined,
+        category: cat !== 'all' ? cat : undefined,
+        page: p,
+        limit: 50,
       }, { showErrorToast: false })
-      setCustomers(result || [])
+      if (result) {
+        setCustomers(result.customers)
+        setTotal(result.total)
+        setPage(result.page)
+        setTotalPages(result.totalPages)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  const fetchCustomers = useCallback(() => {
+    doFetchCustomers(search, activeCategory, page)
+  }, [search, activeCategory, page, doFetchCustomers])
 
   useEffect(() => {
-    fetchCustomers()
+    doFetchCustomers(search, activeCategory, 1)
   }, [])
 
   // ─── Debounced Search ─────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchCustomers(search, activeCategory)
+      setPage(1)
+      doFetchCustomers(search, activeCategory, 1)
     }, 300)
     return () => clearTimeout(timer)
   }, [search, activeCategory])
+
+  // ─── Page navigation ────────────────────────────────────────────────
+  const goToPage = useCallback((p: number) => {
+    if (p >= 1 && p <= totalPages && p !== page) {
+      doFetchCustomers(search, activeCategory, p)
+    }
+  }, [search, activeCategory, page, totalPages, doFetchCustomers])
 
   // ─── Helpers ──────────────────────────────────────────────────────
   const resetForm = () => {
@@ -144,7 +168,7 @@ export function CustomersScreen() {
       if (result) {
         setOpenAddDialog(false)
         resetForm()
-        fetchCustomers(search, activeCategory)
+        fetchCustomers()
       }
     } finally {
       setSubmitting(false)
@@ -169,7 +193,7 @@ export function CustomersScreen() {
       if (result) {
         setOpenEditDialog(false)
         resetForm()
-        fetchCustomers(search, activeCategory)
+        fetchCustomers()
       }
     } finally {
       setSubmitting(false)
@@ -184,7 +208,7 @@ export function CustomersScreen() {
       await del(`/api/customers/${selectedCustomer.id}`)
       setOpenDeleteDialog(false)
       resetForm()
-      fetchCustomers(search, activeCategory)
+      fetchCustomers()
     } finally {
       setDeleting(false)
     }
@@ -234,7 +258,6 @@ export function CustomersScreen() {
   }
 
   // ─── Stats ────────────────────────────────────────────────────────
-  const totalCustomers = customers.length
   const totalDebt = customers.reduce((sum, c) => sum + c.debt, 0)
   const debtorsCount = customers.filter((c) => c.debt > 0).length
   const vipCount = customers.filter((c) => c.category === 'VIP').length
@@ -252,7 +275,7 @@ export function CustomersScreen() {
             <div>
               <h1 className="text-xl font-bold md:text-2xl">إدارة العملاء</h1>
               <p className="text-sm text-muted-foreground">
-                إجمالي {totalCustomers} عميل
+                إجمالي {total} عميل
                 {vipCount > 0 && (
                   <span className="mr-2 inline-flex items-center gap-1 text-amber-600">
                     <Crown className="h-3 w-3" />
@@ -307,7 +330,7 @@ export function CustomersScreen() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">إجمالي العملاء</p>
-                <p className="text-lg font-bold">{totalCustomers}</p>
+                <p className="text-lg font-bold">{total}</p>
               </div>
             </div>
           </div>
@@ -587,6 +610,60 @@ export function CustomersScreen() {
           </ScrollArea>
         </div>
 
+        {/* ── Pagination Controls ────────────────────────────────── */}
+        {totalPages > 1 && !loading && (
+          <div className="py-3 flex-shrink-0 border-t border-border/50">
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => {
+                  if (p === 1 || p === totalPages) return true
+                  if (Math.abs(p - page) <= 1) return true
+                  return false
+                })
+                .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) {
+                    acc.push('ellipsis')
+                  }
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((item, idx) =>
+                  item === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="text-xs text-muted-foreground px-1">...</span>
+                  ) : (
+                    <Button
+                      key={item}
+                      variant={item === page ? 'default' : 'outline'}
+                      size="icon"
+                      className="h-8 w-8 text-xs"
+                      onClick={() => goToPage(item)}
+                    >
+                      {item}
+                    </Button>
+                  ),
+                )}
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={page >= totalPages}
+                onClick={() => goToPage(page + 1)}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* ── Extracted Dialogs ─────────────────────────────────── */}
         <CustomerFormDialog
           open={openAddDialog}
@@ -679,7 +756,7 @@ export function CustomersScreen() {
           customer={paymentCustomer}
           formatCurrency={formatCurrency}
           symbol={symbol}
-          onSuccess={() => fetchCustomers(search, activeCategory)}
+          onSuccess={() => fetchCustomers()}
         />
 
         <PaymentHistoryDialog
@@ -694,7 +771,7 @@ export function CustomersScreen() {
           onOpenChange={setOpenLoyaltyDialog}
           customer={loyaltyCustomer}
           formatCurrency={formatCurrency}
-          onSuccess={() => fetchCustomers(search, activeCategory)}
+          onSuccess={() => fetchCustomers()}
         />
 
         <PurchaseHistoryDialog

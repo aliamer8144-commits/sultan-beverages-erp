@@ -49,28 +49,28 @@ export const GET = withAuth(tryCatch(async (request) => {
   const totalPaymentsBefore = paymentsBefore._sum.amount ?? 0
   const openingBalance = totalSalesBefore - totalPaymentsBefore
 
-  // ── Invoices within date range (sales + returns) ─────────────────
-  const invoices = await db.invoice.findMany({
-    where: {
-      customerId,
-      createdAt: { gte: startDate, lte: endDate },
-    },
-    orderBy: { createdAt: 'asc' },
-    include: {
-      returns: {
-        include: { product: { select: { name: true } } },
+  // ── Invoices & Payments within date range (parallelized) ─────────
+  const [invoices, payments] = await Promise.all([
+    db.invoice.findMany({
+      where: {
+        customerId,
+        createdAt: { gte: startDate, lte: endDate },
       },
-    },
-  })
-
-  // ── Payments within date range ───────────────────────────────────
-  const payments = await db.payment.findMany({
-    where: {
-      customerId,
-      createdAt: { gte: startDate, lte: endDate },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+      orderBy: { createdAt: 'asc' },
+      include: {
+        returns: {
+          include: { product: { select: { name: true } } },
+        },
+      },
+    }),
+    db.payment.findMany({
+      where: {
+        customerId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
 
   // ── Build transaction list with running balance ─────────────────
   interface Transaction {

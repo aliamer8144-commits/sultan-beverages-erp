@@ -5,23 +5,32 @@ import { logAction } from '@/lib/audit-logger'
 import { validateBody, createSupplierPaymentSchema } from '@/lib/validations'
 import { tryCatch } from '@/lib/api-error-handler'
 
-// GET /api/supplier-payments?supplierId=xxx
+// GET /api/supplier-payments?supplierId=xxx&page=1&limit=20
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url)
   const supplierId = searchParams.get('supplierId')
+  const page = Math.max(1, Number(searchParams.get('page')) || 1)
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
 
   if (!supplierId) {
     return errorResponse('معرف المورد مطلوب')
   }
 
-  const payments = await db.supplierPayment.findMany({
-    where: { supplierId },
-    orderBy: { createdAt: 'desc' },
-  })
+  const where = { supplierId }
+
+  const [payments, total] = await Promise.all([
+    db.supplierPayment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    db.supplierPayment.count({ where }),
+  ])
 
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
 
-  return successResponse({ payments, totalPaid })
+  return successResponse({ payments, totalPaid, total, totalPages: Math.ceil(total / limit), page })
 }, 'فشل في جلب مدفوعات المورد'))
 
 // POST /api/supplier-payments
@@ -56,6 +65,8 @@ export const POST = withAuth(tryCatch(async (request) => {
       orderBy: { createdAt: 'asc' }, // Pay oldest first
     })
 
+    // Pre-compute allocations sequentially (remainingPayment depends on order)
+    const allocations: { invoiceId: string; amount: number }[] = []
     for (const invoice of unpaidInvoices) {
       if (remainingPayment <= 0) break
 
@@ -63,13 +74,20 @@ export const POST = withAuth(tryCatch(async (request) => {
       if (invoiceRemaining <= 0) continue
 
       const paymentForInvoice = Math.min(remainingPayment, invoiceRemaining)
-
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: { paidAmount: { increment: paymentForInvoice } },
-      })
-
+      allocations.push({ invoiceId: invoice.id, amount: paymentForInvoice })
       remainingPayment -= paymentForInvoice
+    }
+
+    // Execute all updates in parallel (independent rows)
+    if (allocations.length > 0) {
+      await Promise.all(
+        allocations.map(({ invoiceId, amount }) =>
+          tx.invoice.update({
+            where: { id: invoiceId },
+            data: { paidAmount: { increment: amount } },
+          })
+        )
+      )
     }
 
     return createdPayment

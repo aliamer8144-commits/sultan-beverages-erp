@@ -451,8 +451,8 @@ export function POSScreen() {
   const fetchLastInvoices = useCallback(async () => {
     setLastInvoicesLoading(true)
     try {
-      const result = await get<any[]>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
-      if (result) setLastInvoices(result.slice(0, 3))
+      const result = await get<{ invoices: any[] }>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
+      if (result) setLastInvoices(result.invoices.slice(0, 3))
     } finally {
       setLastInvoicesLoading(false)
     }

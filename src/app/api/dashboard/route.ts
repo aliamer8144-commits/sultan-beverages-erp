@@ -5,74 +5,125 @@ import { tryCatch } from '@/lib/api-error-handler'
 
 export const GET = withAuth(tryCatch(async () => {
   const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
+  const now = new Date()
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0)
 
-  // 1. Today's Sales Total
-  const todaySalesResult = await db.invoice.aggregate({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay },
-    },
-    _sum: { totalAmount: true },
-  })
+  // ── Parallel batch 1: all independent Prisma client queries ──────
+  const [
+    todaySalesResult,
+    todayInvoiceItems,
+    todayInvoiceCount,
+    lowStockCount,
+    topProductGroups,
+    recentSales,
+    salesByCategoryGroups,
+  ] = await Promise.all([
+    // 1. Today's Sales Total
+    db.invoice.aggregate({
+      where: { type: 'sale', createdAt: { gte: startOfDay } },
+      _sum: { totalAmount: true },
+    }),
 
+    // 2. Today's Profit: (item.price - product.costPrice) * item.quantity
+    db.invoiceItem.findMany({
+      where: {
+        invoice: { type: 'sale', createdAt: { gte: startOfDay } },
+      },
+      include: {
+        product: { select: { costPrice: true } },
+      },
+    }),
+
+    // 3. Today's Invoice Count
+    db.invoice.count({
+      where: { type: 'sale', createdAt: { gte: startOfDay } },
+    }),
+
+    // 4. Low Stock Products Count
+    db.product.count({
+      where: {
+        quantity: { lte: db.product.fields.minQuantity },
+        isActive: true,
+      },
+    }),
+
+    // 5. Top Selling Products (top 5 by total quantity sold)
+    db.invoiceItem.groupBy({
+      by: ['productId'],
+      where: { invoice: { type: 'sale' } },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 5,
+    }),
+
+    // 6. Recent Sales (last 10 sale invoices with customer name)
+    db.invoice.findMany({
+      where: { type: 'sale' },
+      include: {
+        customer: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
+
+    // 7. Sales by Category — groupBy productId, resolve category names after
+    db.invoiceItem.groupBy({
+      by: ['productId'],
+      where: { invoice: { type: 'sale' } },
+      _sum: { total: true },
+      orderBy: { _sum: { total: 'desc' } },
+      take: 100,
+    }),
+  ])
+
+  // ── Compute today's metrics ──────────────────────────────────────
   const todaySales = todaySalesResult._sum.totalAmount ?? 0
-
-  // 2. Today's Profit: (item.price - product.costPrice) * item.quantity
-  const todayInvoiceItems = await db.invoiceItem.findMany({
-    where: {
-      invoice: {
-        type: 'sale',
-        createdAt: { gte: startOfDay },
-      },
-    },
-    include: {
-      product: {
-        select: { costPrice: true },
-      },
-    },
-  })
 
   const todayProfit = todayInvoiceItems.reduce(
     (sum, item) => sum + (item.price - item.product.costPrice) * item.quantity,
-    0
+    0,
   )
 
-  // 3. Today's Invoice Count
-  const todayInvoiceCount = await db.invoice.count({
-    where: {
-      type: 'sale',
-      createdAt: { gte: startOfDay },
-    },
-  })
-
-  // 4. Low Stock Products Count
-  const lowStockCount = await db.product.count({
-    where: {
-      quantity: { lte: db.product.fields.minQuantity },
-      isActive: true,
-    },
-  })
-
-  // 5. Top Selling Products (top 5 by total quantity sold)
-  const topProductGroups = await db.invoiceItem.groupBy({
-    by: ['productId'],
-    where: {
-      invoice: { type: 'sale' },
-    },
-    _sum: { quantity: true },
-    orderBy: { _sum: { quantity: 'desc' } },
-    take: 5,
-  })
-
+  // ── Parallel batch 2: SQL aggregation + resolve names from IDs ───
   const topProductIds = topProductGroups.map((g) => g.productId)
-  const topProductsData =
+  const categoryProductIds = salesByCategoryGroups.map((r) => r.productId)
+
+  const [
+    monthlyRaw,
+    topProductsData,
+    categoryProducts,
+  ] = await Promise.all([
+    // Monthly Sales (last 6 months) — SQL aggregation instead of fetching every invoice
+    db.$queryRaw`
+      SELECT TO_CHAR("createdAt", 'YYYY-MM') as month, COALESCE(SUM("totalAmount"), 0)::float as total
+      FROM "Invoice"
+      WHERE "type" = 'sale' AND "createdAt" >= ${sixMonthsAgo}
+      GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
+      ORDER BY month
+    `,
+
+    // Resolve top product names
     topProductIds.length > 0
-      ? await db.product.findMany({
+      ? db.product.findMany({
           where: { id: { in: topProductIds } },
           select: { id: true, name: true },
         })
-      : []
+      : Promise.resolve([]),
 
+    // Resolve product → category names
+    categoryProductIds.length > 0
+      ? db.product.findMany({
+          where: { id: { in: categoryProductIds } },
+          select: { id: true, category: { select: { name: true } } },
+        })
+      : Promise.resolve([]),
+  ]) as [
+    Array<{ month: string; total: number }>,
+    Array<{ id: string; name: string }>,
+    Array<{ id: string; category: { name: string } | null }>,
+  ]
+
+  // ── Top Products formatting ──────────────────────────────────────
   const topProducts = topProductGroups.map((group) => {
     const product = topProductsData.find((p) => p.id === group.productId)
     return {
@@ -81,18 +132,7 @@ export const GET = withAuth(tryCatch(async () => {
     }
   })
 
-  // 6. Recent Sales (last 10 sale invoices with customer name)
-  const recentSales = await db.invoice.findMany({
-    where: { type: 'sale' },
-    include: {
-      customer: {
-        select: { name: true },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-  })
-
+  // ── Recent Sales formatting ──────────────────────────────────────
   const recentSalesData = recentSales.map((inv) => ({
     id: inv.id,
     invoiceNo: inv.invoiceNo,
@@ -101,22 +141,8 @@ export const GET = withAuth(tryCatch(async () => {
     createdAt: inv.createdAt,
   }))
 
-  // 7. Monthly Sales (last 6 months)
-  const now = new Date()
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0)
-
-  const monthlyInvoices = await db.invoice.findMany({
-    where: {
-      type: 'sale',
-      createdAt: { gte: sixMonthsAgo },
-    },
-    select: {
-      totalAmount: true,
-      createdAt: true,
-    },
-  })
-
-  // Aggregate by month
+  // ── Monthly Sales ────────────────────────────────────────────────
+  // Initialize all 6 months with 0
   const monthMap = new Map<string, number>()
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -124,10 +150,10 @@ export const GET = withAuth(tryCatch(async () => {
     monthMap.set(key, 0)
   }
 
-  for (const inv of monthlyInvoices) {
-    const key = `${inv.createdAt.getFullYear()}-${String(inv.createdAt.getMonth() + 1).padStart(2, '0')}`
-    if (monthMap.has(key)) {
-      monthMap.set(key, (monthMap.get(key) ?? 0) + inv.totalAmount)
+  // Fill in aggregated totals from SQL
+  for (const row of monthlyRaw) {
+    if (monthMap.has(row.month)) {
+      monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + Number(row.total))
     }
   }
 
@@ -138,27 +164,16 @@ export const GET = withAuth(tryCatch(async () => {
     return { month: label, total }
   })
 
-  // 8. Sales by Category (donut chart data)
-  const salesByCategoryRaw = await db.invoiceItem.findMany({
-    where: {
-      invoice: { type: 'sale' },
-    },
-    include: {
-      product: {
-        include: {
-          category: {
-            select: { name: true },
-          },
-        },
-      },
-    },
-  })
-
+  // ── Sales by Category (resolve category names from product IDs) ───
+  const productCategoryMap = new Map(
+    categoryProducts.map((p) => [p.id, p.category?.name ?? 'أخرى'] as const),
+  )
   const categorySalesMap = new Map<string, number>()
-  for (const item of salesByCategoryRaw) {
-    const categoryName = item.product?.category?.name ?? 'أخرى'
-    const total = item.price * item.quantity
-    categorySalesMap.set(categoryName, (categorySalesMap.get(categoryName) ?? 0) + total)
+
+  for (const group of salesByCategoryGroups) {
+    const catName = productCategoryMap.get(group.productId) ?? 'أخرى'
+    const total = group._sum.total ?? 0
+    categorySalesMap.set(catName, (categorySalesMap.get(catName) ?? 0) + total)
   }
 
   const salesByCategory = Array.from(categorySalesMap.entries())

@@ -12,6 +12,8 @@ export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const category = searchParams.get("category") || "";
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
   const where: Record<string, unknown> = {};
 
@@ -23,12 +25,19 @@ export const GET = withAuth(tryCatch(async (request) => {
   }
   if (category) where.category = category;
 
-  const customers = await db.customer.findMany({
-    where: Object.keys(where).length > 0 ? where : undefined,
-    orderBy: { createdAt: "desc" },
-  });
+  const whereClause = Object.keys(where).length > 0 ? where : undefined;
 
-  return successResponse(customers);
+  const [customers, total] = await Promise.all([
+    db.customer.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    db.customer.count({ where: whereClause }),
+  ]);
+
+  return successResponse({ customers, total, page, totalPages: Math.ceil(total / limit) });
 }, 'فشل في تحميل العملاء'));
 
 /**

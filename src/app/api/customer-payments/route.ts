@@ -5,21 +5,30 @@ import { logAction } from '@/lib/audit-logger'
 import { validateBody, createCustomerPaymentSchema } from '@/lib/validations'
 import { tryCatch } from '@/lib/api-error-handler'
 
-// GET /api/customer-payments?customerId=xxx
+// GET /api/customer-payments?customerId=xxx&page=1&limit=20
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url)
   const customerId = searchParams.get('customerId')
+  const page = Math.max(1, Number(searchParams.get('page')) || 1)
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
 
   if (!customerId) {
     return errorResponse('معرف العميل مطلوب')
   }
 
-  const payments = await db.payment.findMany({
-    where: { customerId },
-    orderBy: { createdAt: 'desc' },
-  })
+  const where = { customerId }
 
-  return successResponse(payments)
+  const [payments, total] = await Promise.all([
+    db.payment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    db.payment.count({ where }),
+  ])
+
+  return successResponse({ payments, total, totalPages: Math.ceil(total / limit), page })
 }, 'فشل في جلب المدفوعات'))
 
 // POST /api/customer-payments

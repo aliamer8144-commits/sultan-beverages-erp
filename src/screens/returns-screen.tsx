@@ -276,9 +276,9 @@ export function ReturnsScreen() {
     returnValidation.clearAllErrors()
 
     try {
-      const result = await get<SaleInvoice[]>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
+      const result = await get<{ invoices: SaleInvoice[] }>('/api/invoices', { type: 'sale' }, { showErrorToast: false })
       if (result) {
-        setSaleInvoices(result)
+        setSaleInvoices(result.invoices)
       }
     } catch {
       toast.error('حدث خطأ أثناء تحميل الفواتير')

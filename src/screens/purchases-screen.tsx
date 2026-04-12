@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { useFormValidation } from '@/hooks/use-form-validation'
 import { invoiceItemSchema } from '@/lib/validations'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
@@ -48,6 +48,9 @@ export function PurchasesScreen() {
   })
   const [supplierLoading, setSupplierLoading] = useState(false)
   const [supplierSort, setSupplierSort] = useState<string>('createdAt')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [supplierTotal, setSupplierTotal] = useState(0)
 
   // ==================== Supplier Payment State ====================
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false)
@@ -71,32 +74,47 @@ export function PurchasesScreen() {
   const [ratingSupplier, setRatingSupplier] = useState<Supplier | null>(null)
 
   // ==================== Load Data ====================
-  const fetchSuppliers = useCallback(async (search = '', sortBy = 'createdAt') => {
-    const result = await get<Supplier[]>('/api/suppliers', { search: search || undefined, sortBy: sortBy || undefined })
+  const doFetchSuppliers = useCallback(async (s: string, sortBy: string, p: number) => {
+    const result = await get<{ suppliers: Supplier[]; total: number; page: number; totalPages: number }>('/api/suppliers', { search: s || undefined, sortBy: sortBy || undefined, page: p, limit: 50 })
     if (result) {
-      setSuppliers(result)
+      setSuppliers(result.suppliers)
+      setSupplierTotal(result.total)
+      setPage(result.page)
+      setTotalPages(result.totalPages)
     }
   }, [get])
 
+  const fetchSuppliers = useCallback((s = '', sortBy = 'createdAt') => {
+    doFetchSuppliers(s, sortBy, page)
+  }, [page, doFetchSuppliers])
+
   const fetchProducts = useCallback(async () => {
-    const result = await get<Product[]>('/api/products')
+    const result = await get<{ products: Product[] }>('/api/products', { limit: 100 })
     if (result) {
-      setProducts(result)
+      setProducts(result.products)
     }
   }, [get])
 
   useEffect(() => {
-    fetchSuppliers('', supplierSort)
+    doFetchSuppliers('', supplierSort, 1)
     fetchProducts()
-  }, [fetchSuppliers, fetchProducts, supplierSort])
+  }, [supplierSort, doFetchSuppliers, fetchProducts])
 
   // Debounced search for suppliers
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchSuppliers(supplierSearch, supplierSort)
+      setPage(1)
+      doFetchSuppliers(supplierSearch, supplierSort, 1)
     }, 400)
     return () => clearTimeout(timer)
-  }, [supplierSearch, supplierSort, fetchSuppliers])
+  }, [supplierSearch, doFetchSuppliers])
+
+  // Page navigation
+  const goToSupplierPage = useCallback((p: number) => {
+    if (p >= 1 && p <= totalPages && p !== page) {
+      doFetchSuppliers(supplierSearch, supplierSort, p)
+    }
+  }, [supplierSearch, supplierSort, page, totalPages, doFetchSuppliers])
 
   // ==================== Supplier Rating Handler ====================
   const openRatingDialog = (supplier: Supplier) => {
@@ -319,7 +337,7 @@ export function PurchasesScreen() {
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground">إجمالي الموردين</p>
-                    <p className="text-base font-bold number-animate-in">{suppliers.length}</p>
+                    <p className="text-base font-bold number-animate-in">{supplierTotal}</p>
                   </div>
                 </div>
               </div>
@@ -547,12 +565,64 @@ export function PurchasesScreen() {
             {/* Count badge */}
             {suppliers.length > 0 && (
               <div className="mt-3 text-xs text-muted-foreground text-center">
-                إجمالي الموردين: {suppliers.length}
+                إجمالي الموردين: {supplierTotal}
                 {suppliersWithBalance > 0 && (
                   <span className="text-destructive mr-2">
                     • {suppliersWithBalance} مورد برصيد مستحق ({formatCurrency(totalOutstanding)})
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={page <= 1}
+                  onClick={() => goToSupplierPage(page - 1)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    if (p === 1 || p === totalPages) return true
+                    if (Math.abs(p - page) <= 1) return true
+                    return false
+                  })
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) {
+                      acc.push('ellipsis')
+                    }
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <span key={`e-${idx}`} className="text-xs text-muted-foreground px-1">...</span>
+                    ) : (
+                      <Button
+                        key={item}
+                        variant={item === page ? 'default' : 'outline'}
+                        size="icon"
+                        className="h-8 w-8 text-xs"
+                        onClick={() => goToSupplierPage(item)}
+                      >
+                        {item}
+                      </Button>
+                    ),
+                  )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={page >= totalPages}
+                  onClick={() => goToSupplierPage(page + 1)}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
               </div>
             )}
           </TabsContent>

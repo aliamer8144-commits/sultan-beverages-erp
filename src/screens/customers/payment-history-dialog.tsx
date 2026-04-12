@@ -37,9 +37,9 @@ export function PaymentHistoryDialog({
       setHistoryLoading(true)
       ;(async () => {
         try {
-          const result = await get<Payment[]>('/api/customer-payments', { customerId: customer.id }, { showErrorToast: false })
+          const result = await get<{ payments: Payment[] }>('/api/customer-payments', { customerId: customer.id }, { showErrorToast: false })
           if (result) {
-            setPaymentHistory(result)
+            setPaymentHistory(result.payments)
           }
         } finally {
           setHistoryLoading(false)

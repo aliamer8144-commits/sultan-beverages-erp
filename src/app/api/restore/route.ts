@@ -88,81 +88,88 @@ export const POST = withAuth(tryCatch(async (request) => {
       counts.users = data.users.length
     }
 
-    // 2. Categories
+    // 2. Categories — use createMany
     if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
-      for (const cat of data.categories as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, products, ...catData } = cat
-        await tx.category.create({
-          data: catData as Prisma.CategoryCreateInput,
-        })
-      }
-      counts.categories = data.categories.length
+      const cleanedCats = (data.categories as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, products, ...rest }) => rest
+      )
+      await tx.category.createMany({
+        data: cleanedCats as Prisma.CategoryCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.categories = cleanedCats.length
     }
 
-    // 3. Products
+    // 3. Products — use createMany
     if (data.products && Array.isArray(data.products) && data.products.length > 0) {
-      for (const prod of data.products as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, category, invoiceItems, returns, ...prodData } = prod
-        await tx.product.create({
-          data: prodData as Prisma.ProductCreateInput,
-        })
-      }
-      counts.products = data.products.length
+      const cleanedProducts = (data.products as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, category, invoiceItems, returns, stockAdjustments, variants, ...rest }) => rest
+      )
+      await tx.product.createMany({
+        data: cleanedProducts as Prisma.ProductCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.products = cleanedProducts.length
     }
 
-    // 4. Customers
+    // 4. Customers — use createMany
     if (data.customers && Array.isArray(data.customers) && data.customers.length > 0) {
-      for (const cust of data.customers as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, invoices, payments, ...custData } = cust
-        await tx.customer.create({
-          data: custData as Prisma.CustomerCreateInput,
-        })
-      }
-      counts.customers = data.customers.length
+      const cleanedCustomers = (data.customers as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, invoices, payments, loyaltyTransactions, ...rest }) => rest
+      )
+      await tx.customer.createMany({
+        data: cleanedCustomers as Prisma.CustomerCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.customers = cleanedCustomers.length
     }
 
-    // 5. Suppliers
+    // 5. Suppliers — use createMany
     if (data.suppliers && Array.isArray(data.suppliers) && data.suppliers.length > 0) {
-      for (const supp of data.suppliers as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, invoices, supplierPayments, ...suppData } = supp
-        await tx.supplier.create({
-          data: suppData as Prisma.SupplierCreateInput,
-        })
-      }
-      counts.suppliers = data.suppliers.length
+      const cleanedSuppliers = (data.suppliers as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, invoices, supplierPayments, reviews, ...rest }) => rest
+      )
+      await tx.supplier.createMany({
+        data: cleanedSuppliers as Prisma.SupplierCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.suppliers = cleanedSuppliers.length
     }
 
-    // 6. Invoices
+    // 6. Invoices — use createMany
     if (data.invoices && Array.isArray(data.invoices) && data.invoices.length > 0) {
-      for (const inv of data.invoices as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, items, customer, supplier, user, returns, ...invData } = inv
-        await tx.invoice.create({
-          data: invData as Prisma.InvoiceCreateInput,
-        })
-      }
-      counts.invoices = data.invoices.length
+      const cleanedInvoices = (data.invoices as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, items, customer, supplier, user, returns, loyaltyTransactions, ...rest }) => rest
+      )
+      await tx.invoice.createMany({
+        data: cleanedInvoices as Prisma.InvoiceCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.invoices = cleanedInvoices.length
     }
 
-    // 7. InvoiceItems
+    // 7. InvoiceItems — use createMany
     if (data.invoiceItems && Array.isArray(data.invoiceItems) && data.invoiceItems.length > 0) {
-      for (const item of data.invoiceItems as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, invoice, product, ...itemData } = item
-        await tx.invoiceItem.create({
-          data: itemData as Prisma.InvoiceItemCreateInput,
-        })
-      }
-      counts.invoiceItems = data.invoiceItems.length
+      const cleanedItems = (data.invoiceItems as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, invoice, product, ...rest }) => rest
+      )
+      await tx.invoiceItem.createMany({
+        data: cleanedItems as Prisma.InvoiceItemCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.invoiceItems = cleanedItems.length
     }
 
-    // 8. Payments
+    // 8. Payments — use createMany
     if (data.payments && Array.isArray(data.payments) && data.payments.length > 0) {
-      for (const pay of data.payments as Record<string, unknown>[]) {
-        const { id, createdAt, updatedAt, customer, ...payData } = pay
-        await tx.payment.create({
-          data: payData as Prisma.PaymentCreateInput,
-        })
-      }
-      counts.payments = data.payments.length
+      const cleanedPayments = (data.payments as Record<string, unknown>[]).map(
+        ({ id, createdAt, updatedAt, customer, ...rest }) => rest
+      )
+      await tx.payment.createMany({
+        data: cleanedPayments as Prisma.PaymentCreateManyInput[],
+        skipDuplicates: true,
+      })
+      counts.payments = cleanedPayments.length
     }
 
     return counts

@@ -62,6 +62,11 @@ export function InventoryScreen() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+
   // Filter state
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
@@ -156,47 +161,67 @@ export function InventoryScreen() {
     }
   }, [get])
 
-  // Fetch products
-  const fetchProducts = useCallback(async () => {
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
+
+  // Fetch products (internal)
+  const doFetchProducts = useCallback(async (p: number, s: string, cat: string, ls: boolean) => {
     setLoading(true)
     try {
-      const result = await get<Product[]>(
+      const result = await get<{ products: Product[]; total: number; page: number; totalPages: number }>(
         '/api/products',
         {
-          search: search || undefined,
-          categoryId: categoryId !== 'all' ? categoryId : undefined,
-          lowStock: lowStock ? 'true' : undefined,
+          search: s || undefined,
+          categoryId: cat !== 'all' ? cat : undefined,
+          lowStock: ls ? 'true' : undefined,
+          page: p,
+          limit: 50,
         },
         { showErrorToast: false },
       )
       if (result) {
-        setProducts(result)
+        setProducts(result.products)
+        setTotal(result.total)
+        setPage(result.page)
+        setTotalPages(result.totalPages)
       }
     } catch {
       // handled by useApi
     } finally {
       setLoading(false)
     }
-  }, [search, categoryId, lowStock, get])
+  }, [get])
 
-  useEffect(() => {
-    fetchCategories()
-  }, [fetchCategories])
+  // Refresh products with current state (for callbacks that don't have filter values)
+  const fetchProducts = useCallback(() => {
+    doFetchProducts(page, search, categoryId, lowStock)
+  }, [page, search, categoryId, lowStock, doFetchProducts])
 
-  useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
-
-  // Debounced search
+  // Debounced filter changes → reset to page 1
   const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null)
   const handleSearchChange = (value: string) => {
     setSearch(value)
     if (searchTimer) clearTimeout(searchTimer)
     const timer = setTimeout(() => {
-      fetchProducts()
+      setPage(1)
+      doFetchProducts(1, value, categoryId, lowStock)
     }, 300)
     setSearchTimer(timer)
   }
+
+  // Filter changes (non-search) → reset to page 1
+  useEffect(() => {
+    setPage(1)
+    doFetchProducts(1, search, categoryId, lowStock)
+  }, [categoryId, lowStock])
+
+  // Page navigation
+  const goToPage = useCallback((p: number) => {
+    if (p >= 1 && p <= totalPages && p !== page) {
+      doFetchProducts(p, search, categoryId, lowStock)
+    }
+  }, [search, categoryId, lowStock, page, totalPages, doFetchProducts])
 
   // Form open handlers
   const openAddDialog = () => {
@@ -450,7 +475,7 @@ export function InventoryScreen() {
           <div>
             <h2 className="text-lg font-bold text-foreground heading-decoration">إدارة المخزون</h2>
             <p className="text-xs text-muted-foreground">
-              {products.length} منتج
+              {total} منتج
               {lowStockCount > 0 && (
                 <span className="animate-pulse-glow inline-flex items-center px-2 py-0.5 rounded-full text-destructive font-medium mr-2 text-xs bg-destructive/10">
                   • {lowStockCount} منتج منخفض المخزون
@@ -837,6 +862,60 @@ export function InventoryScreen() {
           </ScrollArea>
         )}
       </div>
+
+      {/* ─── Pagination Controls ──────────────────────────────── */}
+      {totalPages > 1 && !loading && (
+        <div className="px-4 md:px-6 py-3 flex-shrink-0 border-t border-border/50">
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page <= 1}
+              onClick={() => goToPage(page - 1)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => {
+                if (p === 1 || p === totalPages) return true
+                if (Math.abs(p - page) <= 1) return true
+                return false
+              })
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) {
+                  acc.push('ellipsis')
+                }
+                acc.push(p)
+                return acc
+              }, [])
+              .map((item, idx) =>
+                item === 'ellipsis' ? (
+                  <span key={`e-${idx}`} className="text-xs text-muted-foreground px-1">...</span>
+                ) : (
+                  <Button
+                    key={item}
+                    variant={item === page ? 'default' : 'outline'}
+                    size="icon"
+                    className="h-8 w-8 text-xs"
+                    onClick={() => goToPage(item)}
+                  >
+                    {item}
+                  </Button>
+                ),
+              )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page >= totalPages}
+              onClick={() => goToPage(page + 1)}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ─── Floating Batch Action Bar ────────────────────────── */}
       {isSomeSelected && (

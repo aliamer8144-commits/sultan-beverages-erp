@@ -12,6 +12,8 @@ export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const sortBy = searchParams.get("sortBy") || "createdAt";
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
   const orderBy: Record<string, string> = {}
   if (sortBy === "rating") {
@@ -20,17 +22,24 @@ export const GET = withAuth(tryCatch(async (request) => {
     orderBy.createdAt = "desc"
   }
 
-  const suppliers = await db.supplier.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search } },
-            { phone: { contains: search } },
-          ],
-        }
-      : undefined,
-    orderBy,
-  })
+  const where = search
+    ? {
+        OR: [
+          { name: { contains: search } },
+          { phone: { contains: search } },
+        ],
+      }
+    : undefined
+
+  const [suppliers, total] = await Promise.all([
+    db.supplier.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    db.supplier.count({ where }),
+  ])
 
   // Efficient balance computation — single aggregate for all suppliers
   const [purchaseAggregates, paymentAggregates] = await Promise.all([
@@ -63,7 +72,7 @@ export const GET = withAuth(tryCatch(async (request) => {
     }
   })
 
-  return successResponse(suppliersWithBalance)
+  return successResponse({ suppliers: suppliersWithBalance, total, page, totalPages: Math.ceil(total / limit) })
 }, 'فشل في تحميل الموردين'))
 
 /**

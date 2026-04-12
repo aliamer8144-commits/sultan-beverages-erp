@@ -3,79 +3,78 @@ import { withAuth } from "@/lib/auth-middleware";
 import { successResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
 
+interface RawAlertRow {
+  id: string;
+  name: string;
+  quantity: number;
+  minQuantity: number;
+  price: number;
+  costPrice: number;
+  barcode: string | null;
+  image: string | null;
+  categoryName: string | null;
+  categoryId: string | null;
+  categoryIcon: string | null;
+  totalSold: number;
+}
+
 export const GET = withAuth(tryCatch(async () => {
-  // Fetch all active products ordered by stock level
-  const products = await db.product.findMany({
-    where: {
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      quantity: true,
-      minQuantity: true,
-      price: true,
-      costPrice: true,
-      barcode: true,
-      image: true,
-      category: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      _count: {
-        select: {
-          invoiceItems: true,
-        },
-      },
-    },
-    orderBy: {
-      quantity: "asc",
-    },
+  // Fetch only products where quantity <= minQuantity (filter at DB level)
+  const rawAlerts = await db.$queryRaw<RawAlertRow[]>`
+    SELECT
+      p.id,
+      p.name,
+      p."quantity",
+      p."minQuantity",
+      p.price,
+      p."costPrice",
+      p.barcode,
+      p.image,
+      c.name as "categoryName",
+      c.id as "categoryId",
+      c.icon as "categoryIcon",
+      (SELECT COUNT(*) FROM "InvoiceItem" ii WHERE ii."productId" = p.id)::int as "totalSold"
+    FROM "Product" p
+    LEFT JOIN "Category" c ON p."categoryId" = c.id
+    WHERE p."isActive" = true AND p."quantity" <= p."minQuantity"
+    ORDER BY p."quantity" ASC
+  `;
+
+  // Build alert objects with computed severity, deficit, etc.
+  const alerts = rawAlerts.map((product) => {
+    let severity: "out" | "critical" | "low" = "low";
+    if (product.quantity === 0) {
+      severity = "out";
+    } else if (product.minQuantity > 0 && product.quantity <= product.minQuantity * 0.25) {
+      severity = "critical";
+    }
+
+    const suggestedOrder = Math.max(product.minQuantity * 2 - product.quantity, 0);
+    const reorderCost = suggestedOrder * product.costPrice;
+
+    return {
+      id: product.id,
+      name: product.name,
+      quantity: product.quantity,
+      minQuantity: product.minQuantity,
+      price: product.price,
+      costPrice: product.costPrice,
+      barcode: product.barcode,
+      image: product.image,
+      categoryName: product.categoryName || "بدون تصنيف",
+      categoryId: product.categoryId || null,
+      status: product.quantity === 0 ? ("out" as const) : ("low" as const),
+      severity,
+      deficit: product.minQuantity - product.quantity,
+      stockPercentage: product.minQuantity > 0
+        ? Math.round((product.quantity / product.minQuantity) * 100)
+        : 0,
+      suggestedOrder,
+      reorderCost,
+      totalSold: product.totalSold,
+      daysRemaining: null as number | null,
+    };
   });
-
-  // Filter: products where quantity <= minQuantity (low stock or out of stock)
-  // Include products that are near the threshold (within 50% buffer)
-  const alerts = products
-    .filter((product) => product.quantity <= product.minQuantity)
-    .map((product) => {
-      // Calculate severity: out (0), critical (< 25% of min), low (< 100% of min)
-      let severity: "out" | "critical" | "low" = "low";
-      if (product.quantity === 0) {
-        severity = "out";
-      } else if (product.quantity <= product.minQuantity * 0.25) {
-        severity = "critical";
-      }
-
-      // Calculate reorder suggestion (restock to 2x minQuantity)
-      const suggestedOrder = Math.max(product.minQuantity * 2 - product.quantity, 0);
-      const reorderCost = suggestedOrder * product.costPrice;
-
-      return {
-        id: product.id,
-        name: product.name,
-        quantity: product.quantity,
-        minQuantity: product.minQuantity,
-        price: product.price,
-        costPrice: product.costPrice,
-        barcode: product.barcode,
-        image: product.image,
-        categoryName: product.category?.name || "بدون تصنيف",
-        categoryId: product.category?.id || null,
-        status: product.quantity === 0 ? ("out" as const) : ("low" as const),
-        severity,
-        deficit: product.minQuantity - product.quantity,
-        stockPercentage: product.minQuantity > 0
-          ? Math.round((product.quantity / product.minQuantity) * 100)
-          : 0,
-        suggestedOrder,
-        reorderCost,
-        totalSold: product._count.invoiceItems,
-        // Days of stock remaining (rough estimate based on recent sales)
-        daysRemaining: null as number | null,
-      };
-    });
 
   // Estimate days remaining for each alert product based on last 30 days sales
   const thirtyDaysAgo = new Date();
