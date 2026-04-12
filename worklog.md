@@ -137,4 +137,39 @@ Stage Summary:
 - Field-level error display added across all forms
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
 - Total: 1182 insertions, 608 deletions (cleaner, more maintainable code)
-- Ready to push to GitHub
+- Pushed to GitHub as commit 8dfe943
+
+---
+Task ID: 13
+Agent: Main + 6 Sub-agents
+Task: Phase 13 — Unified API Error Handling
+
+Work Log:
+- Created src/lib/api-error-handler.ts:
+  - tryCatch(): Auto try/catch wrapper with Prisma error mapping + structured logging
+  - validateRequest(): Zod schema validation with 422 on invalid input
+  - withValidation(): Combined tryCatch + validateRequest for POST/PUT/PATCH
+  - Automatic context.params resolution for Next.js 15+
+  - Prisma error auto-mapping: P2002→409, P2025→404, P2003→400, connection→503
+- Migrated 39 API route files:
+  - Phase 13-B (6 inconsistent files): users, users/[id], auth, auth/me, auth/seed-passwords, route.ts(deleted)
+  - Phase 13-C Batch 1 (9 core CRUD): customers, customers/[id], suppliers, suppliers/[id], categories, categories/[id], products, products/[id], products/search
+  - Phase 13-C Batch 2 (11 business logic): invoices, returns, expenses, expense-categories, stock-adjustments, product-variants, loyalty, loyalty/rewards, customer-payments, supplier-payments, supplier-rating
+  - Phase 13-C Batch 3 (13 dashboard/admin): dashboard, quick-stats, analytics, daily-close, customer-statement, sales-targets, global-search, stock-alerts, audit-log, backup, restore, seed, exchange-rate
+- Fixed inconsistencies:
+  - 6 files using raw NextResponse.json → centralized helpers
+  - 3 English error messages → Arabic (analytics, dashboard, daily-close)
+  - 15 console.error/console.log calls removed (tryCatch logs automatically)
+  - 6 files using errorResponse(msg, 500) → serverError(msg)
+  - auth/seed-passwords: Now requires admin (was publicly accessible!)
+  - users routes: Added Zod validation (createUserSchema, editUserSchema)
+  - users/[id]: Added self-deletion prevention
+- Deleted dead /api/route.ts endpoint
+
+Stage Summary:
+- 39 API route files migrated to unified error handling
+- 1 new infrastructure file (api-error-handler.ts)
+- 1 deleted file (dead endpoint)
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- Total: 4304 insertions, 4503 deletions (net -199 lines of boilerplate)
+- Pushed to GitHub as commit f64f21c
