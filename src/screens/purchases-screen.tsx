@@ -4,22 +4,23 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, Banknote, AlertCircle, TrendingDown, Star, Globe, Phone, ChevronDown } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
 import { EmptyState } from '@/components/empty-state'
 import { StarRating } from '@/components/star-rating'
-import { formatShortDate } from '@/lib/date-utils'
-import type { Supplier, Product, PurchaseItem, SupplierPayment } from './purchases/types'
-import { PAYMENT_TERMS } from './purchases/types'
+import type { Supplier, Product, PurchaseItem } from './purchases/types'
+
+import { SupplierFormDialog } from './purchases/supplier-form-dialog'
+import { SupplierPaymentDialog } from './purchases/supplier-payment-dialog'
+import { PaymentHistoryDialog } from './purchases/payment-history-dialog'
+import { RatingDialog } from './purchases/rating-dialog'
 
 // Types imported from ./purchases/types
 
@@ -49,16 +50,10 @@ export function PurchasesScreen() {
   // ==================== Supplier Payment State ====================
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false)
   const [paymentSupplier, setPaymentSupplier] = useState<Supplier | null>(null)
-  const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [paymentNotes, setPaymentNotes] = useState('')
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false)
 
   // ── Payment history dialog state ──
   const [openHistoryDialog, setOpenHistoryDialog] = useState(false)
   const [historySupplier, setHistorySupplier] = useState<Supplier | null>(null)
-  const [paymentHistory, setPaymentHistory] = useState<SupplierPayment[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
 
   // ==================== Purchase Invoice State ====================
   const [products, setProducts] = useState<Product[]>([])
@@ -68,6 +63,10 @@ export function PurchasesScreen() {
   const [itemQuantity, setItemQuantity] = useState<number>(1)
   const [itemCostPrice, setItemCostPrice] = useState<number>(0)
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
+
+  // ==================== Supplier Rating Dialog State ====================
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false)
+  const [ratingSupplier, setRatingSupplier] = useState<Supplier | null>(null)
 
   // ==================== Load Data ====================
   const fetchSuppliers = useCallback(async (search = '', sortBy = 'createdAt') => {
@@ -97,48 +96,10 @@ export function PurchasesScreen() {
     return () => clearTimeout(timer)
   }, [supplierSearch, supplierSort, fetchSuppliers])
 
-  // ==================== Supplier Rating Dialog State ====================
-  const [ratingDialogOpen, setRatingDialogOpen] = useState(false)
-  const [ratingSupplier, setRatingSupplier] = useState<Supplier | null>(null)
-  const [ratingValue, setRatingValue] = useState(0)
-  const [ratingReview, setRatingReview] = useState('')
-  const [ratingSubmitting, setRatingSubmitting] = useState(false)
-  const [ratingHover, setRatingHover] = useState(0)
-
   // ==================== Supplier Rating Handler ====================
   const openRatingDialog = (supplier: Supplier) => {
     setRatingSupplier(supplier)
-    setRatingValue(0)
-    setRatingReview('')
-    setRatingHover(0)
     setRatingDialogOpen(true)
-  }
-
-  const handleSubmitRating = async () => {
-    if (!ratingSupplier || ratingValue === 0) {
-      toast.error('يرجى اختيار تقييم')
-      return
-    }
-
-    setRatingSubmitting(true)
-    try {
-      const result = await post('/api/supplier-rating', {
-        supplierId: ratingSupplier.id,
-        rating: ratingValue,
-        review: ratingReview.trim() || undefined,
-        userName: user?.name || undefined,
-      }, {
-        showSuccessToast: true,
-        successMessage: `تم تقييم المورد ${ratingValue} نجوم`,
-      })
-      if (result) {
-        setRatingDialogOpen(false)
-        setRatingSupplier(null)
-        fetchSuppliers(supplierSearch, supplierSort)
-      }
-    } finally {
-      setRatingSubmitting(false)
-    }
   }
 
   // ==================== Suppliers Handlers ====================
@@ -197,59 +158,12 @@ export function PurchasesScreen() {
   // ==================== Supplier Payment Handlers ====================
   const openPaymentDialogForSupplier = (supplier: Supplier) => {
     setPaymentSupplier(supplier)
-    setPaymentAmount('')
-    setPaymentMethod('cash')
-    setPaymentNotes('')
     setOpenPaymentDialog(true)
   }
 
-  const handleRecordSupplierPayment = async () => {
-    if (!paymentSupplier) return
-    const amount = parseFloat(paymentAmount)
-    if (!amount || amount <= 0) {
-      toast.error('يرجى إدخال مبلغ صحيح')
-      return
-    }
-    if (amount > paymentSupplier.remainingBalance) {
-      toast.error('المبلغ أكبر من الرصيد المتبقي')
-      return
-    }
-
-    setPaymentSubmitting(true)
-    try {
-      const methodLabel = paymentMethod === 'cash' ? 'نقدي' : paymentMethod === 'transfer' ? 'تحويل' : 'شيك'
-      const result = await post('/api/supplier-payments', {
-        supplierId: paymentSupplier.id,
-        amount,
-        method: paymentMethod,
-        notes: paymentNotes.trim() || null,
-      }, {
-        showSuccessToast: true,
-        successMessage: `تم تسجيل دفعة ${formatCurrency(amount)} (${methodLabel}) للمورد ${paymentSupplier.name}`,
-      })
-      if (result) {
-        setOpenPaymentDialog(false)
-        setPaymentSupplier(null)
-        fetchSuppliers(supplierSearch, supplierSort)
-      }
-    } finally {
-      setPaymentSubmitting(false)
-    }
-  }
-
-  const openPaymentHistory = async (supplier: Supplier) => {
+  const openPaymentHistory = (supplier: Supplier) => {
     setHistorySupplier(supplier)
-    setPaymentHistory([])
     setOpenHistoryDialog(true)
-    setHistoryLoading(true)
-    try {
-      const result = await get<SupplierPayment[]>('/api/supplier-payments', { supplierId: supplier.id }, { showErrorToast: false })
-      if (result) {
-        setPaymentHistory(result)
-      }
-    } finally {
-      setHistoryLoading(false)
-    }
   }
 
   // ==================== Purchase Invoice Handlers ====================
@@ -879,474 +793,36 @@ export function PurchasesScreen() {
         </Tabs>
       </div>
 
-      {/* ==================== Add/Edit Supplier Dialog ==================== */}
-      <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
-        <DialogContent className="sm:max-w-lg" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {editingSupplier ? (
-                <>
-                  <Pencil className="w-4 h-4 text-primary" />
-                  تعديل المورد
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 text-primary" />
-                  إضافة مورد جديد
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
+      {/* ── Extracted Dialogs ── */}
+      <SupplierFormDialog
+        open={supplierDialogOpen}
+        onOpenChange={setSupplierDialogOpen}
+        editingSupplier={editingSupplier}
+        supplierForm={supplierForm}
+        setSupplierForm={setSupplierForm}
+        onSave={handleSaveSupplier}
+        loading={supplierLoading}
+      />
 
-          <ScrollArea className="max-h-[70vh]">
-            <div className="space-y-4 py-2 px-1">
-              {/* Rating Display */}
-              {editingSupplier && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
-                  <Star className="w-5 h-5 text-amber-500" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">التقييم الحالي</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <StarRating rating={editingSupplier.rating} size="sm" />
-                      <span className="text-xs text-muted-foreground">
-                        ({editingSupplier.ratingCount} تقييم)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+      <SupplierPaymentDialog
+        open={openPaymentDialog}
+        onOpenChange={setOpenPaymentDialog}
+        supplier={paymentSupplier}
+        onSuccess={() => fetchSuppliers(supplierSearch, supplierSort)}
+      />
 
-              <div className="glass-card rounded-xl p-4 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-name">اسم المورد *</Label>
-                  <Input
-                    id="supplier-name"
-                    placeholder="أدخل اسم المورد"
-                    value={supplierForm.name}
-                    onChange={(e) =>
-                      setSupplierForm({ ...supplierForm, name: e.target.value })
-                    }
-                    className="h-10 rounded-xl"
-                    autoFocus
-                  />
-                </div>
+      <PaymentHistoryDialog
+        open={openHistoryDialog}
+        onOpenChange={setOpenHistoryDialog}
+        supplier={historySupplier}
+      />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier-phone" className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                      رقم الهاتف
-                    </Label>
-                    <Input
-                      id="supplier-phone"
-                      placeholder="رقم الهاتف"
-                      value={supplierForm.phone}
-                      onChange={(e) =>
-                        setSupplierForm({ ...supplierForm, phone: e.target.value })
-                      }
-                      className="h-10 rounded-xl"
-                      dir="ltr"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier-phone2" className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                      هاتف احتياطي
-                    </Label>
-                    <Input
-                      id="supplier-phone2"
-                      placeholder="رقم احتياطي"
-                      value={supplierForm.phone2}
-                      onChange={(e) =>
-                        setSupplierForm({ ...supplierForm, phone2: e.target.value })
-                      }
-                      className="h-10 rounded-xl"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-address">العنوان</Label>
-                  <Input
-                    id="supplier-address"
-                    placeholder="أدخل العنوان"
-                    value={supplierForm.address}
-                    onChange={(e) =>
-                      setSupplierForm({ ...supplierForm, address: e.target.value })
-                    }
-                    className="h-10 rounded-xl"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-website" className="flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                    الموقع الإلكتروني
-                  </Label>
-                  <Input
-                    id="supplier-website"
-                    placeholder="https://example.com"
-                    value={supplierForm.website}
-                    onChange={(e) =>
-                      setSupplierForm({ ...supplierForm, website: e.target.value })
-                    }
-                    className="h-10 rounded-xl"
-                    dir="ltr"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-payment-terms">شروط الدفع</Label>
-                  <Select
-                    value={supplierForm.paymentTerms}
-                    onValueChange={(val) => setSupplierForm({ ...supplierForm, paymentTerms: val })}
-                  >
-                    <SelectTrigger className="h-10 rounded-xl">
-                      <SelectValue placeholder="شروط الدفع" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_TERMS.map((term) => (
-                        <SelectItem key={term.value} value={term.value}>
-                          {term.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-notes">ملاحظات</Label>
-                  <Textarea
-                    id="supplier-notes"
-                    placeholder="ملاحظات إضافية عن المورد..."
-                    value={supplierForm.notes}
-                    onChange={(e) =>
-                      setSupplierForm({ ...supplierForm, notes: e.target.value })
-                    }
-                    className="rounded-xl resize-none min-h-[80px]"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setSupplierDialogOpen(false)}
-              className="rounded-xl"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSaveSupplier}
-              disabled={supplierLoading}
-              className="rounded-xl gap-2"
-            >
-              {supplierLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>جاري الحفظ...</span>
-                </>
-              ) : editingSupplier ? (
-                <>
-                  <Pencil className="w-4 h-4" />
-                  حفظ التعديلات
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4" />
-                  إضافة المورد
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ==================== Record Payment Dialog ==================== */}
-      <Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Wallet className="h-5 w-5 text-emerald-600" />
-              </div>
-              تسجيل دفعة مورد
-            </DialogTitle>
-          </DialogHeader>
-          {paymentSupplier && (
-            <div className="space-y-4 py-2">
-              <div className="rounded-xl bg-muted/40 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{paymentSupplier.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">المبلغ المستحق</p>
-                  </div>
-                  <span className="text-lg font-bold text-destructive tabular-nums">
-                    {formatCurrency(paymentSupplier.remainingBalance)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>المبلغ *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="h-10 rounded-xl"
-                  placeholder="0.00"
-                  dir="ltr"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-lg"
-                    onClick={() => setPaymentAmount(String(Math.ceil(paymentSupplier.remainingBalance / 4)))}
-                  >
-                    الربع
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-lg"
-                    onClick={() => setPaymentAmount(String(Math.ceil(paymentSupplier.remainingBalance / 2)))}
-                  >
-                    النصف
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-lg"
-                    onClick={() => setPaymentAmount(String(paymentSupplier.remainingBalance))}
-                  >
-                    الكل
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>طريقة الدفع</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'cash', label: 'نقدي', icon: Banknote },
-                    { value: 'transfer', label: 'تحويل', icon: Wallet },
-                    { value: 'check', label: 'شيك', icon: Wallet },
-                  ].map((m) => (
-                    <Button
-                      key={m.value}
-                      type="button"
-                      variant={paymentMethod === m.value ? 'default' : 'outline'}
-                      size="sm"
-                      className="rounded-lg text-xs"
-                      onClick={() => setPaymentMethod(m.value)}
-                    >
-                      {m.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>ملاحظات</Label>
-                <Textarea
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  className="rounded-xl resize-none"
-                  rows={2}
-                  placeholder="ملاحظات إضافية (اختياري)"
-                />
-              </div>
-
-              <Button
-                onClick={handleRecordSupplierPayment}
-                disabled={paymentSubmitting || !paymentAmount}
-                className="w-full gap-2 rounded-xl btn-ripple"
-              >
-                {paymentSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>جاري التسجيل...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wallet className="w-4 h-4" />
-                    تسجيل الدفعة
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ==================== Payment History Dialog ==================== */}
-      <Dialog open={openHistoryDialog} onOpenChange={setOpenHistoryDialog}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-                <History className="h-5 w-5 text-blue-600" />
-              </div>
-              سجل الدفعات
-            </DialogTitle>
-          </DialogHeader>
-          {historySupplier && (
-            <div className="space-y-3 py-2">
-              <div className="rounded-xl bg-muted/40 p-3">
-                <p className="text-sm font-semibold">{historySupplier.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  إجمالي المدفوع: <span className="text-emerald-600 font-bold">{formatCurrency(historySupplier.totalPaid)}</span>
-                </p>
-              </div>
-
-              <ScrollArea className="max-h-[300px]">
-                {historyLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  </div>
-                ) : paymentHistory.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <History className="w-8 h-8 mx-auto opacity-30 mb-2" />
-                    <p className="text-sm">لا توجد دفعات سابقة</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {paymentHistory.map((payment) => (
-                      <div key={payment.id} className="rounded-lg border p-3 bg-card/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-bold text-emerald-600 tabular-nums">
-                              {formatCurrency(payment.amount)}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {payment.method === 'cash' ? 'نقدي' : payment.method === 'transfer' ? 'تحويل' : 'شيك'}
-                            </p>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">
-                            {formatShortDate(payment.createdAt)}
-                          </p>
-                        </div>
-                        {payment.notes && (
-                          <p className="text-xs text-muted-foreground mt-1.5 border-t border-border/30 pt-1.5">
-                            {payment.notes}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ==================== Supplier Rating Dialog ==================== */}
-      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
-        <DialogContent className="sm:max-w-md" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-                <Star className="h-5 w-5 text-amber-500" />
-              </div>
-              تقييم المورد
-            </DialogTitle>
-          </DialogHeader>
-          {ratingSupplier && (
-            <div className="space-y-4 py-2">
-              {/* Supplier Info */}
-              <div className="glass-card rounded-xl p-3">
-                <p className="text-sm font-bold">{ratingSupplier.name}</p>
-                {ratingSupplier.ratingCount > 0 && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    المتوسط الحالي: {ratingSupplier.rating.toFixed(1)} ({ratingSupplier.ratingCount} تقييم)
-                  </p>
-                )}
-              </div>
-
-              {/* Star Selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">اختر التقييم</Label>
-                <div className="flex items-center gap-1 justify-center py-2">
-                  {[1, 2, 3, 4, 5].map((star) => {
-                    const filled = star <= (ratingHover || ratingValue)
-                    return (
-                      <button
-                        key={star}
-                        type="button"
-                        className="cursor-pointer hover:scale-125 transition-transform p-1"
-                        onMouseEnter={() => setRatingHover(star)}
-                        onMouseLeave={() => setRatingHover(0)}
-                        onClick={() => setRatingValue(star)}
-                      >
-                        <Star
-                          className={`w-8 h-8 ${
-                            filled
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'fill-transparent text-muted-foreground/30'
-                          }`}
-                        />
-                      </button>
-                    )
-                  })}
-                </div>
-                {ratingValue > 0 && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    {ratingValue === 1 && 'سيئ'}
-                    {ratingValue === 2 && 'مقبول'}
-                    {ratingValue === 3 && 'جيد'}
-                    {ratingValue === 4 && 'جيد جداً'}
-                    {ratingValue === 5 && 'ممتاز'}
-                  </p>
-                )}
-              </div>
-
-              {/* Review Text */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  ملاحظات <span className="text-muted-foreground text-xs">(اختياري)</span>
-                </Label>
-                <Textarea
-                  placeholder="أضف تعليقاً على تقييمك..."
-                  value={ratingReview}
-                  onChange={(e) => setRatingReview(e.target.value)}
-                  className="rounded-xl min-h-[80px] resize-none"
-                  maxLength={200}
-                />
-                <p className="text-[10px] text-muted-foreground text-left" dir="ltr">
-                  {ratingReview.length}/200
-                </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setRatingDialogOpen(false)}
-              disabled={ratingSubmitting}
-              className="rounded-lg"
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSubmitRating}
-              disabled={ratingSubmitting || ratingValue === 0}
-              className="gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              {ratingSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              <Star className="w-4 h-4" />
-              إرسال التقييم
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RatingDialog
+        open={ratingDialogOpen}
+        onOpenChange={setRatingDialogOpen}
+        supplier={ratingSupplier}
+        onSuccess={() => fetchSuppliers(supplierSearch, supplierSort)}
+      />
     </div>
   )
 }
