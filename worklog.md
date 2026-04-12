@@ -245,3 +245,41 @@ Stage Summary:
 - 8 duplicate tooltip/legend components eliminated
 - 5 reusable chart components created for future use
 - All existing visual appearance preserved exactly
+
+---
+Task ID: 16
+Agent: Main + 4 Sub-agents
+Task: Phase 16 — Type Safety Improvements (تحسين Type Safety)
+
+Work Log:
+- Level 1 (Red): Removed dangerous `any` types
+  - charts/index.tsx: Generic `<T>` on all 5 chart components + AxisInterval type
+  - pos-screen.tsx: `any[]` → `LastInvoice[]` for invoice fetch
+  - rating-dialog.tsx: `0 as any` → proper RatingFormValues + schema extend
+  - supplier-payment-dialog.tsx: `'' as any` → PaymentFormValues interface
+- Level 2 (Yellow): Improved generic types
+  - use-zod-form.ts: Two-generic support `<TInput, TOutput>` for coerce.number scenarios
+    - TInput: form state (raw strings from HTML inputs)
+    - TOutput: schema output (coerced numbers for submit handler)
+  - auth-middleware.ts: Declaration merging replaces unsafe `as unknown as Record` casts
+    - New AuthUserInfo interface exported
+    - getRequestUser() now returns typed AuthUserInfo | undefined
+- Level 3 (Green): Type-safe API params
+  - Created getRequiredParam() helper in api-error-handler.ts
+  - Updated 5 [id] routes: suppliers, products, categories, customers, users
+  - Eliminated 10 manual `?? {}` + null check patterns
+- Level 4 (Blue): Cleanup
+  - Added explanatory comments to all 7 eslint-disable directives
+  - db.ts: "Prisma generate requires dynamic require"
+  - 5 screens: "Intentionally triggers data fetch that sets state — safe pattern"
+- Fixed 6 dialog files for strict type compatibility:
+  - customer-payment-dialog, loyalty-history-dialog, product-form-dialog
+  - product-variants-dialog, rating-dialog, supplier-payment-dialog
+
+Stage Summary:
+- Commit: 62b8f25, pushed to GitHub
+- 21 files changed, 197 insertions(+), 112 deletions(-)
+- All `: any` removed from charts, API client, form hooks
+- useZodForm now properly supports input/output type separation
+- Auth middleware uses clean declaration merging instead of type casts
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
