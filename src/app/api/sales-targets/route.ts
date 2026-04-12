@@ -211,7 +211,7 @@ export const GET = withAuth(tryCatch(async (request) => {
   const targetWithData = await computeTargetData(activeTargets[0])
 
   return successResponse(targetWithData)
-}, 'خطأ في جلب أهداف المبيعات'))
+}, 'خطأ في جلب أهداف المبيعات'), { requireAdmin: true })
 
 // ─── POST: Create new sales target ──────────────────────────────────────────
 export const POST = withAuth(tryCatch(async (request) => {
@@ -250,7 +250,7 @@ export const POST = withAuth(tryCatch(async (request) => {
   const targetWithData = await computeTargetData(target)
 
   return successResponse(targetWithData, 201)
-}, 'خطأ في إنشاء هدف المبيعات'))
+}, 'خطأ في إنشاء هدف المبيعات'), { requireAdmin: true })
 
 // ─── PUT: Update existing sales target ──────────────────────────────────────
 export const PUT = withAuth(tryCatch(async (request) => {
@@ -286,7 +286,7 @@ export const PUT = withAuth(tryCatch(async (request) => {
   const targetWithData = await computeTargetData(target)
 
   return successResponse(targetWithData)
-}, 'خطأ في تحديث هدف المبيعات'))
+}, 'خطأ في تحديث هدف المبيعات'), { requireAdmin: true })
 
 // ─── DELETE: Delete a target ────────────────────────────────────────────────
 export const DELETE = withAuth(tryCatch(async (request) => {
@@ -308,4 +308,4 @@ export const DELETE = withAuth(tryCatch(async (request) => {
   })
 
   return successResponse({ message: 'تم حذف الهدف بنجاح' })
-}, 'خطأ في حذف هدف المبيعات'))
+}, 'خطأ في حذف هدف المبيعات'), { requireAdmin: true })

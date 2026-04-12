@@ -1,6 +1,15 @@
 import { withAuth } from '@/lib/auth-middleware'
-import { successResponse, errorResponse } from '@/lib/api-response'
-import { tryCatch } from '@/lib/api-error-handler'
+import { successResponse } from '@/lib/api-response'
+import { tryCatch, withValidation } from '@/lib/api-error-handler'
+import { z } from 'zod'
+
+const exchangeRateSchema = z.object({
+  exchangeRate: z.number().positive().optional(),
+  secondaryCurrency: z.string().max(10).optional(),
+  currencyDisplayMode: z.string().max(20).optional(),
+  secondaryCurrencyEnabled: z.boolean().optional(),
+  secondaryCurrencySymbol: z.string().max(10).optional(),
+})
 
 // ─── GET: Return default exchange rate settings ──────────────────
 // Stateless endpoint — the frontend manages exchange rate via Zustand.
@@ -19,20 +28,17 @@ export const GET = withAuth(tryCatch(async () => {
 // ─── POST: Accept exchange rate settings (stateless echo) ────────
 // The frontend persists settings via Zustand/localStorage.
 // This endpoint validates and echoes back the posted data.
-export const POST = withAuth(tryCatch(async (request) => {
-  const body = await request.json()
-  const { exchangeRate, secondaryCurrency, currencyDisplayMode, secondaryCurrencyEnabled, secondaryCurrencySymbol } = body
-
-  if (exchangeRate !== undefined && (typeof exchangeRate !== 'number' || exchangeRate <= 0)) {
-    return errorResponse('يجب أن يكون سعر الصرف رقماً أكبر من صفر')
-  }
-
-  return successResponse({
-    primaryCurrency: 'YER',
-    secondaryCurrencyEnabled: secondaryCurrencyEnabled ?? false,
-    secondaryCurrency: secondaryCurrency ?? 'USD',
-    exchangeRate: exchangeRate ?? 1,
-    currencyDisplayMode: currencyDisplayMode ?? 'primary',
-    secondaryCurrencySymbol: secondaryCurrencySymbol ?? '$',
-  })
-}, 'فشل في حفظ سعر الصرف'))
+export const POST = withAuth(withValidation(
+  exchangeRateSchema,
+  async (request, body) => {
+    return successResponse({
+      primaryCurrency: 'YER',
+      secondaryCurrencyEnabled: body.secondaryCurrencyEnabled ?? false,
+      secondaryCurrency: body.secondaryCurrency ?? 'USD',
+      exchangeRate: body.exchangeRate ?? 1,
+      currencyDisplayMode: body.currencyDisplayMode ?? 'primary',
+      secondaryCurrencySymbol: body.secondaryCurrencySymbol ?? '$',
+    })
+  },
+  'فشل في حفظ سعر الصرف'
+))

@@ -64,15 +64,21 @@ export function tryCatch(
       const resolvedParams = context.params ? await context.params : undefined
       return await handler(request, { params: resolvedParams })
     } catch (error) {
-      const message = error instanceof Error ? error.message : fallbackMessage
-      console.error(`[API Error] ${request.method} ${request.nextUrl.pathname}:`, message)
+      const internalMessage = error instanceof Error ? error.message : fallbackMessage
+      console.error(`[API Error] ${request.method} ${request.nextUrl.pathname}:`, internalMessage)
 
-      // Handle specific Prisma errors
+      // Handle specific Prisma errors (mapped to safe Arabic messages)
       if (isPrismaError(error)) {
         return handlePrismaError(error, fallbackMessage)
       }
 
-      return serverError(message)
+      // Handle validation errors (thrown by validateRequest with statusCode 422)
+      if (isValidationError(error)) {
+        return errorResponse(internalMessage, 422)
+      }
+
+      // All other errors: return generic fallback to client, log details server-side only
+      return serverError(fallbackMessage)
     }
   }
 }
@@ -210,6 +216,13 @@ export function getRequiredParam(
     throw error
   }
   return value
+}
+
+// ── Internal Helpers ────────────────────────────────────────────────
+
+/** Check if an error was thrown by validateRequest/getRequiredParam (has statusCode) */
+function isValidationError(error: unknown): error is Error & { statusCode: number } {
+  return error instanceof Error && 'statusCode' in error
 }
 
 // ── Internal Types ─────────────────────────────────────────────────

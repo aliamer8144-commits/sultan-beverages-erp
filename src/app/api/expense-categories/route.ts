@@ -67,7 +67,7 @@ export const POST = withAuth(tryCatch(async (request) => {
     }
     throw error
   }
-}, 'فشل في إنشاء فئة المصروفات'))
+}, 'فشل في إنشاء فئة المصروفات'), { requireAdmin: true })
 
 export const PUT = withAuth(tryCatch(async (request) => {
   const body = await request.json()
@@ -113,7 +113,7 @@ export const PUT = withAuth(tryCatch(async (request) => {
     }
     throw error
   }
-}, 'فشل في تحديث فئة المصروفات'))
+}, 'فشل في تحديث فئة المصروفات'), { requireAdmin: true })
 
 export const DELETE = withAuth(tryCatch(async (request) => {
   const user = getRequestUser(request)
@@ -143,4 +143,4 @@ export const DELETE = withAuth(tryCatch(async (request) => {
   })
 
   return successResponse({ message: 'تم حذف الفئة بنجاح' })
-}, 'فشل في حذف فئة المصروفات'))
+}, 'فشل في حذف فئة المصروفات'), { requireAdmin: true })

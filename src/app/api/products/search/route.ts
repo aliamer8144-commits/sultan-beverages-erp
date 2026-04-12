@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import { withAuth } from "@/lib/auth-middleware";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { successResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
 
@@ -85,6 +85,10 @@ export const GET = withAuth(tryCatch(async (request) => {
       break;
   }
 
+  // ── Auth check for costPrice filtering ───────────────────────────
+  const user = getRequestUser(request)
+  const isAdmin = user?.role === 'admin'
+
   // ── Fetch Data ────────────────────────────────────────────────────
   const [products, total] = await Promise.all([
     db.product.findMany({
@@ -115,7 +119,7 @@ export const GET = withAuth(tryCatch(async (request) => {
     id: product.id,
     name: product.name,
     price: product.price,
-    costPrice: product.costPrice,
+    costPrice: isAdmin ? product.costPrice : undefined,
     quantity: product.quantity,
     minQuantity: product.minQuantity,
     barcode: product.barcode,

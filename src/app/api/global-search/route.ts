@@ -37,7 +37,6 @@ export const GET = withAuth(tryCatch(async (request) => {
           id: true,
           name: true,
           price: true,
-          costPrice: true,
           quantity: true,
           minQuantity: true,
           barcode: true,

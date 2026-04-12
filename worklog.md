@@ -283,3 +283,56 @@ Stage Summary:
 - useZodForm now properly supports input/output type separation
 - Auth middleware uses clean declaration merging instead of type casts
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
+
+---
+Task ID: 17-2a
+Agent: general-purpose
+Task: Add requireAdmin to 6 sensitive API routes
+
+Work Log:
+- Read worklog.md for project context
+- Added `{ requireAdmin: true }` to 11 handler registrations across 6 route files:
+  - src/app/api/analytics/route.ts — GET (1 handler)
+  - src/app/api/audit-log/route.ts — GET (POST already had requireAdmin)
+  - src/app/api/sales-targets/route.ts — GET, POST, PUT, DELETE (4 handlers)
+  - src/app/api/daily-close/route.ts — GET (1 handler)
+  - src/app/api/quick-stats/route.ts — GET (1 handler)
+  - src/app/api/expense-categories/route.ts — POST, PUT, DELETE (GET left public for cashiers)
+- Each change follows the pattern: `withAuth(tryCatch(..., 'msg'))` → `withAuth(tryCatch(..., 'msg'), { requireAdmin: true })`
+- Verified with `npx tsc --noEmit` — 0 errors
+
+Stage Summary:
+- 6 route files modified, 11 handler registrations secured with requireAdmin
+- expense-categories GET left intentionally public (cashiers need category list for expense creation)
+- audit-log POST was already protected; only GET needed the fix
+- tsc --noEmit: 0 errors
+
+---
+Task ID: 17-2b
+Agent: general-purpose
+Task: Zod validation, costPrice filtering, remove quick-login
+
+Work Log:
+- Subtask A: Replaced manual JSON validation in exchange-rate POST with `withValidation` + Zod schema
+  - Created `exchangeRateSchema` with typed fields: exchangeRate (number, positive, optional), secondaryCurrency (string, max 10), currencyDisplayMode (string, max 20), secondaryCurrencyEnabled (boolean), secondaryCurrencySymbol (string, max 10)
+  - POST handler now uses `withValidation(exchangeRateSchema, handler, fallbackMsg)` — body is type-safe
+  - GET handler left as `tryCatch` only (no body to validate)
+  - Removed unused `errorResponse` import; removed `tryCatch` import (only needed via `withValidation`)
+- Subtask B1: Filtered costPrice for non-admin users in products/search/route.ts
+  - Added `getRequestUser` to import from `@/lib/auth-middleware`
+  - Added `const isAdmin = getRequestUser(request)?.role === 'admin'` at handler top
+  - Changed `costPrice: product.costPrice` → `costPrice: isAdmin ? product.costPrice : undefined`
+- Subtask B2: Removed unnecessary `costPrice: true` from global-search product select
+  - costPrice was selected but never returned in the mapped items (already secure by omission)
+  - Removed to avoid fetching unnecessary sensitive data
+- Subtask C: Wrapped demo credentials section in login-screen.tsx with `process.env.NODE_ENV === 'development'`
+  - Quick-login buttons (admin/admin123, cashier/cashier123) now only visible in dev mode
+  - Production users see clean login form without demo shortcuts
+- Verification: `npx tsc --noEmit` — 0 errors
+
+Stage Summary:
+- 4 files modified: exchange-rate/route.ts, products/search/route.ts, global-search/route.ts, login-screen.tsx
+- costPrice no longer exposed to non-admin users via product search APIs
+- Login screen is production-safe (no credential shortcuts)
+- exchange-rate POST now uses type-safe Zod validation (422 on invalid input)
+- tsc --noEmit: 0 errors

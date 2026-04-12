@@ -161,7 +161,8 @@ export function LoginScreen() {
             </Button>
           </form>
 
-          {/* Demo credentials */}
+          {/* Demo credentials — only shown in development */}
+          {process.env.NODE_ENV === 'development' && (
           <div className="mt-6 pt-6 border-t border-border/50">
             <p className="text-xs text-center text-muted-foreground mb-3">{t('login.demoCredentials')}</p>
             <div className="grid grid-cols-2 gap-3">
@@ -185,6 +186,7 @@ export function LoginScreen() {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Decorative security indicator */}

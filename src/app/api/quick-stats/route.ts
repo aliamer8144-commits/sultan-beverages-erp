@@ -326,4 +326,4 @@ export const GET = withAuth(tryCatch(async () => {
       },
     },
   })
-}, 'فشل في تحميل الإحصائيات السريعة'))
+}, 'فشل في تحميل الإحصائيات السريعة'), { requireAdmin: true })

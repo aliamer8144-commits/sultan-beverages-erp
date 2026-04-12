@@ -146,4 +146,4 @@ export const GET = withAuth(tryCatch(async () => {
     },
     hourlyBreakdown,
   })
-}, 'فشل في تحميل بيانات الإغلاق اليومي'))
+}, 'فشل في تحميل بيانات الإغلاق اليومي'), { requireAdmin: true })

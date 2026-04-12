@@ -1,38 +1,116 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { logAction } from "@/lib/audit-logger"
-import { verifyPassword, generateToken } from "@/lib/auth"
+import { verifyPassword, hashPassword, generateToken } from "@/lib/auth"
 import { setAuthCookie } from "@/lib/auth-middleware"
+import { checkRateLimit, LOGIN_RATE_LIMIT, LOGIN_RATE_LIMIT_SLOW } from "@/lib/rate-limit"
 import { tryCatch } from "@/lib/api-error-handler"
 import { errorResponse } from "@/lib/api-response"
+import { z } from "zod"
+
+// ── Validation Schema ──────────────────────────────────────────────
+
+const loginSchema = z.object({
+  username: z.string().min(1).max(50),
+  password: z.string().min(1).max(100),
+})
+
+// ── Rate Limit Key ─────────────────────────────────────────────────
+
+function getClientKey(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  const ip = forwarded?.split(',')[0]?.trim() || 'unknown'
+  return `login:${ip}`
+}
 
 /**
  * POST /api/auth
  * Login endpoint — public (no withAuth).
  *
- * Uses tryCatch for unified error handling and errorResponse for validation
- * errors. The success response keeps the legacy shape
- * { success, user, token } for frontend backward compatibility.
+ * Security features:
+ * - Zod schema validation for input sanitization
+ * - Rate limiting: 5 attempts/min, 15 attempts/5min per IP
+ * - Auto-hash plaintext passwords (migration)
+ * - Token in httpOnly cookie only (not in response body)
  */
 export const POST = tryCatch(async (request) => {
-  const body = await request.json()
-  const { username, password } = body
+  // 1. Rate limiting check
+  const clientKey = getClientKey(request)
 
-  if (!username || !password) {
+  // Fast window: 5 per minute
+  const fastCheck = checkRateLimit(clientKey, LOGIN_RATE_LIMIT)
+  if (!fastCheck.success) {
+    const retryAfterSec = Math.ceil((fastCheck.resetAt - Date.now()) / 1000)
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار قليلاً',
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(retryAfterSec),
+        },
+      }
+    )
+  }
+
+  // Slow window: 15 per 5 minutes
+  const slowCheck = checkRateLimit(clientKey, LOGIN_RATE_LIMIT_SLOW)
+  if (!slowCheck.success) {
+    const retryAfterSec = Math.ceil((slowCheck.resetAt - Date.now()) / 1000)
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار عدة دقائق',
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(retryAfterSec),
+        },
+      }
+    )
+  }
+
+  // 2. Validate input with Zod
+  const body = await request.json()
+  const parsed = loginSchema.safeParse(body)
+
+  if (!parsed.success) {
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401)
   }
 
+  const { username, password } = parsed.data
+
+  // 3. Find user
   const user = await db.user.findUnique({ where: { username } })
 
   if (!user) {
+    // Don't reveal whether the user exists
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401)
   }
 
-  // Check if password is plaintext (migration phase) or hashed
-  const isHashed = user.password.startsWith("$2")
-  const passwordValid = isHashed
-    ? await verifyPassword(password, user.password)
-    : user.password === password
+  // 4. Verify password (auto-hash plaintext if found)
+  let passwordValid: boolean
+
+  if (user.password.startsWith("$2")) {
+    // Already hashed — verify with bcrypt
+    passwordValid = await verifyPassword(password, user.password)
+  } else {
+    // Plaintext password detected — verify and auto-hash
+    passwordValid = user.password === password
+
+    if (passwordValid) {
+      // Auto-hash the plaintext password for security
+      await db.user.update({
+        where: { id: user.id },
+        data: { password: await hashPassword(password) },
+      })
+    }
+  }
 
   if (!passwordValid) {
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401)
@@ -42,16 +120,14 @@ export const POST = tryCatch(async (request) => {
     return errorResponse("هذا الحساب معطل", 403)
   }
 
-  // Generate JWT token
+  // 5. Generate JWT token
   const token = await generateToken({
     userId: user.id,
     username: user.username,
     role: user.role as "admin" | "cashier",
   })
 
-  // Build success response — legacy shape for frontend backward compatibility
-  // (successResponse wraps under `data`, but the frontend reads `data.user`
-  //  and `data.token` directly from the top-level JSON body)
+  // 6. Build success response — token in httpOnly cookie ONLY
   const response = NextResponse.json({
     success: true,
     user: {
@@ -61,12 +137,13 @@ export const POST = tryCatch(async (request) => {
       role: user.role,
       isActive: user.isActive,
     },
-    token,
+    // Note: token is NOT included in the response body for security.
+    // It's stored exclusively in the httpOnly cookie.
   })
 
   setAuthCookie(response, token)
 
-  // Log the login action
+  // 7. Log the login action
   logAction({
     action: "login",
     entity: "User",

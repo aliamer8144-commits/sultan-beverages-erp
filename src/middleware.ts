@@ -15,7 +15,11 @@ import { jwtVerify } from 'jose'
 
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || ''
-  if (!secret) return new Uint8Array(0) // Allow boot without secret for setup
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET is not configured. Add it to your .env file.'
+    )
+  }
   return new TextEncoder().encode(secret)
 }
 
@@ -23,7 +27,7 @@ function getSecret(): Uint8Array {
 
 /** Routes that don't require authentication */
 const PUBLIC_PATHS = [
-  '/api/auth',           // Login endpoint (POST)
+  '/api/auth',           // Login endpoint (POST only)
   '/_next',              // Next.js static assets
   '/favicon.ico',        // Favicon
   '/robots.txt',         // SEO
@@ -33,23 +37,57 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 }
 
+// ── Security Headers ────────────────────────────────────────────────
+
+function getSecurityHeaders(): HeadersInit {
+  return {
+    // Prevent MIME type sniffing
+    'X-Content-Type-Options': 'nosniff',
+    // Prevent clickjacking
+    'X-Frame-Options': 'DENY',
+    // XSS protection (legacy browsers)
+    'X-XSS-Protection': '1; mode=block',
+    // Referrer policy
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    // Content-Security-Policy: restrict resource loading
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval needed for Next.js dev
+      "style-src 'self' 'unsafe-inline'",                  // unsafe-inline needed for Tailwind
+      "img-src 'self' data: blob:",                        // data: for base64 product images
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  }
+}
+
 // ── Middleware ──────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow public routes
+  // Apply security headers to all responses
+  const securityHeaders = getSecurityHeaders()
+
+  // Allow public routes (but still apply security headers)
   if (isPublicPath(pathname)) {
-    return NextResponse.next()
+    return NextResponse.next({ headers: securityHeaders })
   }
 
   // Only protect /api/* routes
   if (pathname.startsWith('/api/')) {
-    const secret = getSecret()
-
-    // If no secret configured, allow through (development setup)
-    if (secret.length === 0) {
-      return NextResponse.next()
+    // Get secret — will throw if not configured, caught below
+    let secret: Uint8Array
+    try {
+      secret = getSecret()
+    } catch {
+      // CRITICAL: If JWT_SECRET is missing, reject all API requests
+      // This prevents accidental deployment without authentication
+      return NextResponse.json(
+        { success: false, error: 'خطأ في إعدادات الخادم — يرجى التواصل مع المدير' },
+        { status: 500, headers: securityHeaders }
+      )
     }
 
     // Extract token from cookie or Authorization header
@@ -60,24 +98,24 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       return NextResponse.json(
         { success: false, error: 'غير مصرح — يرجى تسجيل الدخول' },
-        { status: 401 }
+        { status: 401, headers: securityHeaders }
       )
     }
 
     // Verify JWT
     try {
       await jwtVerify(token, secret)
-      return NextResponse.next()
+      return NextResponse.next({ headers: securityHeaders })
     } catch {
       return NextResponse.json(
         { success: false, error: 'صلاحية الدخول منتهية — يرجى تسجيل الدخول مجدداً' },
-        { status: 401 }
+        { status: 401, headers: securityHeaders }
       )
     }
   }
 
-  // Non-API routes: allow through (SPA routing)
-  return NextResponse.next()
+  // Non-API routes: allow through (SPA routing) with security headers
+  return NextResponse.next({ headers: securityHeaders })
 }
 
 // ── Config ──────────────────────────────────────────────────────────

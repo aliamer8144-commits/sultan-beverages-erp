@@ -224,4 +224,4 @@ export const GET = withAuth(tryCatch(async (request) => {
     topCustomers,
     expenseBreakdown,
   })
-}, 'فشل في تحميل بيانات التحليلات'))
+}, 'فشل في تحميل بيانات التحليلات'), { requireAdmin: true })

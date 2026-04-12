@@ -130,7 +130,7 @@ export const GET = withAuth(tryCatch(async (request) => {
     page,
     totalPages,
   })
-}, 'فشل في جلب سجل المراجعة'))
+}, 'فشل في جلب سجل المراجعة'), { requireAdmin: true })
 
 // ── POST: Create a new audit log entry (admin only) ─────────────────
 export const POST = withAuth(tryCatch(async (request) => {
