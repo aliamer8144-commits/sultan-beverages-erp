@@ -530,3 +530,31 @@ Stage Summary:
 - All 11 review findings fixed without exception
 - TypeScript: 0 errors, ESLint: 0 errors
 - Committed as cc95e3a and pushed to GitHub
+
+---
+Task ID: 20
+Agent: Main
+Task: Remove ALL SQLite remnants — Supabase/PostgreSQL only
+
+Work Log:
+- Scanned entire codebase for SQLite references (grep across all file types)
+- Found SQLite remnants in 2 locations:
+  1. src/lib/db.ts — Had getDatabaseUrl() with SQLite fallback, .env file reading, conditional datasourceUrl, SQLite comments
+  2. db/custom.db — SQLite database file
+- Rewrote src/lib/db.ts: 44 lines → 14 lines (clean PrismaClient with global singleton)
+- Removed: getDatabaseUrl(), readFileSync, join imports, SQLite comments, .env fallback, conditional datasourceUrl
+- Deleted db/custom.db SQLite file
+- Removed empty db/ directory
+- Verified: prisma/schema.prisma already says provider = "postgresql" ✅
+- Verified: .env already points to Supabase PostgreSQL ✅
+- Verified: No SQLite packages in package.json ✅
+- Verified: Zero SQLite references remain in entire project (grep confirmed)
+- TypeScript: 0 errors, ESLint: 0 errors
+- Dev server: running, all API routes return 200 (connected to Supabase)
+
+Stage Summary:
+- 1 file rewritten (db.ts: 44→14 lines)
+- 1 file deleted (db/custom.db)
+- 1 directory deleted (db/)
+- Project is now 100% Supabase/PostgreSQL — zero SQLite remnants
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
