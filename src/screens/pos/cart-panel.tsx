@@ -65,6 +65,9 @@ export interface CartPanelProps {
   setDeleteHeldOrderId: (id: string | null) => void
   getHeldOrderTotal: (order: HeldOrder) => number
   getHeldCustomerName: (order: HeldOrder) => string | null
+
+  // Resizable width (from parent)
+  cartWidth?: number
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -98,9 +101,13 @@ export function CartPanel({
   setDeleteHeldOrderId,
   getHeldOrderTotal,
   getHeldCustomerName,
+  cartWidth,
 }: CartPanelProps) {
   return (
-    <div className="w-full lg:w-[360px] xl:w-[400px] 2xl:w-[420px] flex-shrink-0 border-r border-border/50 bg-card flex flex-col h-full lg:h-auto max-h-[50vh] lg:max-h-none glass-card relative">
+    <div
+      className="w-full md:flex-shrink-0 border-r border-border/50 bg-card flex flex-col h-full md:h-auto max-h-[50vh] md:max-h-none glass-card relative min-w-0 overflow-hidden"
+      style={cartWidth ? { width: `${cartWidth}px` } : undefined}
+    >
       <div className="glow-orb-blue" />
       {/* Cart header */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-border/50 flex-shrink-0">

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { CartPanel } from './pos/cart-panel'
 import { ProductGrid } from './pos/product-grid'
+import { ResizeHandle } from './pos/resize-handle'
 import { getNextReceiptNumber } from '@/lib/receipt-utils'
 import { getCategoryIcon, getCategoryColor } from '@/lib/category-utils'
 import { toast } from 'sonner'
@@ -51,6 +52,10 @@ export function POSScreen() {
   // ── Filter state ──
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
+
+  // ── Resizable panels ──
+  const [cartWidth, setCartWidth] = useState(380)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Payment dialog ──
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
@@ -594,8 +599,9 @@ export function POSScreen() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-0 animate-fade-in-up" dir="rtl">
+    <div ref={containerRef} className="h-full flex flex-col md:flex-row gap-0 animate-fade-in-up" dir="rtl">
       {/* ── Right Side: Product Grid ── */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <ProductGrid
         displayProducts={displayProducts}
         categories={categories}
@@ -624,6 +630,19 @@ export function POSScreen() {
         symbol={symbol}
         formatDual={formatDual}
       />
+      </div>
+
+      {/* ── Resize Handle (hidden on mobile) ── */}
+      <div className="hidden md:block">
+        <ResizeHandle
+          containerRef={containerRef}
+          panelSide="left"
+          panelWidth={cartWidth}
+          onResize={setCartWidth}
+          minWidth={260}
+          maxWidth={600}
+        />
+      </div>
 
       {/* ── Left Side: Cart / Receipt ── */}
       <CartPanel
@@ -655,6 +674,7 @@ export function POSScreen() {
         setDeleteHeldOrderId={setDeleteHeldOrderId}
         getHeldOrderTotal={getHeldOrderTotal}
         getHeldCustomerName={getHeldCustomerName}
+        cartWidth={cartWidth}
       />
 
       {/* ── Calculator Widget ── */}
