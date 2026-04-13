@@ -10,6 +10,7 @@ import {
 } from "@/lib/validations";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
+import { uploadProductImage } from "@/lib/storage";
 
 /** Fields to exclude for non-admin users */
 function sanitizeProduct(product: Record<string, unknown>, isAdmin: boolean) {
@@ -124,16 +125,30 @@ export const POST = withAuth(tryCatch(async (request) => {
 
   const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = validation.data;
 
+  // Upload image to Supabase Storage if it's a base64 data URL
+  let finalImageUrl: string | null = null;
+  if (image && image.startsWith('data:image/')) {
+    // Generate a temporary product ID for the image path
+    const tempId = `temp-${Date.now()}`;
+    finalImageUrl = await uploadProductImage(image, tempId);
+    if (!finalImageUrl) {
+      return errorResponse('فشل في رفع الصورة', 500);
+    }
+  } else if (image) {
+    // Already a URL (Supabase Storage or external)
+    finalImageUrl = image;
+  }
+
   const product = await db.product.create({
     data: {
       name,
-      categoryId: categoryId || '',
+      categoryId,
       price,
       costPrice,
       quantity: quantity ?? 0,
       minQuantity: minQuantity ?? 5,
       barcode,
-      image,
+      image: finalImageUrl,
     },
   });
 

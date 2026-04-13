@@ -4,6 +4,7 @@ import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { validateBody, updateProductSchema } from "@/lib/validations";
 import { successResponse, errorResponse, notFound } from "@/lib/api-response";
 import { tryCatch, getRequiredParam } from "@/lib/api-error-handler";
+import { uploadProductImage, deleteProductImage } from "@/lib/storage";
 
 /**
  * PUT /api/products/[id] — Update a single product
@@ -18,10 +19,38 @@ export const PUT = withAuth(tryCatch(async (request, context) => {
   const existing = await db.product.findUnique({ where: { id } });
   if (!existing) return notFound("المنتج غير موجود");
 
+  const updateData: Record<string, unknown> = { ...validation.data };
+
+  // Handle image upload/replacement
+  if ('image' in updateData && updateData.image !== undefined) {
+    const newImage = updateData.image as string | null;
+
+    if (newImage && newImage.startsWith('data:image/')) {
+      // New base64 image — upload to Supabase Storage
+      const uploadedUrl = await uploadProductImage(newImage, id);
+      if (!uploadedUrl) {
+        return errorResponse('فشل في رفع الصورة', 500);
+      }
+      updateData.image = uploadedUrl;
+
+      // Delete old image from storage if it was a Supabase URL
+      if (existing.image && existing.image.startsWith('http')) {
+        await deleteProductImage(existing.image);
+      }
+    } else if (newImage === null || newImage === '') {
+      // Image removed — delete from storage
+      updateData.image = null;
+      if (existing.image && existing.image.startsWith('http')) {
+        await deleteProductImage(existing.image);
+      }
+    }
+    // If newImage is already a URL, keep it as-is (no upload needed)
+  }
+
   const user = getRequestUser(request);
   const updated = await db.product.update({
     where: { id },
-    data: validation.data,
+    data: updateData,
     include: { category: true, _count: { select: { variants: true } } },
   });
 
@@ -51,6 +80,11 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
 
   const existing = await db.product.findUnique({ where: { id } });
   if (!existing) return notFound("المنتج غير موجود");
+
+  // Delete product image from Storage before deleting the record
+  if (existing.image && existing.image.startsWith('http')) {
+    await deleteProductImage(existing.image);
+  }
 
   await db.product.delete({ where: { id } });
 

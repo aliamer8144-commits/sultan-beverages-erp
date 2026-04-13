@@ -23,7 +23,7 @@ export const updateCategorySchema = z.object({
 
 const imageValidation = z.string()
   .refine(
-    (val) => !val || val.startsWith('data:image/'),
+    (val) => !val || val.startsWith('data:image/') || val.startsWith('http'),
     'صيغة الصورة غير مدعومة'
   )
   .refine(
@@ -35,7 +35,7 @@ const imageValidation = z.string()
 
 export const createProductSchema = z.object({
   name: z.string().min(1, 'اسم المنتج مطلوب').max(200),
-  categoryId: z.string().min(1, 'الفئة مطلوبة').optional(),
+  categoryId: z.string().min(1, 'الفئة مطلوبة'),
   price: z.coerce.number().positive('السعر مطلوب'),
   costPrice: z.coerce.number().min(0).default(0),
   quantity: z.coerce.number().int().min(0).default(0),

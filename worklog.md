@@ -641,3 +641,35 @@ Stage Summary:
 - Quick-stats panel shows server error message instead of generic "فشل"
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
 - **IMPORTANT for user**: Must set DATABASE_URL and JWT_SECRET in Vercel dashboard Settings → Environment Variables
+
+---
+Task ID: 1
+Agent: Main
+Task: Fix product creation failure + Implement Supabase Storage for product images
+
+Work Log:
+- Investigated product creation failure: found `categoryId: z.string().min(1).optional()` was allowing empty string to pass through, and API was doing `categoryId || ''` which violated FK constraint
+- Installed @supabase/supabase-js@2.103.0
+- Created `src/lib/supabase.ts` — server-side Supabase admin client with service role permissions
+- Created `src/lib/storage.ts` — image upload/delete utilities with graceful fallback when storage not configured
+- Added `nanoid()` utility to `src/lib/utils.ts` for generating unique file names
+- Updated `src/lib/validations.ts`:
+  - `imageValidation` now accepts both `data:image/` base64 and `http` URLs
+  - `createProductSchema.categoryId` made required (removed `.optional()`)
+- Updated `src/app/api/products/route.ts`:
+  - Added image upload to Supabase Storage before creating product
+  - Removed `categoryId || ''` fallback, now uses validated `categoryId` directly
+  - Falls back to base64 in DB if Supabase Storage not configured
+- Updated `src/app/api/products/[id]/route.ts`:
+  - Image update: uploads new base64 to Storage, deletes old Storage image
+  - Image removal: deletes from Storage
+  - Product deletion: cleans up Storage image
+- Created `src/app/api/storage/setup/route.ts` — POST creates bucket, GET checks status
+- Updated `.env` with NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY placeholder
+
+Stage Summary:
+- 7 files changed/created: supabase.ts, storage.ts, validations.ts, products/route.ts, products/[id]/route.ts, storage/setup/route.ts, utils.ts, .env
+- Product creation: categoryId now required, image uploads to Supabase Storage (with base64 fallback)
+- User must set SUPABASE_SERVICE_ROLE_KEY in .env and Vercel env vars
+- User must call POST /api/storage/setup (or create bucket manually in Supabase Dashboard)
+- lint passes, no TypeScript errors
