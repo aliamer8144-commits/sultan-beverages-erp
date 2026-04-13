@@ -33,6 +33,7 @@ import { useAppStore } from '@/store/app-store'
 import { useApi } from '@/hooks/use-api'
 import { useFormValidation } from '@/hooks/use-form-validation'
 import { createUserSchema, editUserSchema } from '@/lib/validations'
+import { EmptyState } from '@/components/empty-state'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, UserCog, Shield, ShieldCheck } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
@@ -289,12 +290,18 @@ export function UsersScreen() {
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-48 text-center">
-                        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                          <UserCog className="w-12 h-12 opacity-30" />
-                          <p className="text-sm">لا يوجد مستخدمين بعد</p>
-                          <p className="text-xs">اضغط على &quot;إضافة مستخدم&quot; لإنشاء مستخدم جديد</p>
-                        </div>
+                      <TableCell colSpan={6} className="h-48 p-0">
+                        <EmptyState
+                          icon={UserCog}
+                          title="لا يوجد مستخدمين بعد"
+                          description='اضغط على "إضافة مستخدم" لإنشاء مستخدم جديد'
+                          action={(
+                            <Button onClick={() => { setAddForm({ ...emptyForm }); setAddDialogOpen(true) }}>
+                              <Plus className="w-4 h-4" /> إضافة مستخدم
+                            </Button>
+                          )}
+                          compact
+                        />
                       </TableCell>
                     </TableRow>
                   ) : (

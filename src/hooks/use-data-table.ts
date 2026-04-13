@@ -141,7 +141,7 @@ export function useDataTable<T = unknown>(
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
         fetchData()
-      }, 150)
+      }, 300)
     }
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)

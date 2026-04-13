@@ -40,9 +40,9 @@ import {
   StickyNote,
   ShoppingBag,
   Crown,
-  ChevronLeft,
-  ChevronRight,
+  PackageOpen,
 } from 'lucide-react'
+import { EmptyState, Pagination } from '@/components/empty-state'
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
@@ -440,16 +440,18 @@ export function CustomersScreen() {
                   ))
                 ) : customers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-48 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Users className="h-10 w-10 opacity-40" />
-                        <p className="font-medium">لا يوجد عملاء</p>
-                        <p className="text-sm">
-                          {search
-                            ? 'لا توجد نتائج مطابقة للبحث'
-                            : 'اضغط على "إضافة عميل" لبدء إضافة العملاء'}
-                        </p>
-                      </div>
+                    <TableCell colSpan={8} className="h-48 p-0">
+                      <EmptyState
+                        icon={PackageOpen}
+                        title="لا يوجد عملاء"
+                        description={search ? 'لا توجد نتائج مطابقة للبحث' : 'لم يتم تسجيل أي عميل بعد'}
+                        action={!search && (
+                          <Button onClick={() => { resetForm(); setOpenAddDialog(true) }}>
+                            <Plus className="w-4 h-4" /> إضافة عميل
+                          </Button>
+                        )}
+                        compact
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -611,58 +613,9 @@ export function CustomersScreen() {
         </div>
 
         {/* ── Pagination Controls ────────────────────────────────── */}
-        {totalPages > 1 && !loading && (
-          <div className="py-3 flex-shrink-0 border-t border-border/50">
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                disabled={page <= 1}
-                onClick={() => goToPage(page - 1)}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => {
-                  if (p === 1 || p === totalPages) return true
-                  if (Math.abs(p - page) <= 1) return true
-                  return false
-                })
-                .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                  if (idx > 0 && p - arr[idx - 1] > 1) {
-                    acc.push('ellipsis')
-                  }
-                  acc.push(p)
-                  return acc
-                }, [])
-                .map((item, idx) =>
-                  item === 'ellipsis' ? (
-                    <span key={`e-${idx}`} className="text-xs text-muted-foreground px-1">...</span>
-                  ) : (
-                    <Button
-                      key={item}
-                      variant={item === page ? 'default' : 'outline'}
-                      size="icon"
-                      className="h-8 w-8 text-xs"
-                      onClick={() => goToPage(item)}
-                    >
-                      {item}
-                    </Button>
-                  ),
-                )}
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                disabled={page >= totalPages}
-                onClick={() => goToPage(page + 1)}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <div className="py-3 flex-shrink-0">
+          <Pagination page={page} totalPages={totalPages} total={total} onPageChange={goToPage} />
+        </div>
 
         {/* ── Extracted Dialogs ─────────────────────────────────── */}
         <CustomerFormDialog

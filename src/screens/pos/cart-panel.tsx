@@ -100,7 +100,7 @@ export function CartPanel({
   getHeldCustomerName,
 }: CartPanelProps) {
   return (
-    <div className="w-full lg:w-[400px] xl:w-[420px] flex-shrink-0 border-r border-border/50 bg-card flex flex-col h-full lg:h-auto max-h-[50vh] lg:max-h-none glass-card relative">
+    <div className="w-full lg:w-[360px] xl:w-[400px] 2xl:w-[420px] flex-shrink-0 border-r border-border/50 bg-card flex flex-col h-full lg:h-auto max-h-[50vh] lg:max-h-none glass-card relative">
       <div className="glow-orb-blue" />
       {/* Cart header */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-border/50 flex-shrink-0">
@@ -196,7 +196,7 @@ export function CartPanel({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 h-7 text-[10px] font-medium gap-1 rounded-lg bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 btn-ripple"
+                              className="flex-1 h-7 text-[10px] font-medium gap-1 rounded-lg bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400 hover:bg-emerald-100 hover:text-emerald-800 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300 btn-ripple"
                               onClick={() => handleRecallOrder(order.id)}
                             >
                               <Play className="w-3 h-3" />

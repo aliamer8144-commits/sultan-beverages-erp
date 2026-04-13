@@ -12,7 +12,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
 import type { ApiResponse, ApiErrorResponse } from '@/types/api'
@@ -78,8 +78,19 @@ interface UseApiReturn {
 // ── Hook ────────────────────────────────────────────────────────────
 
 export function useApi(): UseApiReturn {
+  const loadingCountRef = useRef(0)
   const [loading, setLoading] = useState(false)
   const token = useAppStore((s) => s.token)
+
+  const startLoading = useCallback(() => {
+    loadingCountRef.current++
+    if (loadingCountRef.current === 1) setLoading(true)
+  }, [])
+
+  const stopLoading = useCallback(() => {
+    loadingCountRef.current = Math.max(0, loadingCountRef.current - 1)
+    if (loadingCountRef.current === 0) setLoading(false)
+  }, [])
 
   const handleResponse = useCallback(
     async <T>(response: Response, options?: UseApiOptions): Promise<T | null> => {
@@ -89,6 +100,24 @@ export function useApi(): UseApiReturn {
       const successMessage = options?.successMessage
 
       if (!response.ok) {
+        // Handle auth errors — redirect to login
+        if (response.status === 401 || response.status === 403) {
+          // Clear stored auth state and redirect
+          useAppStore.getState().logout()
+          if (typeof window !== 'undefined') {
+            window.location.href = '/'
+          }
+          return null
+        }
+
+        // Handle rate limiting
+        if (response.status === 429) {
+          if (showError) {
+            toast.warning('محاولات كثيرة — يرجى الانتظار قليلاً')
+          }
+          return null
+        }
+
         let message = errMessage || 'حدث خطأ في الخادم'
         try {
           const body = (await response.json()) as ApiErrorResponse
@@ -128,7 +157,7 @@ export function useApi(): UseApiReturn {
       init: RequestInit,
       options?: UseApiOptions,
     ): Promise<T | null> => {
-      setLoading(true)
+      startLoading()
       try {
         const headers: Record<string, string> = {
           ...(init.headers as Record<string, string>),
@@ -149,10 +178,10 @@ export function useApi(): UseApiReturn {
         }
         return null
       } finally {
-        setLoading(false)
+        stopLoading()
       }
     },
-    [token, handleResponse],
+    [token, handleResponse, startLoading, stopLoading],
   )
 
   const get = useCallback(

@@ -379,3 +379,98 @@ Stage Summary:
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
 - Manual tests: login ✓, token not in body ✓, unauth 401 ✓, page loads ✓
 - System now protected against: brute-force, missing JWT_SECRET, costPrice leak, unauthorized admin access
+
+---
+Task ID: 18-3
+Agent: general-purpose
+Task: UX Level 3 — Minor polish (3 subtasks)
+
+Work Log:
+- Subtask A: Fixed cart-panel responsive width in src/screens/pos/cart-panel.tsx
+  - Changed `lg:w-[400px] xl:w-[420px]` → `lg:w-[360px] xl:w-[400px] 2xl:w-[420px]`
+  - Narrower on medium-large screens, wider on very large screens
+- Subtask B: Removed noisy navigation toast from src/components/erp/app-layout.tsx
+  - Removed entire useEffect that fired toast on every screen change (lines 495-515)
+  - Removed unused `import { toast } from 'sonner'`
+  - Removed unused `prevScreenRef` ref and `useRef` import
+  - All navigation logic (sidebar, mobile close, screen rendering) preserved intact
+- Subtask C: Improved EmptyState typography in src/components/empty-state.tsx
+  - Changed non-compact mode title from `text-sm` → `text-base` for better prominence
+  - Compact mode remains at `text-sm`
+- Verification: `npx tsc --noEmit` — 0 errors
+
+Stage Summary:
+- 3 files modified with minor UX polish changes
+- Cart panel now has better responsive breakpoints
+- Navigation toast (noisy UX) removed — screen name still shown in header
+- Empty states more visually prominent in non-compact mode
+- tsc --noEmit: 0 errors
+
+---
+Task ID: 18-1
+Agent: general-purpose
+Task: UX Level 1 — Critical fixes (4 subtasks)
+
+Work Log:
+- Subtask A: Added 401/403/429 redirect handling to useApi hook (src/hooks/use-api.ts)
+  - 401/403: Calls `useAppStore.getState().logout()` then redirects to `/` via `window.location.href`
+  - 429: Shows `toast.warning('محاولات كثيرة — يرجى الانتظار قليلاً')` instead of generic error
+  - Both handlers return null before reaching the generic error toast
+  - Uses `typeof window !== 'undefined'` guard for SSR safety
+- Subtask B: Fixed Dialog component for Arabic RTL (src/components/ui/dialog.tsx)
+  - Changed close button sr-only text from "Close" → "إغلاق"
+  - Changed DialogHeader alignment from `sm:text-left` → `sm:text-right`
+  - DialogFooter kept as `sm:justify-end` (correct for RTL with flex-row)
+- Subtask C: Fixed Dark Mode inconsistencies
+  - users-screen.tsx: Cashier avatar already had dark variants (`dark:bg-orange-900/30 dark:text-orange-400`) — no changes needed
+  - cart-panel.tsx: Added dark variants to held order "recall" button:
+    - `dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400`
+    - `dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300`
+- Subtask D: Added loadingCount ref-based counter to useApi for stable parallel loading
+  - Added `useRef` import from React
+  - Created `loadingCountRef = useRef(0)` for tracking concurrent requests
+  - Added `startLoading()` / `stopLoading()` helpers using ref counter
+  - `loading` state only becomes true on first request, false when last completes
+  - Prevents loading flicker when multiple parallel API calls are made
+  - Updated `request` dependencies array to include `startLoading` and `stopLoading`
+- Verification: `npx tsc --noEmit` — 0 errors
+
+Stage Summary:
+- 3 files modified: use-api.ts, dialog.tsx, cart-panel.tsx
+- Auth errors (401/403) now properly redirect to login page
+- Rate limit (429) shows user-friendly Arabic warning toast
+- Dialog header aligned correctly for RTL Arabic layout
+- Cart panel recall button now visible in dark mode
+- Parallel API requests no longer cause loading state flicker
+- tsc --noEmit: 0 errors
+
+---
+Task ID: 18-2
+Agent: general-purpose
+Task: UX Level 2 — Medium improvements (3 subtasks)
+
+Work Log:
+- Subtask A: Standardized search debounce to 300ms in src/hooks/use-data-table.ts
+  - Changed debounce timeout from 150ms → 300ms (line 144) for consistent UX across all data tables
+- Subtask B: Added total count display to Pagination and unified pagination across screens
+  - Updated PaginationProps in src/components/empty-state.tsx: added `total?: number` prop
+  - Updated Pagination component to show `({total} نتيجة)` badge when total > 0
+  - Replaced custom inline pagination with shared Pagination component in 3 screens:
+    - src/screens/customers-screen.tsx: 50-line custom pagination → 1-line Pagination call
+    - src/screens/invoices-screen.tsx: 52-line custom pagination → 1-line Pagination call
+    - src/screens/inventory-screen.tsx: 51-line custom pagination → 1-line Pagination call
+  - users-screen.tsx skipped (no pagination exists — fetches all users at once)
+  - Removed unused ChevronLeft/ChevronRight imports from customers and invoices screens
+  - Kept ChevronLeft/ChevronRight in inventory-screen (used by stock history pagination)
+- Subtask C: Unified EmptyState usage in customers-screen and users-screen
+  - src/screens/customers-screen.tsx: Replaced inline empty state (Users icon + text) with shared EmptyState component using PackageOpen icon, contextual description, and "إضافة عميل" action button
+  - src/screens/users-screen.tsx: Replaced inline empty state (UserCog icon + text) with shared EmptyState component using UserCog icon, description, and "إضافة مستخدم" action button
+  - Both use compact mode and conditional action (only shown when no search filter active)
+- Verification: `npx tsc --noEmit` — 0 errors
+
+Stage Summary:
+- 5 files modified: use-data-table.ts, empty-state.tsx, customers-screen.tsx, invoices-screen.tsx, inventory-screen.tsx, users-screen.tsx
+- Search debounce standardized to 300ms across all useDataTable consumers
+- ~150 lines of duplicate pagination code replaced with shared Pagination component (with total count)
+- 2 screens now use consistent EmptyState component instead of inline empty state markup
+- tsc --noEmit: 0 errors

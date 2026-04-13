@@ -60,7 +60,7 @@ export function EmptyState({
           </div>
         )}
         <div>
-          <p className={cn('font-semibold text-foreground empty-state-title', compact ? 'text-sm' : 'text-sm')}>
+          <p className={cn('font-semibold text-foreground empty-state-title', compact ? 'text-sm' : 'text-base')}>
             {title}
           </p>
           {description && (
@@ -101,6 +101,7 @@ export function LoadingState({
 interface PaginationProps {
   page: number
   totalPages: number
+  total?: number
   onPageChange: (page: number) => void
   className?: string
 }
@@ -108,6 +109,7 @@ interface PaginationProps {
 export function Pagination({
   page,
   totalPages,
+  total,
   onPageChange,
   className,
 }: PaginationProps) {
@@ -132,6 +134,11 @@ export function Pagination({
       >
         التالي
       </button>
+      {typeof total === 'number' && total > 0 && (
+        <span className="text-xs text-muted-foreground mr-2">
+          ({total} نتيجة)
+        </span>
+      )}
     </div>
   )
 }

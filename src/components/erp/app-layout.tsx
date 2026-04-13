@@ -34,7 +34,6 @@ import { ProductVariantsScreen } from '@/screens/product-variants-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { StockAlertsWidget } from '@/components/stock-alerts-widget'
 import { GlobalSearchDialog } from '@/components/global-search-dialog'
-import { toast } from 'sonner'
 import {
   ShoppingCart,
   Package,
@@ -68,7 +67,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from '@/lib/translations'
 import { useTheme } from 'next-themes'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 // ─── Hydration-safe mounted hook ─────────────────────────────────
 const emptySubscribe = () => () => {}
@@ -467,7 +466,6 @@ export function AppLayout() {
   const { t, isRTL } = useTranslation()
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const prevScreenRef = useRef<Screen>(currentScreen)
 
   // Navigation key mapping
   const navKeyMap: Record<Screen, string> = {
@@ -491,28 +489,6 @@ export function AppLayout() {
     loyalty: 'nav.loyalty',
     'product-variants': 'nav.product-variants',
   }
-
-  // ── Screen navigation toast ───────────────────────────────────────
-  useEffect(() => {
-    if (prevScreenRef.current !== currentScreen) {
-      const label = t(navKeyMap[currentScreen])
-      if (label) {
-        toast(label, {
-          description: `${t('toast.navigatedTo')} ${label}`,
-          duration: 1500,
-          icon: (() => {
-            const item = navItems.find(n => n.id === currentScreen)
-            if (item) {
-              const Icon = item.icon
-              return <Icon className="w-4 h-4 text-primary" />
-            }
-            return null
-          })(),
-        })
-      }
-      prevScreenRef.current = currentScreen
-    }
-  }, [currentScreen, t])
 
   // ── Keyboard shortcuts listener ───────────────────────────────────
   useEffect(() => {
