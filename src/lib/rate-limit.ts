@@ -108,16 +108,63 @@ export function checkRateLimit(
   }
 }
 
+/**
+ * Record a failed attempt (used for login brute-force protection).
+ * Only failed attempts are counted — successful logins are not recorded.
+ */
+export function recordFailedAttempt(key: string) {
+  ensureCleanup()
+  const now = Date.now()
+  let attempts = store.get(key)
+  if (!attempts) {
+    attempts = []
+    store.set(key, attempts)
+  }
+  attempts.push({ timestamp: now })
+}
+
+/**
+ * Check rate limit without recording an attempt.
+ * Used to verify if a key has exceeded limits before allowing the request.
+ */
+export function checkRateLimitOnly(key: string, config: RateLimitConfig): RateLimitResult {
+  ensureCleanup()
+  const now = Date.now()
+  const windowStart = now - config.windowMs
+
+  let attempts = store.get(key)
+  if (!attempts) {
+    return { success: true, remaining: config.maxAttempts, resetAt: now + config.windowMs }
+  }
+
+  const recentAttempts = attempts.filter((a) => a.timestamp > windowStart)
+
+  if (recentAttempts.length >= config.maxAttempts) {
+    const oldestInWindow = recentAttempts[0].timestamp
+    return {
+      success: false,
+      remaining: 0,
+      resetAt: oldestInWindow + config.windowMs,
+    }
+  }
+
+  return {
+    success: true,
+    remaining: config.maxAttempts - recentAttempts.length,
+    resetAt: windowStart + config.windowMs,
+  }
+}
+
 // ── Preset Configs ─────────────────────────────────────────────────
 
-/** Login: 5 attempts per minute per IP */
+/** Login: 20 attempts per minute per IP */
 export const LOGIN_RATE_LIMIT: RateLimitConfig = {
-  maxAttempts: 5,
+  maxAttempts: 20,
   windowMs: 60_000,
 }
 
-/** Login: 15 attempts per 5 minutes per IP (backup window) */
+/** Login: 60 attempts per 5 minutes per IP (backup window) */
 export const LOGIN_RATE_LIMIT_SLOW: RateLimitConfig = {
-  maxAttempts: 15,
+  maxAttempts: 60,
   windowMs: 300_000,
 }

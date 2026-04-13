@@ -3,7 +3,7 @@ import { db } from "@/lib/db"
 import { logAction } from "@/lib/audit-logger"
 import { verifyPassword, hashPassword, generateToken } from "@/lib/auth"
 import { setAuthCookie } from "@/lib/auth-middleware"
-import { checkRateLimit, LOGIN_RATE_LIMIT, LOGIN_RATE_LIMIT_SLOW } from "@/lib/rate-limit"
+import { checkRateLimitOnly, recordFailedAttempt, LOGIN_RATE_LIMIT, LOGIN_RATE_LIMIT_SLOW } from "@/lib/rate-limit"
 import { tryCatch } from "@/lib/api-error-handler"
 import { errorResponse } from "@/lib/api-response"
 import { z } from "zod"
@@ -29,53 +29,15 @@ function getClientKey(request: Request): string {
  *
  * Security features:
  * - Zod schema validation for input sanitization
- * - Rate limiting: 5 attempts/min, 15 attempts/5min per IP
+ * - Rate limiting: 20 failed attempts/min, 60 failed attempts/5min per IP
+ * - Only FAILED login attempts are counted — successful logins ALWAYS work
  * - Auto-hash plaintext passwords (migration)
  * - Token in httpOnly cookie only (not in response body)
  */
 export const POST = tryCatch(async (request) => {
-  // 1. Rate limiting check
   const clientKey = getClientKey(request)
 
-  // Fast window: 5 per minute
-  const fastCheck = checkRateLimit(clientKey, LOGIN_RATE_LIMIT)
-  if (!fastCheck.success) {
-    const retryAfterSec = Math.ceil((fastCheck.resetAt - Date.now()) / 1000)
-    return new NextResponse(
-      JSON.stringify({
-        success: false,
-        error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار قليلاً',
-      }),
-      {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': String(retryAfterSec),
-        },
-      }
-    )
-  }
-
-  // Slow window: 15 per 5 minutes
-  const slowCheck = checkRateLimit(clientKey, LOGIN_RATE_LIMIT_SLOW)
-  if (!slowCheck.success) {
-    const retryAfterSec = Math.ceil((slowCheck.resetAt - Date.now()) / 1000)
-    return new NextResponse(
-      JSON.stringify({
-        success: false,
-        error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار عدة دقائق',
-      }),
-      {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': String(retryAfterSec),
-        },
-      }
-    )
-  }
-
-  // 2. Validate input with Zod
+  // 1. Validate input with Zod
   const body = await request.json()
   const parsed = loginSchema.safeParse(body)
 
@@ -85,15 +47,16 @@ export const POST = tryCatch(async (request) => {
 
   const { username, password } = parsed.data
 
-  // 3. Find user
+  // 2. Find user
   const user = await db.user.findUnique({ where: { username } })
 
   if (!user) {
     // Don't reveal whether the user exists
+    recordFailedAttempt(clientKey)
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401)
   }
 
-  // 4. Verify password (auto-hash plaintext if found)
+  // 3. Verify password (auto-hash plaintext if found)
   let passwordValid: boolean
 
   if (user.password.startsWith("$2")) {
@@ -113,6 +76,24 @@ export const POST = tryCatch(async (request) => {
   }
 
   if (!passwordValid) {
+    // Check rate limit and record failed attempt
+    recordFailedAttempt(clientKey)
+    const fastCheck = checkRateLimitOnly(clientKey, LOGIN_RATE_LIMIT)
+    if (!fastCheck.success) {
+      const retryAfterSec = Math.ceil((fastCheck.resetAt - Date.now()) / 1000)
+      return new NextResponse(
+        JSON.stringify({ success: false, error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار قليلاً' }),
+        { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfterSec) } }
+      )
+    }
+    const slowCheck = checkRateLimitOnly(clientKey, LOGIN_RATE_LIMIT_SLOW)
+    if (!slowCheck.success) {
+      const retryAfterSec = Math.ceil((slowCheck.resetAt - Date.now()) / 1000)
+      return new NextResponse(
+        JSON.stringify({ success: false, error: 'محاولات تسجيل دخول كثيرة — يرجى الانتظار عدة دقائق' }),
+        { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfterSec) } }
+      )
+    }
     return errorResponse("اسم المستخدم أو كلمة المرور غير صحيحة", 401)
   }
 
@@ -120,14 +101,14 @@ export const POST = tryCatch(async (request) => {
     return errorResponse("هذا الحساب معطل", 403)
   }
 
-  // 5. Generate JWT token
+  // 4. Generate JWT token — successful login ALWAYS proceeds (not rate limited)
   const token = await generateToken({
     userId: user.id,
     username: user.username,
     role: user.role as "admin" | "cashier",
   })
 
-  // 6. Build success response — token in httpOnly cookie ONLY
+  // 5. Build success response — token in httpOnly cookie ONLY
   const response = NextResponse.json({
     success: true,
     user: {
@@ -137,13 +118,11 @@ export const POST = tryCatch(async (request) => {
       role: user.role,
       isActive: user.isActive,
     },
-    // Note: token is NOT included in the response body for security.
-    // It's stored exclusively in the httpOnly cookie.
   })
 
   setAuthCookie(response, token)
 
-  // 7. Log the login action
+  // 6. Log the login action
   logAction({
     action: "login",
     entity: "User",
