@@ -474,3 +474,35 @@ Stage Summary:
 - ~150 lines of duplicate pagination code replaced with shared Pagination component (with total count)
 - 2 screens now use consistent EmptyState component instead of inline empty state markup
 - tsc --noEmit: 0 errors
+
+---
+Task ID: 18
+Agent: Main + 3 Sub-agents
+Task: Phase 18 — UX Improvements (تحسين تجربة المستخدم)
+
+Work Log:
+- Level 1 (High): Critical UX fixes
+  - use-api.ts: Added 401/403 auto-redirect to login page (clears auth state + window.location.href)
+  - use-api.ts: Added 429 rate-limit warning toast ('محاولات كثيرة — يرجى الانتظار قليلاً')
+  - use-api.ts: Replaced single boolean loading with ref-based counter for stable parallel requests
+  - dialog.tsx: Changed sr-only text from "Close" to "إغلاق" for Arabic screen readers
+  - dialog.tsx: Changed DialogHeader from sm:text-left to sm:text-right for RTL layout
+  - cart-panel.tsx: Added dark: variants to emerald held-order button (dark:bg-emerald-900/30 etc.)
+- Level 2 (Medium): Consistency improvements
+  - use-data-table.ts: Standardized search debounce from 150ms to 300ms
+  - empty-state.tsx: Added optional 'total' prop to Pagination component (shows 'X نتيجة')
+  - customers-screen.tsx: Replaced ~50-line custom pagination + inline empty state with shared components
+  - invoices-screen.tsx: Replaced ~52-line custom pagination with shared Pagination
+  - inventory-screen.tsx: Replaced ~51-line custom pagination with shared Pagination
+  - users-screen.tsx: Replaced inline empty state with EmptyState + action button
+- Level 3 (Low): Polish
+  - cart-panel.tsx: Responsive width lg:w-[360px] xl:w-[400px] 2xl:w-[420px]
+  - app-layout.tsx: Removed noisy navigation toast (screen name already in header)
+  - empty-state.tsx: Non-compact title upgraded from text-sm to text-base
+
+Stage Summary:
+- Commit: 021c18d, pushed to GitHub
+- 11 files changed: 181 insertions(+), 212 deletions(-) (net -31 lines, cleaner)
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- Dev server: compiles clean, no runtime errors
+- Key UX wins: session expiry auto-redirect, stable parallel loading, unified pagination/empty states
