@@ -33,7 +33,7 @@ export const GET = withAuth(tryCatch(async () => {
     topProductGroups,
     recentLogs,
     activeTargets,
-    topCustomerToday,
+    topCustomerRow,
     itemsSoldTodayAgg,
     // Previous period data for trends
     prevDaySalesAgg,
@@ -128,14 +128,16 @@ export const GET = withAuth(tryCatch(async () => {
       orderBy: { createdAt: 'desc' },
     }),
 
-    // 16. Top customer today (by total sales)
-    db.invoice.groupBy({
-      by: ['customerId'],
-      where: { type: 'sale', createdAt: { gte: startOfDay }, customerId: { not: null } },
-      _sum: { totalAmount: true },
-      orderBy: { _sum: { totalAmount: 'desc' } },
-      take: 1,
-    }),
+    // 16. Top customer today — single query with JOIN (no N+1)
+    db.$queryRaw<Array<{ customerName: string | null }>>`
+      SELECT c."name" as "customerName"
+      FROM "Invoice" i
+      LEFT JOIN "Customer" c ON i."customerId" = c.id
+      WHERE i."type" = 'sale' AND i."createdAt" >= ${startOfDay} AND i."customerId" IS NOT NULL
+      GROUP BY i."customerId", c."name"
+      ORDER BY SUM(i."totalAmount") DESC
+      LIMIT 1
+    `,
 
     // 17. Total items sold today
     db.invoiceItem.aggregate({
@@ -257,15 +259,8 @@ export const GET = withAuth(tryCatch(async () => {
   const itemsSoldToday = itemsSoldTodayAgg._sum.quantity ?? 0
   const averageSaleToday = invoicesCountToday > 0 ? Math.round((totalSalesToday / invoicesCountToday) * 100) / 100 : 0
 
-  // Resolve top customer name
-  let topCustomerTodayName: string | null = null
-  if (topCustomerToday.length > 0 && topCustomerToday[0].customerId) {
-    const topCustomer = await db.customer.findUnique({
-      where: { id: topCustomerToday[0].customerId },
-      select: { name: true },
-    })
-    topCustomerTodayName = topCustomer?.name ?? null
-  }
+  // Top customer name (resolved from the JOIN query — no N+1)
+  const topCustomerTodayName = topCustomerRow.length > 0 ? topCustomerRow[0].customerName : null
 
   return successResponse({
     // Existing fields (backward compatible)

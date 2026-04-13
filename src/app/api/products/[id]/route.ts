@@ -34,7 +34,13 @@ export const PUT = withAuth(tryCatch(async (request, context) => {
     details: { name: updated.name, price: updated.price },
   });
 
-  return successResponse(updated);
+  // Strip costPrice for non-admin users
+  const isAdmin = user?.role === 'admin';
+  const safeProduct = isAdmin
+    ? updated
+    : (() => { const { costPrice: _c, ...rest } = updated; return rest as typeof updated; })();
+
+  return successResponse(safeProduct);
 }, 'فشل في تحديث المنتج'));
 
 /**

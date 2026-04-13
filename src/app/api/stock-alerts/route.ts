@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { withAuth } from "@/lib/auth-middleware";
+import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { successResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
 
@@ -18,7 +18,13 @@ interface RawAlertRow {
   totalSold: number;
 }
 
-export const GET = withAuth(tryCatch(async () => {
+export const GET = withAuth(tryCatch(async (request) => {
+  const { searchParams } = new URL(request.url);
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
+  const user = getRequestUser(request);
+  const isAdmin = user?.role === 'admin';
+
   // Fetch only products where quantity <= minQuantity (filter at DB level)
   const rawAlerts = await db.$queryRaw<RawAlertRow[]>`
     SELECT
@@ -58,7 +64,7 @@ export const GET = withAuth(tryCatch(async () => {
       quantity: product.quantity,
       minQuantity: product.minQuantity,
       price: product.price,
-      costPrice: product.costPrice,
+      ...(isAdmin ? { costPrice: product.costPrice } : {}),
       barcode: product.barcode,
       image: product.image,
       categoryName: product.categoryName || "بدون تصنيف",
@@ -70,7 +76,7 @@ export const GET = withAuth(tryCatch(async () => {
         ? Math.round((product.quantity / product.minQuantity) * 100)
         : 0,
       suggestedOrder,
-      reorderCost,
+      ...(isAdmin ? { reorderCost } : {}),
       totalSold: product.totalSold,
       daysRemaining: null as number | null,
     };
@@ -80,7 +86,8 @@ export const GET = withAuth(tryCatch(async () => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Get sales data for the last 30 days
+  // Get sales data for the last 30 days (only for current page items)
+  const paginatedAlerts = alerts.slice((page - 1) * limit, page * limit);
   const recentSalesData = await db.invoiceItem.groupBy({
     by: ["productId"],
     where: {
@@ -88,7 +95,7 @@ export const GET = withAuth(tryCatch(async () => {
         type: "sale",
         createdAt: { gte: thirtyDaysAgo },
       },
-      productId: { in: alerts.map((a) => a.id) },
+      productId: { in: paginatedAlerts.map((a) => a.id) },
     },
     _sum: { quantity: true },
   });
@@ -99,8 +106,8 @@ export const GET = withAuth(tryCatch(async () => {
     salesMap.set(item.productId, item._sum.quantity ?? 0);
   }
 
-  // Calculate days remaining
-  for (const alert of alerts) {
+  // Calculate days remaining (only for paginated items)
+  for (const alert of paginatedAlerts) {
     const soldLast30Days = salesMap.get(alert.id) ?? 0;
     if (soldLast30Days > 0 && alert.quantity > 0) {
       const dailyRate = soldLast30Days / 30;
@@ -110,25 +117,33 @@ export const GET = withAuth(tryCatch(async () => {
     }
   }
 
-  // Separate counts by severity
+  // Separate counts by severity (from all alerts, not just paginated)
   const outOfStockCount = alerts.filter((a) => a.severity === "out").length;
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
   const lowStockCount = alerts.filter((a) => a.severity === "low").length;
+  const totalAlerts = alerts.length;
+  const totalPages = Math.ceil(totalAlerts / limit);
 
-  // Summary statistics
-  const totalReorderCost = alerts.reduce((sum, a) => sum + a.reorderCost, 0);
-  const avgDeficit = alerts.length > 0
-    ? Math.round(alerts.reduce((sum, a) => sum + a.deficit, 0) / alerts.length)
+  // Summary statistics (admin only for cost)
+  const totalReorderCost = isAdmin ? alerts.reduce((sum, a) => sum + (a.reorderCost ?? 0), 0) : 0;
+  const avgDeficit = totalAlerts > 0
+    ? Math.round(alerts.reduce((sum, a) => sum + a.deficit, 0) / totalAlerts)
     : 0;
 
   return successResponse({
-    alerts,
+    alerts: paginatedAlerts,
+    pagination: {
+      total: totalAlerts,
+      page,
+      limit,
+      totalPages,
+    },
     summary: {
-      total: alerts.length,
+      total: totalAlerts,
       outOfStock: outOfStockCount,
       critical: criticalCount,
       lowStock: lowStockCount,
-      totalReorderCost,
+      ...(isAdmin ? { totalReorderCost } : {}),
       avgDeficit,
     },
   });

@@ -20,6 +20,7 @@
 
 'use client'
 
+import { useState } from 'react'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -152,5 +153,3 @@ export function useConfirm() {
     onOpenChange: handleOpenChange,
   }
 }
-
-import { useState } from 'react'

@@ -190,4 +190,4 @@ export const GET = withAuth(tryCatch(async () => {
     monthlySales,
     salesByCategory,
   })
-}, 'فشل في تحميل بيانات لوحة التحكم'))
+}, 'فشل في تحميل بيانات لوحة التحكم'), { requireAdmin: true })

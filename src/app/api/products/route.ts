@@ -11,6 +11,13 @@ import {
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
 
+/** Fields to exclude for non-admin users */
+function sanitizeProduct(product: Record<string, unknown>, isAdmin: boolean) {
+  if (isAdmin) return product;
+  const { costPrice: _cost, ...rest } = product;
+  return rest;
+}
+
 /**
  * GET /api/products — List products with filters
  */
@@ -35,6 +42,9 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   const whereClause = Object.keys(where).length > 0 ? where : undefined;
 
+  const user = getRequestUser(request);
+  const isAdmin = user?.role === 'admin';
+
   const [products, total] = await Promise.all([
     db.product.findMany({
       where: whereClause,
@@ -49,7 +59,9 @@ export const GET = withAuth(tryCatch(async (request) => {
     db.product.count({ where: whereClause }),
   ]);
 
-  return successResponse({ products, total, page, totalPages: Math.ceil(total / limit) });
+  const safeProducts = products.map((p) => sanitizeProduct({ ...p }, isAdmin));
+
+  return successResponse({ products: safeProducts, total, page, totalPages: Math.ceil(total / limit) });
 }, 'فشل في تحميل المنتجات'));
 
 /**

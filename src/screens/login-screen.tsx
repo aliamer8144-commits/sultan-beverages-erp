@@ -47,7 +47,7 @@ export function LoginScreen() {
       const data = await res.json()
 
       if (data.success) {
-        login(data.user, data.token)
+        login(data.user, '')
         toast.success(`${t('login.welcomeMsg')} ${data.user.name}!`)
       } else {
         toast.error(data.error || t('login.errorFailed'))
