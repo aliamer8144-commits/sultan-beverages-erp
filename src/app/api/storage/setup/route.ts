@@ -49,7 +49,7 @@ export const POST = withAuth(tryCatch(async () => {
 export const GET = withAuth(tryCatch(async () => {
   const configured = isStorageConfigured()
 
-  let bucketInfo: Record<string, unknown> | null = null
+  let bucketInfo = null as unknown
   if (configured && supabaseAdmin) {
     try {
       const { data } = await supabaseAdmin.storage.getBucket(PRODUCT_IMAGES_BUCKET)
