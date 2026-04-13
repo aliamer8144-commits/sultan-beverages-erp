@@ -178,8 +178,8 @@ export function POSScreen() {
     const params: Record<string, string | undefined> = {}
     if (search) params.search = search
     if (categoryId && categoryId !== 'all') params.categoryId = categoryId
-    const result = await get<any[]>('/api/products', params, { showErrorToast: false })
-    if (result) setProducts(result)
+    const result = await get<{ products: any[] }>('/api/products', params, { showErrorToast: false })
+    if (result) setProducts(result.products)
   }, [get])
 
   const fetchCategories = useCallback(async () => {

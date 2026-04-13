@@ -55,8 +55,11 @@ interface StockAlertSummary {
 
 interface StockAlertResponse {
   success: boolean
-  data: StockAlert[]
-  summary?: StockAlertSummary
+  data: {
+    alerts: StockAlert[]
+    summary?: StockAlertSummary
+    pagination?: { total: number; page: number; totalPages: number }
+  }
 }
 
 type FilterSeverity = 'all' | Severity
@@ -113,8 +116,8 @@ export function StockAlertsWidget() {
       const res = await fetch('/api/stock-alerts')
       const json: StockAlertResponse = await res.json()
       if (json.success && json.data) {
-        setAlerts(json.data)
-        setSummary(json.summary || { total: json.data.length, outOfStock: 0, critical: 0, lowStock: 0, totalReorderCost: 0, avgDeficit: 0 })
+        setAlerts(json.data.alerts)
+        setSummary(json.data.summary || { total: json.data.alerts.length, outOfStock: 0, critical: 0, lowStock: 0, totalReorderCost: 0, avgDeficit: 0 })
       }
     } catch {
       // Silently fail - non-critical feature
