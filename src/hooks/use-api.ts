@@ -100,12 +100,25 @@ export function useApi(): UseApiReturn {
       const successMessage = options?.successMessage
 
       if (!response.ok) {
-        // Handle auth errors — redirect to login
+        // Handle auth errors — only redirect if actually on the app (not login page)
         if (response.status === 401 || response.status === 403) {
-          // Clear stored auth state and redirect
+          try {
+            const body = (await response.json()) as ApiErrorResponse
+            if (showError) {
+              toast.error(body.error || 'انتهت صلاحية الجلسة — يرجى تسجيل الدخول مجدداً')
+            }
+          } catch {
+            if (showError) {
+              toast.error('انتهت صلاحية الجلسة — يرجى تسجيل الدخول مجدداً')
+            }
+          }
+          // Clear stored auth state and redirect to login
           useAppStore.getState().logout()
-          if (typeof window !== 'undefined') {
-            window.location.href = '/'
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            // Small delay so the user sees the toast before redirect
+            setTimeout(() => {
+              window.location.href = '/'
+            }, 500)
           }
           return null
         }

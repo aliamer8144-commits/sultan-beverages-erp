@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { type Screen } from '@/types'
 import { useCurrency } from '@/hooks/use-currency'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 import { toast } from 'sonner'
 import {
   BarChart3,
@@ -421,17 +422,22 @@ export function QuickStatsPanel() {
       if (isRefresh) setRefreshing(true)
 
       try {
-        const res = await fetch('/api/quick-stats')
+        const res = await fetchWithAuth('/api/quick-stats')
         const json = await res.json()
 
-        if (json.success && json.data) {
+        if (res.ok && json.success && json.data) {
           setStats(json.data)
           setLastRefreshAt(new Date())
+        } else if (res.status === 401 || res.status === 403) {
+          // Auth expired — redirect to login
+          useAppStore.getState().logout()
+          window.location.href = '/'
         } else {
-          toast.error('فشل في تحميل الإحصائيات')
+          toast.error(json.error || 'فشل في تحميل الإحصائيات')
         }
-      } catch {
-        toast.error('فشل في تحميل الإحصائيات')
+      } catch (err) {
+        console.error('[QuickStats] Fetch error:', err)
+        toast.error('فشل الاتصال بالخادم')
       } finally {
         setLoading(false)
         setRefreshing(false)

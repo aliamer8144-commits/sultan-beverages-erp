@@ -18,6 +18,7 @@ import {
 import { Bell, AlertTriangle, PackageSearch, XCircle, Package, ShoppingCart, Eye, Filter, RefreshCw } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 import { toast } from 'sonner'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -113,7 +114,7 @@ export function StockAlertsWidget() {
   const fetchAlerts = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     try {
-      const res = await fetch('/api/stock-alerts')
+      const res = await fetchWithAuth('/api/stock-alerts')
       const json: StockAlertResponse = await res.json()
       if (json.success && json.data) {
         setAlerts(json.data.alerts)

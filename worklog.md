@@ -589,3 +589,55 @@ Stage Summary:
 - TypeScript: 0 errors, ESLint: 0 errors
 - Full POS flow verified working end-to-end
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
+---
+Task ID: 22
+Agent: Main
+Task: Fix Vercel deployment issues — no data loading + statistics error
+
+Work Log:
+- Investigated root cause of "no data shows after Vercel deployment" + "فشل في تحميل الإحصائيات"
+- Found multiple issues:
+
+  Issue 1: Login API returned token only in httpOnly cookie (Phase 19 security change)
+  - Client stored `login(data.user, '')` — empty token in Zustand store
+  - useApi hook checked `if (token)` to send Authorization header — empty string is falsy → no header sent
+  - Server relied on cookie only, which works on same-origin but is fragile on Vercel
+  
+  Fix: Auth route now returns token in BOTH cookie AND response body
+  - src/app/api/auth/route.ts: Added `token` field to JSON response body
+  - src/screens/login-screen.tsx: Changed `login(data.user, '')` → `login(data.user, data.token || '')`
+
+  Issue 2: Direct fetch() calls missing auth headers entirely
+  - quick-stats-panel.tsx, stock-alerts-widget.tsx, exchange-rate-widget.tsx, csv-import-dialog.tsx
+  - All used `fetch('/api/...')` without any Authorization header or credentials
+  
+  Fix: Created `src/lib/fetchWithAuth` utility + updated all 4 components
+  - New utility: src/lib/fetch-with-auth.ts — wraps fetch() with Authorization header from Zustand + credentials: 'include'
+  - Updated quick-stats-panel.tsx, stock-alerts-widget.tsx, exchange-rate-widget.tsx, csv-import-dialog.tsx
+  - quick-stats-panel also improved: checks res.ok before reading json, handles 401/403 explicitly
+
+  Issue 3: use-api.ts 401/403 redirect was too aggressive
+  - On ANY 401/403, immediately logged out and redirected without showing error
+  
+  Fix: Improved with toast message + 500ms delay before redirect
+  - Shows error toast "انتهت صلاحية الجلسة" before redirecting
+  - Uses setTimeout(500ms) so user sees the toast
+  - Doesn't redirect if already on login page
+
+  Issue 4: .env file had quotes around values
+  - DATABASE_URL="postgresql://..." — quotes became part of the value
+  - Prisma couldn't parse: "the URL must start with the protocol postgresql://"
+  
+  Fix: Removed quotes from .env file
+
+  Issue 5: Prisma db push verified
+  - Ran prisma db push — "The database is already in sync with the Prisma schema"
+  - All tables exist on Supabase
+
+Stage Summary:
+- 8 files changed: 2 modified auth routes, 1 new utility (fetch-with-auth.ts), 4 components updated, 1 .env fixed
+- Login now properly stores JWT token in client-side Zustand store
+- All API calls (both useApi hook and direct fetch) include Authorization header
+- Quick-stats panel shows server error message instead of generic "فشل"
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
+- **IMPORTANT for user**: Must set DATABASE_URL and JWT_SECRET in Vercel dashboard Settings → Environment Variables

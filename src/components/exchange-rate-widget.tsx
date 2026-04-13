@@ -33,6 +33,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 import { CURRENCY_MAP, type CurrencyCode } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ export function ExchangeRateWidget() {
   const fetchRates = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/exchange-rate')
+      const res = await fetchWithAuth('/api/exchange-rate')
       const data = await res.json()
       if (data.success) {
         const d = data.data as ExchangeRateData
@@ -127,9 +128,8 @@ export function ExchangeRateWidget() {
 
     setSaving(true)
     try {
-      const res = await fetch('/api/exchange-rate', {
+      const res = await fetchWithAuth('/api/exchange-rate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           exchangeRate: rate,
           secondaryCurrency: selectedSecondary,

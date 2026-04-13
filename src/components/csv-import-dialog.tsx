@@ -19,6 +19,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { parseCSV } from '@/lib/csv-import'
+import { fetchWithAuth } from '@/lib/fetch-with-auth'
 
 // ─── Types ─────────────────────────────────────────────────────────
 interface CsvImportDialogProps {
@@ -282,9 +283,8 @@ export function CsvImportDialog({ open, onOpenChange, categories, onImportComple
 
     try {
       setImportProgress(95)
-      const res = await fetch('/api/products', {
+      const res = await fetchWithAuth('/api/products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'bulk-import', products }),
       })
       const data = await res.json()
