@@ -6,6 +6,11 @@ const globalForPrisma = globalThis as unknown as {
 
 export const db =
   globalForPrisma.prisma ??
-  new PrismaClient()
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  })
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+// Cache in globalThis for ALL environments (not just dev)
+// This is critical on Vercel where each serverless function invocation
+// would otherwise create a new PrismaClient and exhaust connection pool
+if (!globalForPrisma.prisma) globalForPrisma.prisma = db
