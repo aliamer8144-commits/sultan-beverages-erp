@@ -282,9 +282,9 @@ export function LoyaltyScreen() {
     setAdjustType('add')
     adjustValidation.clearAllErrors()
 
-    const result = await get<CustomerOption[]>('/api/customers')
-    if (result) {
-      setAdjustCustomers(result)
+    const result = await get<{ customers: CustomerOption[] }>('/api/customers')
+    if (result?.customers) {
+      setAdjustCustomers(result.customers)
     }
   }
 

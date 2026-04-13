@@ -136,9 +136,9 @@ export function CustomerStatementScreen() {
   useEffect(() => {
     async function fetchCustomers() {
       try {
-        const result = await get<Customer[]>('/api/customers', undefined, { showErrorToast: false })
-        if (result) {
-          setCustomers(result)
+        const result = await get<{ customers: Customer[] }>('/api/customers', undefined, { showErrorToast: false })
+        if (result?.customers) {
+          setCustomers(result.customers)
         }
       } catch {
         toast.error('فشل في تحميل قائمة العملاء')

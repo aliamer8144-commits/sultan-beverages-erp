@@ -484,9 +484,9 @@ export function SettingsScreen() {
     let cancelled = false
     const load = async () => {
       try {
-        const result = await get<Customer[]>('/api/customers', undefined, { showErrorToast: false })
-        if (!cancelled && result) {
-          setCustomers(result)
+        const result = await get<{ customers: Customer[] }>('/api/customers', undefined, { showErrorToast: false })
+        if (!cancelled && result?.customers) {
+          setCustomers(result.customers)
           setCustomersLoaded(true)
         }
       } catch {

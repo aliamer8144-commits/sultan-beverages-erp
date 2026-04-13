@@ -74,8 +74,8 @@ export function POSScreen() {
 
   // ── Fetch customers (needed before loyalty handlers) ──
   const fetchCustomers = useCallback(async () => {
-    const result = await get<any[]>('/api/customers', undefined, { showErrorToast: false })
-    if (result) setCustomers(result)
+    const result = await get<{ customers: Customer[] }>('/api/customers', undefined, { showErrorToast: false })
+    if (result?.customers) setCustomers(result.customers)
   }, [get])
 
   // ── Loyalty redeem handler ──

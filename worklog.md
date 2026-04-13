@@ -558,3 +558,34 @@ Stage Summary:
 - 1 directory deleted (db/)
 - Project is now 100% Supabase/PostgreSQL — zero SQLite remnants
 - tsc --noEmit: 0 errors, bun run lint: 0 errors
+
+---
+Task ID: 21
+Agent: Main
+Task: E2E Testing — Browser testing and bug fixes
+
+Work Log:
+- Tested full POS flow via agent-browser (headless browser automation)
+- Login: admin/admin123 ✓
+- POS screen: loaded successfully with 21 products ✓
+- Discovered critical bug: `customers.map is not a function` in CartPanel
+  - Root cause: /api/customers returns `{ customers: [...], total, page, totalPages }` (paginated)
+  - But pos-screen.tsx, settings-screen.tsx, loyalty-screen.tsx, customer-statement-screen.tsx were treating response as plain array
+- Fixed 4 files:
+  - src/screens/pos-screen.tsx: get<any[]> → get<{ customers: Customer[] }>, extract .customers
+  - src/screens/settings-screen.tsx: same fix
+  - src/screens/loyalty-screen.tsx: same fix
+  - src/screens/customer-statement-screen.tsx: same fix
+- After fix, tested full invoice creation flow:
+  - Added 3 products to cart (كوكاكولا 330مل, عصير برتقال طبيعي, قهوة عربية) ✓
+  - Opened payment dialog, selected cash payment ✓
+  - Invoice INV-00003 created successfully ✓
+  - Stock updated correctly (decreased by 1 each) ✓
+  - Verified invoice appears in الفواتير screen ✓
+  - Verified stats in التقارير screen: مبيعات اليوم = 40 ر.ي, عدد الفواتير = 2 ✓
+
+Stage Summary:
+- 4 files fixed (customers pagination response handling)
+- TypeScript: 0 errors, ESLint: 0 errors
+- Full POS flow verified working end-to-end
+- tsc --noEmit: 0 errors, bun run lint: 0 errors
