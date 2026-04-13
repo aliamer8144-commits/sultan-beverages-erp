@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { useTranslation } from '@/lib/translations'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,28 @@ export function LoginScreen() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+
+  // Check database connection status on mount
+  useEffect(() => {
+    const checkDb = async () => {
+      try {
+        const res = await fetch('/api/health')
+        const data = await res.json()
+        if (data.data?.database === 'connected') {
+          setDbStatus('connected')
+        } else {
+          setDbStatus('disconnected')
+        }
+      } catch {
+        setDbStatus('disconnected')
+      }
+    }
+    checkDb()
+    // Re-check every 30 seconds
+    const interval = setInterval(checkDb, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const performLogin = useCallback(async (uname: string, pwd: string) => {
     if (!uname || !pwd) {
@@ -114,8 +136,19 @@ export function LoginScreen() {
                 <circle cx="15" cy="9" r="0.5" fill="currentColor" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gradient">{t('login.title')}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{t('login.subtitle')}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gradient">{t('login.title')}</h1>
+              <span className="relative flex h-3 w-3" title={dbStatus === 'connected' ? 'قاعدة البيانات متصلة' : dbStatus === 'disconnected' ? 'قاعدة البيانات غير متصلة' : 'جاري التحقق...'}>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dbStatus === 'connected' ? 'bg-green-400' : dbStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${dbStatus === 'connected' ? 'bg-green-500' : dbStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t('login.subtitle')}
+              {dbStatus === 'disconnected' && (
+                <span className="text-red-400 font-medium mr-2">— قاعدة البيانات غير متصلة</span>
+              )}
+            </p>
           </div>
 
           {/* Login Form */}
