@@ -8,8 +8,8 @@ import { GripVertical } from 'lucide-react'
  *
  * In RTL layout:
  * - "left" panel = cart (on the left side visually)
- * - Dragging right → increases cart width
- * - Dragging left → decreases cart width
+ * - Dragging right (→) → cart gets wider, products narrower
+ * - Dragging left (←) → cart gets narrower, products wider
  */
 
 interface ResizeHandleProps {
@@ -50,14 +50,14 @@ export function ResizeHandle({
         const container = containerRef.current
         if (!container) return
 
-        const containerRect = container.getBoundingClientRect()
-        const deltaX = startXRef.current - moveEvent.clientX // RTL: drag left = increase
+        // clientX increases going right on screen
+        // Drag RIGHT (→) → increase clientX → cart WIDER
+        // Drag LEFT  (←) → decrease clientX → cart NARROWER
+        const deltaX = moveEvent.clientX - startXRef.current
 
         let newWidth: number
 
         if (panelSide === 'left') {
-          // In RTL, left panel is on the left side
-          // deltaX positive (dragged left) = wider panel
           newWidth = startWidthRef.current + deltaX
         } else {
           newWidth = startWidthRef.current - deltaX
@@ -98,7 +98,7 @@ export function ResizeHandle({
         if (!container) return
 
         const touch = moveEvent.touches[0]
-        const deltaX = startXRef.current - touch.clientX
+        const deltaX = touch.clientX - startXRef.current
 
         let newWidth: number
         if (panelSide === 'left') {
@@ -163,12 +163,12 @@ export function ResizeHandle({
       aria-label="تعديل عرض اللوحة"
       tabIndex={0}
     >
-      {/* Drag handle icon — visible on hover */}
+      {/* Grip icon — always visible, brighter on hover/drag */}
       <div
         className={`
           absolute inset-y-0 flex items-center justify-center
           transition-opacity duration-150
-          ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}
+          ${isDragging ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'}
         `}
       >
         <div
@@ -181,11 +181,15 @@ export function ResizeHandle({
             }
           `}
         >
-          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/60" />
+          <GripVertical className={`w-3.5 h-3.5 transition-colors duration-150 ${
+            isDragging
+              ? 'text-primary/70'
+              : 'text-muted-foreground/50 group-hover:text-muted-foreground/80'
+          }`} />
         </div>
       </div>
 
-      {/* Thin visible line */}
+      {/* Thin center line */}
       <div
         className={`
           w-[2px] h-full transition-colors duration-150
