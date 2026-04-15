@@ -1,27 +1,28 @@
 import { db } from '@/lib/db'
+import { hashPassword } from '@/lib/auth'
 
 async function main() {
   console.log('🌱 Seeding database...')
 
-  // Create admin user
+  // Create admin user (password hashed with bcrypt)
   await db.user.upsert({
     where: { username: 'admin' },
     update: {},
     create: {
       username: 'admin',
-      password: 'admin123',
+      password: await hashPassword('admin123'),
       name: 'مدير النظام',
       role: 'admin',
     },
   })
 
-  // Create cashier user
+  // Create cashier user (password hashed with bcrypt)
   await db.user.upsert({
     where: { username: 'cashier' },
     update: {},
     create: {
       username: 'cashier',
-      password: 'cashier123',
+      password: await hashPassword('cashier123'),
       name: 'الكاشير',
       role: 'cashier',
     },

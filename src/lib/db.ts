@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 
+// Use SUPABASE_DIRECT_URL for Prisma operations, fall back to DATABASE_URL
+// This prevents system-level DATABASE_URL from overriding .env files
+const databaseUrl = process.env.SUPABASE_DIRECT_URL || process.env.DATABASE_URL
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
@@ -7,6 +11,11 @@ const globalForPrisma = globalThis as unknown as {
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: {
+      db: {
+        url: databaseUrl,
+      },
+    },
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 

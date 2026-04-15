@@ -37,9 +37,24 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 }
 
+// ── Supabase Domain Helper ──────────────────────────────────────────
+
+function getSupabaseDomain(): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (supabaseUrl) {
+    try {
+      return new URL(supabaseUrl).hostname
+    } catch {
+      return '*.supabase.co'
+    }
+  }
+  return '*.supabase.co'
+}
+
 // ── Security Headers ────────────────────────────────────────────────
 
 function getSecurityHeaders(): HeadersInit {
+  const supabaseDomain = getSupabaseDomain()
   return {
     // Prevent MIME type sniffing
     'X-Content-Type-Options': 'nosniff',
@@ -50,13 +65,14 @@ function getSecurityHeaders(): HeadersInit {
     // Referrer policy
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     // Content-Security-Policy: restrict resource loading
+    // Supabase domains are allowed for Storage (images) and API calls
     'Content-Security-Policy': [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval needed for Next.js dev
       "style-src 'self' 'unsafe-inline'",                  // unsafe-inline needed for Tailwind
-      "img-src 'self' data: blob:",                        // data: for base64 product images
+      `img-src 'self' data: blob: https://${supabaseDomain}`,  // Supabase Storage for product images
       "font-src 'self' data:",
-      "connect-src 'self'",
+      `connect-src 'self' https://${supabaseDomain}`,       // Supabase Storage API calls
       "frame-ancestors 'none'",
     ].join('; '),
   }

@@ -673,3 +673,30 @@ Stage Summary:
 - User must set SUPABASE_SERVICE_ROLE_KEY in .env and Vercel env vars
 - User must call POST /api/storage/setup (or create bucket manually in Supabase Dashboard)
 - lint passes, no TypeScript errors
+---
+Task ID: 1
+Agent: Main Agent
+Task: Clone, analyze, and migrate Sultan Beverages ERP from SQLite to Supabase PostgreSQL
+
+Work Log:
+- Cloned project from GitHub to /home/z/sultan-beverages-erp
+- Analyzed 90+ files across the entire codebase (screens, API routes, lib, hooks, types, components)
+- Identified all SQLite references, bugs, and issues
+- Changed `provider = "sqlite"` to `provider = "postgresql"` in prisma/schema.prisma
+- Updated .env with actual Supabase Service Role Key and Supabase URL
+- Fixed seed.ts to hash passwords with bcrypt (was storing plaintext)
+- Fixed middleware.ts CSP to allow Supabase domains in connect-src and img-src
+- Fixed db.ts to explicitly set datasource URL to prevent system env override
+- Generated Prisma client for PostgreSQL
+- Pushed schema to Supabase PostgreSQL (all 15 tables created)
+- Seeded database with users, categories, products, customers, suppliers
+- Verified login works with admin/admin123 against Supabase
+- Synced all fixes back to /home/z/sultan-beverages-erp
+
+Stage Summary:
+- Project fully migrated from SQLite to Supabase PostgreSQL
+- All 15 tables created in Supabase
+- Authentication working with bcrypt-hashed passwords
+- JWT tokens generated and set as httpOnly cookies
+- CSP headers updated to allow Supabase Storage
+- Key fixes: schema.prisma, .env, seed.ts, middleware.ts, db.ts
