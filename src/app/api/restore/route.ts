@@ -209,7 +209,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.category.createMany({
         data: cleanedCats as Prisma.CategoryCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.categories = cleanedCats.length
     }
@@ -221,7 +220,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.product.createMany({
         data: cleanedProducts as Prisma.ProductCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.products = cleanedProducts.length
     }
@@ -233,7 +231,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.customer.createMany({
         data: cleanedCustomers as Prisma.CustomerCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.customers = cleanedCustomers.length
     }
@@ -245,7 +242,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.supplier.createMany({
         data: cleanedSuppliers as Prisma.SupplierCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.suppliers = cleanedSuppliers.length
     }
@@ -257,7 +253,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.invoice.createMany({
         data: cleanedInvoices as Prisma.InvoiceCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.invoices = cleanedInvoices.length
     }
@@ -269,7 +264,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.invoiceItem.createMany({
         data: cleanedItems as Prisma.InvoiceItemCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.invoiceItems = cleanedItems.length
     }
@@ -281,7 +275,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.payment.createMany({
         data: cleanedPayments as Prisma.PaymentCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.payments = cleanedPayments.length
     }
@@ -293,7 +286,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.stockAdjustment.createMany({
         data: cleanedStockAdj as Prisma.StockAdjustmentCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.stockAdjustments = cleanedStockAdj.length
     }
@@ -305,7 +297,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.productReturn.createMany({
         data: cleanedReturns as Prisma.ProductReturnCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.productReturns = cleanedReturns.length
     }
@@ -317,7 +308,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.supplierPayment.createMany({
         data: cleanedSupPayments as Prisma.SupplierPaymentCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.supplierPayments = cleanedSupPayments.length
     }
@@ -329,7 +319,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.supplierReview.createMany({
         data: cleanedReviews as Prisma.SupplierReviewCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.supplierReviews = cleanedReviews.length
     }
@@ -341,7 +330,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.loyaltyTransaction.createMany({
         data: cleanedLoyalty as Prisma.LoyaltyTransactionCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.loyaltyTransactions = cleanedLoyalty.length
     }
@@ -353,7 +341,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.salesTarget.createMany({
         data: cleanedTargets as Prisma.SalesTargetCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.salesTargets = cleanedTargets.length
     }
@@ -365,7 +352,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.expenseCategory.createMany({
         data: cleanedExpCats as Prisma.ExpenseCategoryCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.expenseCategories = cleanedExpCats.length
     }
@@ -377,7 +363,6 @@ export const POST = withAuth(tryCatch(async (request) => {
       )
       await tx.expense.createMany({
         data: cleanedExpenses as Prisma.ExpenseCreateManyInput[],
-        skipDuplicates: true,
       })
       counts.expenses = cleanedExpenses.length
     }

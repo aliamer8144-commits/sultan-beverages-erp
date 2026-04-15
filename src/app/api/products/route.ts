@@ -125,7 +125,6 @@ export const POST = withAuth(tryCatch(async (request) => {
           minQuantity: 5,
           barcode: item.barcode?.trim() || null,
         })),
-        skipDuplicates: true,
       });
       created = validProducts.length;
     }

@@ -35,7 +35,7 @@ export const CURRENCY_MAP: Record<CurrencyCode, CurrencyMeta> = {
 
 // ── User ─────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'cashier'
+export type UserRole = 'admin' | 'manager' | 'cashier'
 
 export interface User {
   id: string

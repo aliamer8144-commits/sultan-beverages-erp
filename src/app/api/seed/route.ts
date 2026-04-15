@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { withAuth, getRequestUser } from '@/lib/auth-middleware'
-import { successResponse } from '@/lib/api-response'
+import { successResponse, errorResponse } from '@/lib/api-response'
 import { logAction } from '@/lib/audit-logger'
 import { hashPassword } from '@/lib/auth'
 import { tryCatch } from '@/lib/api-error-handler'
