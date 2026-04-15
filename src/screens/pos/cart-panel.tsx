@@ -129,6 +129,7 @@ export function CartPanel({
                 variant="ghost"
                 size="sm"
                 className="relative h-8 w-8 p-0 rounded-lg hover:bg-amber-500/10 hover:text-amber-600 transition-colors"
+                aria-label="الطلبات المجمّدة"
               >
                 <Clock className="w-4 h-4" />
                 {heldOrders.length > 0 && (
@@ -313,6 +314,7 @@ export function CartPanel({
                     <button
                       onClick={(e) => { e.stopPropagation(); removeFromCart(item.productId) }}
                       className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground/40 hover:text-destructive transition-colors"
+                      aria-label="حذف من السلة"
                     >
                       <X className="w-3 h-3" />
                     </button>

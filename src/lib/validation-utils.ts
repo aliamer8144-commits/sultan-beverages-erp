@@ -40,27 +40,37 @@ export function validateFormClient<T extends z.ZodType>(
 /**
  * Validate a single field against a Zod schema.
  *
+ * Uses `.pick()` to validate only the specific field instead of
+ * parsing the entire schema, which is much more efficient for
+ * large schemas.
+ *
  * Returns the first error message for the specified field,
  * or `undefined` if the field is valid.
  *
  * @example
  * ```ts
- * const error = validateField(createCustomerSchema, { name: '' }, 'name')
+ * const error = validateField(createCustomerSchema, 'name', '')
  * // error = 'اسم العميل مطلوب'
  * ```
  */
-export function validateField<T extends z.ZodType>(
-  schema: T,
-  data: unknown,
-  fieldName: string
+export function validateField(
+  schema: z.ZodObject<any>,
+  field: string,
+  value: unknown
 ): string | undefined {
-  const result = schema.safeParse(data)
-  if (result.success) return undefined
+  try {
+    const fieldSchema = schema.pick({ [field]: true })
+    const result = fieldSchema.safeParse({ [field]: value })
+    if (result.success) return undefined
 
-  const match = result.error.issues.find(
-    (issue) => issue.path.join('.') === fieldName
-  )
-  return match?.message
+    const match = result.error.issues.find(
+      (issue) => issue.path.join('.') === field
+    )
+    return match?.message
+  } catch {
+    // Fallback: if pick fails (e.g. field doesn't exist in schema), return undefined
+    return undefined
+  }
 }
 
 /**

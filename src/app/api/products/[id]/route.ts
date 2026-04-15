@@ -81,12 +81,17 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   const existing = await db.product.findUnique({ where: { id } });
   if (!existing) return notFound("المنتج غير موجود");
 
-  // Delete product image from Storage before deleting the record
-  if (existing.image && existing.image.startsWith('http')) {
-    await deleteProductImage(existing.image);
-  }
+  // Check for invoice items before soft-deleting
+  const invoiceItemCount = await db.invoiceItem.count({
+    where: { productId: id },
+  });
+  const hasSales = invoiceItemCount > 0;
 
-  await db.product.delete({ where: { id } });
+  // Soft delete — mark as deleted instead of removing the record
+  await db.product.update({
+    where: { id },
+    data: { deletedAt: new Date(), isActive: false },
+  });
 
   const user = getRequestUser(request);
   logAction({
@@ -95,7 +100,7 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
     entityId: id,
     userId: user?.userId,
     userName: user?.username,
-    details: { name: existing.name },
+    details: { name: existing.name, hasSales, invoiceItemCount },
   });
 
   return successResponse({ deleted: true });

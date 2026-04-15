@@ -55,11 +55,21 @@ export const GET = withAuth(tryCatch(async () => {
   })
   const totalPurchases = purchasesResult._sum.totalAmount ?? 0
 
-  // 4. Total Expenses = purchases
-  const totalExpenses = totalPurchases
+  // 4. Total Expenses: actual expenses from Expense table
+  const expenseResult = await db.expense.aggregate({
+    where: {
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    _sum: { amount: true },
+  })
+  const totalExpenses = expenseResult._sum.amount || 0
 
-  // 5. Net Profit = Total Sales - Total Purchases
-  const netProfit = totalSales - totalPurchases
+  // 5. Net Profit = Sales - Cost of goods sold - Operating expenses
+  const costOfGoodsSold = totalPurchases
+  const netProfit = totalSales - costOfGoodsSold - totalExpenses
 
   // 6. Invoice Count from single query
   const invoiceCount = todaySaleInvoices.length

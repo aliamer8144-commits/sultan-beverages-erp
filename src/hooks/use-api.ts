@@ -1,8 +1,8 @@
 /**
  * useApi — Sultan Beverages ERP
  *
- * Centralized API client hook. Handles auth headers, error responses,
- * toast notifications, and loading state.
+ * Centralized API client hook. Handles auth via httpOnly cookies,
+ * error responses, toast notifications, and loading state.
  *
  * Usage:
  *   const { get, post, put, del, loading } = useApi()
@@ -20,7 +20,7 @@ import type { ApiResponse, ApiErrorResponse } from '@/types/api'
 // ── Config ──────────────────────────────────────────────────────────
 
 const DEFAULT_OPTIONS: RequestInit = {
-  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
 }
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -80,7 +80,6 @@ interface UseApiReturn {
 export function useApi(): UseApiReturn {
   const loadingCountRef = useRef(0)
   const [loading, setLoading] = useState(false)
-  const token = useAppStore((s) => s.token)
 
   const startLoading = useCallback(() => {
     loadingCountRef.current++
@@ -175,13 +174,11 @@ export function useApi(): UseApiReturn {
         const headers: Record<string, string> = {
           ...(init.headers as Record<string, string>),
         }
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`
-        }
 
         const response = await fetch(url, {
           ...init,
           headers,
+          credentials: 'include',
         })
 
         return handleResponse<T>(response, options)
@@ -194,7 +191,7 @@ export function useApi(): UseApiReturn {
         stopLoading()
       }
     },
-    [token, handleResponse, startLoading, stopLoading],
+    [handleResponse, startLoading, stopLoading],
   )
 
   const get = useCallback(
@@ -221,9 +218,14 @@ export function useApi(): UseApiReturn {
 
   const post = useCallback(
     async <T = unknown>(url: string, body?: unknown, options?: UseApiOptions): Promise<T | null> => {
+      const isFormData = body instanceof FormData
+      const headers: Record<string, string> = {}
+      if (body && !isFormData) {
+        headers['Content-Type'] = 'application/json'
+      }
       return request<T>(
         url,
-        { method: 'POST', ...DEFAULT_OPTIONS, body: body ? JSON.stringify(body) : undefined },
+        { method: 'POST', ...DEFAULT_OPTIONS, headers, body: body ? (isFormData ? body : JSON.stringify(body)) : undefined },
         options,
       )
     },
@@ -232,9 +234,14 @@ export function useApi(): UseApiReturn {
 
   const put = useCallback(
     async <T = unknown>(url: string, body?: unknown, options?: UseApiOptions): Promise<T | null> => {
+      const isFormData = body instanceof FormData
+      const headers: Record<string, string> = {}
+      if (body && !isFormData) {
+        headers['Content-Type'] = 'application/json'
+      }
       return request<T>(
         url,
-        { method: 'PUT', ...DEFAULT_OPTIONS, body: body ? JSON.stringify(body) : undefined },
+        { method: 'PUT', ...DEFAULT_OPTIONS, headers, body: body ? (isFormData ? body : JSON.stringify(body)) : undefined },
         options,
       )
     },
@@ -243,9 +250,14 @@ export function useApi(): UseApiReturn {
 
   const patch = useCallback(
     async <T = unknown>(url: string, body?: unknown, options?: UseApiOptions): Promise<T | null> => {
+      const isFormData = body instanceof FormData
+      const headers: Record<string, string> = {}
+      if (body && !isFormData) {
+        headers['Content-Type'] = 'application/json'
+      }
       return request<T>(
         url,
-        { method: 'PATCH', ...DEFAULT_OPTIONS, body: body ? JSON.stringify(body) : undefined },
+        { method: 'PATCH', ...DEFAULT_OPTIONS, headers, body: body ? (isFormData ? body : JSON.stringify(body)) : undefined },
         options,
       )
     },
@@ -259,48 +271,10 @@ export function useApi(): UseApiReturn {
         { method: 'DELETE', ...DEFAULT_OPTIONS },
         { showSuccessToast: true, successMessage: 'تم الحذف بنجاح', ...options },
       )
-      return result !== null || true // Return true even for 204
+      return result !== null
     },
     [request],
   )
 
   return { loading, get, post, put, patch, del, request }
-}
-
-// ── Convenience: non-hook API client (for use outside components) ────
-
-export function apiClient() {
-  const stored = localStorage.getItem('sultan-erp-store')
-  let token: string | null = null
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored)
-      token = parsed?.state?.token || null
-    } catch {
-      // ignore
-    }
-  }
-
-  return {
-    async get<T = unknown>(url: string, params?: Record<string, string | number | undefined>): Promise<T | null> {
-      let fullUrl = url
-      if (params) {
-        const sp = new URLSearchParams()
-        for (const [k, v] of Object.entries(params)) {
-          if (v !== undefined && v !== '') sp.set(k, String(v))
-        }
-        if (sp.toString()) fullUrl += `?${sp.toString()}`
-      }
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      try {
-        const res = await fetch(fullUrl, { headers })
-        if (!res.ok) return null
-        const body = await res.json()
-        return (body as ApiResponse<T>).data
-      } catch {
-        return null
-      }
-    },
-  }
 }

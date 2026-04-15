@@ -69,7 +69,7 @@ export function LoginScreen() {
       const data = await res.json()
 
       if (data.success) {
-        login(data.user, data.token || '')
+        login(data.user)
         toast.success(`${t('login.welcomeMsg')} ${data.user.name}!`)
       } else {
         toast.error(data.error || t('login.errorFailed'))
@@ -197,6 +197,14 @@ export function LoginScreen() {
           {/* Demo credentials — only shown in development */}
           {process.env.NODE_ENV === 'development' && (
           <div className="mt-6 pt-6 border-t border-border/50">
+            <div className="flex items-center gap-1.5 justify-center mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span className="text-[10px] text-amber-600 dark:text-amber-400">بيانات تجريبية — لا تستخدم في الإنتاج</span>
+            </div>
             <p className="text-xs text-center text-muted-foreground mb-3">{t('login.demoCredentials')}</p>
             <div className="grid grid-cols-2 gap-3">
               <button

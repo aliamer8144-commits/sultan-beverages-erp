@@ -31,34 +31,57 @@ export const GET = withAuth(tryCatch(async (request) => {
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    deletedAt: null,
+  };
 
   if (search) where.name = { contains: search };
   if (categoryId) where.categoryId = categoryId;
   if (lowStock) {
-    where.quantity = { lte: 5 };
+    // We'll filter by minQuantity after fetching (Prisma can't compare two fields)
     where.isActive = true;
   }
   if (barcode) where.barcode = barcode;
 
-  const whereClause = Object.keys(where).length > 0 ? where : undefined;
+  const whereClause = where;
 
   const user = getRequestUser(request);
   const isAdmin = user?.role === 'admin';
 
-  const [products, total] = await Promise.all([
-    db.product.findMany({
+  let products;
+  let total;
+
+  if (lowStock) {
+    // Fetch all active products and filter by minQuantity in code
+    // (Prisma can't compare two fields in a where clause)
+    const allProducts = await db.product.findMany({
       where: whereClause,
       include: {
         category: { select: { id: true, name: true, icon: true } },
         _count: { select: { variants: true } },
       },
       orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    db.product.count({ where: whereClause }),
-  ]);
+    });
+
+    // Filter: quantity <= product's own minQuantity
+    const filteredProducts = allProducts.filter(p => p.quantity <= p.minQuantity);
+    total = filteredProducts.length;
+    products = filteredProducts.slice((page - 1) * limit, page * limit);
+  } else {
+    [products, total] = await Promise.all([
+      db.product.findMany({
+        where: whereClause,
+        include: {
+          category: { select: { id: true, name: true, icon: true } },
+          _count: { select: { variants: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.product.count({ where: whereClause }),
+    ]);
+  }
 
   const safeProducts = products.map((p) => sanitizeProduct({ ...p }, isAdmin));
 
@@ -125,20 +148,7 @@ export const POST = withAuth(tryCatch(async (request) => {
 
   const { name, categoryId, price, costPrice, quantity, minQuantity, barcode, image } = validation.data;
 
-  // Upload image to Supabase Storage if it's a base64 data URL
-  let finalImageUrl: string | null = null;
-  if (image && image.startsWith('data:image/')) {
-    // Generate a temporary product ID for the image path
-    const tempId = `temp-${Date.now()}`;
-    finalImageUrl = await uploadProductImage(image, tempId);
-    if (!finalImageUrl) {
-      return errorResponse('فشل في رفع الصورة', 500);
-    }
-  } else if (image) {
-    // Already a URL (Supabase Storage or external)
-    finalImageUrl = image;
-  }
-
+  // Create product first (without image) to get a real ID for image upload
   const product = await db.product.create({
     data: {
       name,
@@ -148,9 +158,22 @@ export const POST = withAuth(tryCatch(async (request) => {
       quantity: quantity ?? 0,
       minQuantity: minQuantity ?? 5,
       barcode,
-      image: finalImageUrl,
+      image: null,
     },
   });
+
+  // Upload image to Supabase Storage if it's a base64 data URL
+  if (image && image.startsWith('data:image/')) {
+    const imageUrl = await uploadProductImage(image, product.id);
+    if (imageUrl) {
+      await db.product.update({ where: { id: product.id }, data: { image: imageUrl } });
+      product.image = imageUrl;
+    }
+  } else if (image) {
+    // Already a URL (Supabase Storage or external)
+    await db.product.update({ where: { id: product.id }, data: { image } });
+    product.image = image;
+  }
 
   logAction({
     action: "create",
@@ -187,12 +210,11 @@ export const PATCH = withAuth(tryCatch(async (request) => {
         select: { id: true, price: true },
       });
 
-      const priceUpdates = currentProducts.map((p) => {
-        const newPrice = Math.max(0, Number((p.price * (1 + Number(priceChangeValue) / 100)).toFixed(2)));
-        return db.product.update({ where: { id: p.id }, data: { price: newPrice } });
-      });
-
-      await Promise.all(priceUpdates);
+      await db.$transaction(
+        currentProducts.map((p) =>
+          db.product.update({ where: { id: p.id }, data: { price: Math.max(0, Number((p.price * (1 + Number(priceChangeValue) / 100)).toFixed(2))) } })
+        )
+      );
 
       logAction({
         action: "batch_update",
@@ -245,7 +267,10 @@ export const DELETE = withAuth(tryCatch(async (request) => {
   const { id, ids } = validation.data;
 
   if (ids && ids.length > 0) {
-    const result = await db.product.deleteMany({ where: { id: { in: ids } } });
+    const result = await db.product.updateMany({
+      where: { id: { in: ids } },
+      data: { deletedAt: new Date(), isActive: false },
+    });
 
     logAction({
       action: "bulk_delete",
@@ -260,7 +285,10 @@ export const DELETE = withAuth(tryCatch(async (request) => {
 
   if (id) {
     const existing = await db.product.findUnique({ where: { id } });
-    await db.product.delete({ where: { id } });
+    await db.product.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
 
     logAction({
       action: "delete",
@@ -275,4 +303,4 @@ export const DELETE = withAuth(tryCatch(async (request) => {
   }
 
   return errorResponse("يرجى تحديد منتج واحد على الأقل");
-}, 'فشل في حذف المنتج(ات)'));
+}, 'فشل في حذف المنتج(ات)'), { requireAdmin: true });

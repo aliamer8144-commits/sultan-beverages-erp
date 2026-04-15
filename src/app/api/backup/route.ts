@@ -8,7 +8,9 @@ import { tryCatch } from '@/lib/api-error-handler'
 export const GET = withAuth(tryCatch(async (request) => {
   const user = getRequestUser(request)
 
-  const [users, categories, products, customers, suppliers, invoices, payments] =
+  const [users, categories, products, customers, suppliers, invoices, payments,
+    stockAdjustments, productReturns, supplierPayments, supplierReviews,
+    loyaltyTransactions, salesTargets, expenseCategories, expenses] =
     await Promise.all([
       // SECURITY: Exclude password field from backup export
       db.user.findMany({
@@ -39,6 +41,14 @@ export const GET = withAuth(tryCatch(async (request) => {
         },
       }),
       db.payment.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.stockAdjustment.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.productReturn.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.supplierPayment.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.supplierReview.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.loyaltyTransaction.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.salesTarget.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.expenseCategory.findMany({ orderBy: { createdAt: 'asc' } }),
+      db.expense.findMany({ orderBy: { createdAt: 'asc' } }),
     ])
 
   // Extract invoice items from the nested invoices for backward compatibility
@@ -60,6 +70,14 @@ export const GET = withAuth(tryCatch(async (request) => {
       invoices: serialize(invoices),
       invoiceItems: serialize(invoiceItems),
       payments: serialize(payments),
+      stockAdjustments: serialize(stockAdjustments),
+      productReturns: serialize(productReturns),
+      supplierPayments: serialize(supplierPayments),
+      supplierReviews: serialize(supplierReviews),
+      loyaltyTransactions: serialize(loyaltyTransactions),
+      salesTargets: serialize(salesTargets),
+      expenseCategories: serialize(expenseCategories),
+      expenses: serialize(expenses),
     },
     summary: {
       users: users.length,
@@ -70,6 +88,14 @@ export const GET = withAuth(tryCatch(async (request) => {
       invoices: invoices.length,
       invoiceItems: invoiceItems.length,
       payments: payments.length,
+      stockAdjustments: stockAdjustments.length,
+      productReturns: productReturns.length,
+      supplierPayments: supplierPayments.length,
+      supplierReviews: supplierReviews.length,
+      loyaltyTransactions: loyaltyTransactions.length,
+      salesTargets: salesTargets.length,
+      expenseCategories: expenseCategories.length,
+      expenses: expenses.length,
     },
   }
 

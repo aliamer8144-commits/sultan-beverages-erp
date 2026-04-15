@@ -142,6 +142,20 @@ export const POST = withAuth(tryCatch(async (request) => {
     return errorResponse('رصيد نقاط الولاء غير كافٍ')
   }
 
+  // Validate max points per transaction
+  const MAX_POINTS_PER_TRANSACTION = 10000
+  if (points > 0 && points > MAX_POINTS_PER_TRANSACTION) {
+    return errorResponse('عدد النقاط كبير جداً')
+  }
+
+  // Validate transaction type matches sign of points
+  if (transactionType === 'earned' && points <= 0) {
+    return errorResponse('نقاط الكسب يجب أن تكون موجبة')
+  }
+  if (transactionType === 'redeemed' && points >= 0) {
+    return errorResponse('نقاط الاستبدال يجب أن تكون سالبة')
+  }
+
   // Create transaction and update customer points atomically
   const newPoints = customer.loyaltyPoints + points
 
@@ -177,4 +191,4 @@ export const POST = withAuth(tryCatch(async (request) => {
     transaction,
     newPointsBalance: newPoints,
   })
-}, 'فشل في إنشاء عملية الولاء'))
+}, 'فشل في إنشاء عملية الولاء'), { requireAdmin: true })

@@ -50,6 +50,10 @@ function forbiddenResponse(message = 'ليس لديك صلاحية لهذا ال
 interface WithAuthOptions {
   /** If true, only users with role 'admin' can access */
   requireAdmin?: boolean
+  /** If true, users with role 'admin' or 'manager' can access (but not cashier) */
+  requireManager?: boolean
+  /** Specific roles allowed (e.g., ['admin', 'manager']) */
+  roles?: string[]
   /** Custom 401 message */
   unauthorizedMessage?: string
   /** Custom 403 message */
@@ -81,6 +85,15 @@ export function withAuth(
       return forbiddenResponse(options.forbiddenMessage)
     }
 
+    if (options.requireManager && user.role !== 'admin' && user.role !== 'manager') {
+      return forbiddenResponse(options.forbiddenMessage)
+    }
+
+    // Check specific roles if provided
+    if (options.roles && options.roles.length > 0 && !options.roles.includes(user.role)) {
+      return forbiddenResponse(options.forbiddenMessage)
+    }
+
     // Attach user info to the request for downstream use
     request.__authUser = user
 
@@ -105,7 +118,7 @@ export function getRequestUser(request: NextRequest): AuthUserInfo | undefined {
 export function setAuthCookie(
   response: NextResponse,
   token: string,
-  maxAge = 7 * 24 * 60 * 60 // 7 days in seconds
+  maxAge = 24 * 60 * 60 // 24 hours in seconds
 ) {
   response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,

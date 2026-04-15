@@ -168,8 +168,6 @@ export interface InvoiceData {
   createdAt: string
 }
 
-export type TemplateType = 'classic' | 'professional' | 'simple'
-
 // ── Translation / i18n ───────────────────────────────────────────────
 
 export type Lang = 'ar' | 'en'

@@ -408,6 +408,7 @@ export function UsersScreen() {
                               size="sm"
                               className="h-8 w-8 p-0 rounded-lg hover:bg-primary/10 hover:text-primary"
                               onClick={() => openEditDialog(user)}
+                              aria-label="تعديل"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
@@ -421,6 +422,7 @@ export function UsersScreen() {
                               }`}
                               onClick={() => openDeleteDialog(user)}
                               disabled={user.id === currentUser?.id}
+                              aria-label="حذف"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>

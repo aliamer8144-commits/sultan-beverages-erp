@@ -134,6 +134,7 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
                         size="sm"
                         onClick={() => openEditCatDialog(cat)}
                         className="h-8 w-8 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                        aria-label="تعديل"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -147,6 +148,7 @@ export function CategoryManager({ open, onOpenChange, categories, onUpdated }: C
                         className="h-8 w-8 p-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                         disabled={(cat._count?.products ?? 0) > 0}
                         title={(cat._count?.products ?? 0) > 0 ? 'لا يمكن حذف تصنيف يحتوي على منتجات' : 'حذف التصنيف'}
+                        aria-label="حذف"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>

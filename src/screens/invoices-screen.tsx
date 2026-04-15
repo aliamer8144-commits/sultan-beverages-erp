@@ -31,6 +31,7 @@ export function InvoicesScreen() {
 
   // Filters
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -53,6 +54,12 @@ export function InvoicesScreen() {
   const [returnOpen, setReturnOpen] = useState(false)
   const [returnInvoice, setReturnInvoice] = useState<Invoice | null>(null)
 
+  // ── Debounce search ──────────────────────────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   // ── Fetch Invoices ─────────────────────────────────────────────────────
 
   const fetchInvoices = useCallback(async (p = 1) => {
@@ -60,7 +67,7 @@ export function InvoicesScreen() {
     try {
       const result = await get<{ invoices: Invoice[]; total: number; page: number; totalPages: number }>('/api/invoices', {
         type: activeTab,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page: p,
@@ -79,13 +86,13 @@ export function InvoicesScreen() {
     } finally {
       setLoading(false)
     }
-  }, [activeTab, search, dateFrom, dateTo, get])
+  }, [activeTab, debouncedSearch, dateFrom, dateTo, get])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1)
     fetchInvoices(1)
-  }, [activeTab, search, dateFrom, dateTo])
+  }, [activeTab, debouncedSearch, dateFrom, dateTo])
 
   const goToPage = (p: number) => {
     if (p < 1 || p > totalPages) return
@@ -385,6 +392,7 @@ export function InvoicesScreen() {
                               className="h-8 w-8 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600"
                               onClick={() => openReturnDialog(invoice)}
                               title="إرجاع"
+                              aria-label="إرجاع"
                             >
                               <RotateCcw className="w-4 h-4" />
                             </Button>
@@ -395,6 +403,7 @@ export function InvoicesScreen() {
                             className="h-8 w-8"
                             onClick={() => openDetail(invoice)}
                             title="عرض التفاصيل"
+                            aria-label="عرض التفاصيل"
                           >
                             <Eye className="w-4 h-4 text-muted-foreground" />
                           </Button>
@@ -404,6 +413,7 @@ export function InvoicesScreen() {
                             className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
                             onClick={() => handlePrint(invoice)}
                             title="طباعة"
+                            aria-label="طباعة"
                           >
                             <Printer className="w-4 h-4" />
                           </Button>
@@ -413,6 +423,7 @@ export function InvoicesScreen() {
                             className="h-8 w-8"
                             onClick={() => toggleExpand(invoice.id)}
                             title="تفاصيل العناصر"
+                            aria-label="تفاصيل العناصر"
                           >
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />

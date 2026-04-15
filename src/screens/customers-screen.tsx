@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -46,6 +46,7 @@ import { EmptyState, Pagination } from '@/components/empty-state'
 import { exportToCSV } from '@/lib/export-csv'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
+import { useAppStore } from '@/store/app-store'
 
 import type { Customer, CustomerFormData } from './customers/types'
 import { CUSTOMER_CATEGORIES, emptyForm } from './customers/types'
@@ -58,6 +59,9 @@ import { PurchaseHistoryDialog } from './customers/purchase-history-dialog'
 export function CustomersScreen() {
   const { formatCurrency, symbol } = useCurrency()
   const { get, post, put, del } = useApi()
+
+  // Role-based access
+  const isAdmin = useAppStore((s) => s.user?.role === 'admin')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
@@ -258,9 +262,9 @@ export function CustomersScreen() {
   }
 
   // ─── Stats ────────────────────────────────────────────────────────
-  const totalDebt = customers.reduce((sum, c) => sum + c.debt, 0)
-  const debtorsCount = customers.filter((c) => c.debt > 0).length
-  const vipCount = customers.filter((c) => c.category === 'VIP').length
+  const totalDebt = useMemo(() => customers.reduce((sum, c) => sum + (c.debt || 0), 0), [customers])
+  const debtorsCount = useMemo(() => customers.filter((c) => (c.debt || 0) > 0).length, [customers])
+  const vipCount = useMemo(() => customers.filter((c) => c.category === 'VIP' || c.category === 'مميز').length, [customers])
 
   // ─── Render ───────────────────────────────────────────────────────
   return (
@@ -541,6 +545,7 @@ export function CustomersScreen() {
                                   size="icon"
                                   className="h-8 w-8 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500"
                                   onClick={() => openPurchaseHistory(customer)}
+                                  aria-label="سجل المشتريات"
                                 >
                                   <ShoppingBag className="h-4 w-4" />
                                 </Button>
@@ -555,6 +560,7 @@ export function CustomersScreen() {
                                     size="icon"
                                     className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600"
                                     onClick={() => openPaymentDialogForCustomer(customer)}
+                                    aria-label="تسجيل دفعة"
                                   >
                                     <Wallet className="h-4 w-4" />
                                   </Button>
@@ -569,6 +575,7 @@ export function CustomersScreen() {
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => openPaymentHistory(customer)}
+                                  aria-label="سجل الدفعات"
                                 >
                                   <History className="h-4 w-4 text-muted-foreground" />
                                 </Button>
@@ -582,12 +589,14 @@ export function CustomersScreen() {
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => openEdit(customer)}
+                                  aria-label="تعديل"
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>تعديل</TooltipContent>
                             </Tooltip>
+                            {isAdmin && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -595,12 +604,14 @@ export function CustomersScreen() {
                                   size="icon"
                                   className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                   onClick={() => openDelete(customer)}
+                                  aria-label="حذف"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>حذف</TooltipContent>
                             </Tooltip>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

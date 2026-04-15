@@ -23,7 +23,7 @@ export const GET = withAuth(tryCatch(async () => {
   })
 
   return successResponse(categories)
-}, 'فشل في تحميل فئات المصروفات'))
+}, 'فشل في تحميل فئات المصروفات'), { requireAdmin: true })
 
 export const POST = withAuth(tryCatch(async (request) => {
   const body = await request.json()

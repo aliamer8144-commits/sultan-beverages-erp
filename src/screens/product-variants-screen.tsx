@@ -583,6 +583,7 @@ export function ProductVariantsScreen() {
                                       onClick={() => openQuickAdjust(variant)}
                                       className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
                                       title="تعديل سريع للمخزون"
+                                      aria-label="تعديل سريع للمخزون"
                                     >
                                       <RotateCcw className="w-3.5 h-3.5" />
                                     </button>
@@ -590,6 +591,7 @@ export function ProductVariantsScreen() {
                                       onClick={() => openEditVariant(variant, product)}
                                       className="p-1.5 rounded-lg hover:bg-blue-500/10 text-muted-foreground hover:text-blue-500 transition-colors"
                                       title="تعديل المتغير"
+                                      aria-label="تعديل"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
@@ -597,6 +599,7 @@ export function ProductVariantsScreen() {
                                       onClick={() => openDeleteVariant(variant)}
                                       className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                       title="حذف المتغير"
+                                      aria-label="حذف"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>

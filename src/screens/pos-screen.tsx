@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { CartPanel } from './pos/cart-panel'
 import { ProductGrid } from './pos/product-grid'
 import { ResizeHandle } from './pos/resize-handle'
-import { getNextReceiptNumber } from '@/lib/receipt-utils'
+import { formatReceiptNo } from '@/lib/receipt-utils'
 import { getCategoryIcon, getCategoryColor } from '@/lib/category-utils'
 import { toast } from 'sonner'
 import { Calculator as CalculatorWidget } from '@/components/calculator'
@@ -258,7 +258,7 @@ export function POSScreen() {
     [cart]
   )
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart])
   const effectiveTotal = Math.max(0, cartTotal() - loyaltyDiscount)
   const grandTotal = effectiveTotal
 
@@ -313,9 +313,6 @@ export function POSScreen() {
       if (paid < grandTotal) return
     }
 
-    // Generate and store receipt number
-    const receiptNumber = getNextReceiptNumber()
-
     setProcessingPayment(true)
     try {
       const result = await post<any>('/api/invoices', {
@@ -332,6 +329,8 @@ export function POSScreen() {
       }, { showErrorToast: false })
 
       if (result) {
+        // Use server-generated invoice number (authoritative)
+        const receiptNumber = formatReceiptNo(result.invoiceNo)
         toast.success(`تم إنشاء الفاتورة ${receiptNumber} بنجاح`)
         // Auto-award loyalty points after successful payment
         awardLoyaltyPoints(result.id, result.totalAmount || subtotal, cartCustomerId)
@@ -594,7 +593,7 @@ export function POSScreen() {
     return null
   }, [customers])
 
-  const displayProducts = products.filter((p) => p.isActive !== false)
+  const displayProducts = useMemo(() => products.filter((p) => p.isActive !== false), [products])
 
   // ─── Render ─────────────────────────────────────────────────────────────
 

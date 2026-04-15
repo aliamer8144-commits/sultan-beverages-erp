@@ -27,7 +27,7 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   // ── Opening balance: debt from before startDate ─────────────────
   // Sum of sales invoice totals - sum of payments made before startDate
-  const [salesBefore, paymentsBefore] = await Promise.all([
+  const [salesBefore, paymentsBefore, returnsBefore] = await Promise.all([
     db.invoice.aggregate({
       where: {
         type: 'sale',
@@ -43,11 +43,20 @@ export const GET = withAuth(tryCatch(async (request) => {
       },
       _sum: { amount: true },
     }),
+    db.productReturn.aggregate({
+      where: {
+        invoice: { customerId },
+        status: 'approved',
+        createdAt: { lt: startDate },
+      },
+      _sum: { totalAmount: true },
+    }),
   ])
 
   const totalSalesBefore = salesBefore._sum.totalAmount ?? 0
   const totalPaymentsBefore = paymentsBefore._sum.amount ?? 0
-  const openingBalance = totalSalesBefore - totalPaymentsBefore
+  const totalReturnsBefore = returnsBefore._sum.totalAmount ?? 0
+  const openingBalance = totalSalesBefore - totalPaymentsBefore - totalReturnsBefore
 
   // ── Invoices & Payments within date range (parallelized) ─────────
   const [invoices, payments] = await Promise.all([

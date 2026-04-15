@@ -1,11 +1,18 @@
 // ─── Shared Date Formatting Utilities ─────────────────────────────────
 // Centralized date formatting for all screens (Arabic locale)
 
-const ARABIC_LOCALE = 'ar-SA'
+const ARABIC_LOCALE = 'ar-SA-u-nu-latn'
+
+/** Check if a Date object represents a valid date */
+function isValidDate(d: Date): boolean {
+  return !isNaN(d.getTime())
+}
 
 /** Full date: "15 يناير 2025" */
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleDateString(ARABIC_LOCALE, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -14,7 +21,9 @@ export function formatDate(dateStr: string): string {
 
 /** Short date: "2025/01/15" */
 export function formatShortDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleDateString(ARABIC_LOCALE, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -23,7 +32,9 @@ export function formatShortDate(dateStr: string): string {
 
 /** Time only: "02:30 م" */
 export function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleTimeString(ARABIC_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -31,7 +42,9 @@ export function formatTime(dateStr: string): string {
 
 /** Full date + time: "15 يناير 2025, 02:30 م" */
 export function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleDateString(ARABIC_LOCALE, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -42,7 +55,9 @@ export function formatDateTime(dateStr: string): string {
 
 /** Date with short month: "15 يناير 2025" (shorter than formatDate) */
 export function formatDateShortMonth(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleDateString(ARABIC_LOCALE, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -51,7 +66,9 @@ export function formatDateShortMonth(dateStr: string): string {
 
 /** Full day name + date: "الأربعاء 15 يناير 2025" */
 export function formatDateFull(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  const d = new Date(dateStr)
+  if (!isValidDate(d)) return '—'
+  return d.toLocaleDateString(ARABIC_LOCALE, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -63,6 +80,7 @@ export function formatDateFull(dateStr: string): string {
 export function getRelativeTime(dateStr: string): string {
   const now = new Date()
   const date = new Date(dateStr)
+  if (!isValidDate(date)) return '—'
   const diffMs = now.getTime() - date.getTime()
   const diffMin = Math.floor(diffMs / 60000)
   const diffHour = Math.floor(diffMs / 3600000)
@@ -72,7 +90,7 @@ export function getRelativeTime(dateStr: string): string {
   if (diffMin < 60) return `منذ ${diffMin} دقيقة`
   if (diffHour < 24) return `منذ ${diffHour} ساعة`
   if (diffDay < 7) return `منذ ${diffDay} يوم`
-  return new Date(dateStr).toLocaleDateString(ARABIC_LOCALE, {
+  return date.toLocaleDateString(ARABIC_LOCALE, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

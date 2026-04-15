@@ -18,14 +18,45 @@ interface RawAlertRow {
   totalSold: number;
 }
 
+interface RawAlertCountRow {
+  total: bigint;
+  outOfStock: bigint;
+  critical: bigint;
+  lowStock: bigint;
+  totalDeficit: bigint;
+  totalReorderCost: bigint;
+}
+
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
+  const offset = (page - 1) * limit;
   const user = getRequestUser(request);
   const isAdmin = user?.role === 'admin';
 
-  // Fetch only products where quantity <= minQuantity (filter at DB level)
+  // Get total counts and severity breakdown (single aggregate query)
+  const [countResult] = await db.$queryRaw<RawAlertCountRow[]>`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN p."quantity" = 0 THEN 1 ELSE 0 END) as "outOfStock",
+      SUM(CASE WHEN p."quantity" > 0 AND p."quantity" <= p."minQuantity" * 0.25 THEN 1 ELSE 0 END) as critical,
+      SUM(CASE WHEN p."quantity" > p."minQuantity" * 0.25 THEN 1 ELSE 0 END) as "lowStock",
+      SUM(CASE WHEN p."minQuantity" > 0 THEN p."minQuantity" - p."quantity" ELSE 0 END) as "totalDeficit",
+      SUM(CASE WHEN p."minQuantity" > 0 THEN (p."minQuantity" * 2 - p."quantity") * p."costPrice" ELSE 0 END) as "totalReorderCost"
+    FROM "Product" p
+    WHERE p."isActive" = true AND p."quantity" <= p."minQuantity"
+  `;
+
+  const totalAlerts = Number(countResult.total);
+  const outOfStockCount = Number(countResult.outOfStock);
+  const criticalCount = Number(countResult.critical);
+  const lowStockCount = Number(countResult.lowStock);
+  const totalDeficit = Number(countResult.totalDeficit);
+  const totalReorderCostAll = Number(countResult.totalReorderCost);
+  const totalPages = Math.ceil(totalAlerts / limit);
+
+  // Fetch only the current page of low-stock products (SQL-level pagination)
   const rawAlerts = await db.$queryRaw<RawAlertRow[]>`
     SELECT
       p.id,
@@ -44,6 +75,7 @@ export const GET = withAuth(tryCatch(async (request) => {
     LEFT JOIN "Category" c ON p."categoryId" = c.id
     WHERE p."isActive" = true AND p."quantity" <= p."minQuantity"
     ORDER BY p."quantity" ASC
+    LIMIT ${limit} OFFSET ${offset}
   `;
 
   // Build alert objects with computed severity, deficit, etc.
@@ -87,7 +119,6 @@ export const GET = withAuth(tryCatch(async (request) => {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   // Get sales data for the last 30 days (only for current page items)
-  const paginatedAlerts = alerts.slice((page - 1) * limit, page * limit);
   const recentSalesData = await db.invoiceItem.groupBy({
     by: ["productId"],
     where: {
@@ -95,7 +126,7 @@ export const GET = withAuth(tryCatch(async (request) => {
         type: "sale",
         createdAt: { gte: thirtyDaysAgo },
       },
-      productId: { in: paginatedAlerts.map((a) => a.id) },
+      productId: { in: alerts.map((a) => a.id) },
     },
     _sum: { quantity: true },
   });
@@ -106,8 +137,8 @@ export const GET = withAuth(tryCatch(async (request) => {
     salesMap.set(item.productId, item._sum.quantity ?? 0);
   }
 
-  // Calculate days remaining (only for paginated items)
-  for (const alert of paginatedAlerts) {
+  // Calculate days remaining
+  for (const alert of alerts) {
     const soldLast30Days = salesMap.get(alert.id) ?? 0;
     if (soldLast30Days > 0 && alert.quantity > 0) {
       const dailyRate = soldLast30Days / 30;
@@ -117,21 +148,13 @@ export const GET = withAuth(tryCatch(async (request) => {
     }
   }
 
-  // Separate counts by severity (from all alerts, not just paginated)
-  const outOfStockCount = alerts.filter((a) => a.severity === "out").length;
-  const criticalCount = alerts.filter((a) => a.severity === "critical").length;
-  const lowStockCount = alerts.filter((a) => a.severity === "low").length;
-  const totalAlerts = alerts.length;
-  const totalPages = Math.ceil(totalAlerts / limit);
-
-  // Summary statistics (admin only for cost)
-  const totalReorderCost = isAdmin ? alerts.reduce((sum, a) => sum + (a.reorderCost ?? 0), 0) : 0;
+  // Average deficit across all alerts
   const avgDeficit = totalAlerts > 0
-    ? Math.round(alerts.reduce((sum, a) => sum + a.deficit, 0) / totalAlerts)
+    ? Math.round(totalDeficit / totalAlerts)
     : 0;
 
   return successResponse({
-    alerts: paginatedAlerts,
+    alerts,
     pagination: {
       total: totalAlerts,
       page,
@@ -143,7 +166,7 @@ export const GET = withAuth(tryCatch(async (request) => {
       outOfStock: outOfStockCount,
       critical: criticalCount,
       lowStock: lowStockCount,
-      ...(isAdmin ? { totalReorderCost } : {}),
+      ...(isAdmin ? { totalReorderCost: Math.round(totalReorderCostAll * 100) / 100 } : {}),
       avgDeficit,
     },
   });

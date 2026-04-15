@@ -75,56 +75,51 @@ function parseLine(line: string, delimiter: string): string[] {
 }
 
 // ─── Main parse function ──────────────────────────────────────────
-export async function parseCSV(csvText: string): Promise<Record<string, string>[]> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Strip BOM
-      let text = stripBOM(csvText)
+export function parseCSV(csvText: string, maxRows: number = 10000): Record<string, string>[] {
+  // Strip BOM
+  let text = stripBOM(csvText)
 
-      // Normalize line endings
-      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
-      // Split into lines
-      const lines = text.split('\n').filter((line) => line.trim().length > 0)
+  // Split into lines
+  const lines = text.split('\n').filter((line) => line.trim().length > 0)
 
-      if (lines.length < 2) {
-        reject(new Error('ملف CSV فارغ أو يحتوي على صف واحد فقط'))
-        return
+  if (lines.length < 2) {
+    throw new Error('ملف CSV فارغ أو يحتوي على صف واحد فقط')
+  }
+
+  // Check row limit (+1 for header)
+  if (lines.length > maxRows + 1) {
+    throw new Error(`الحد الأقصى ${maxRows} صف — الملف يحتوي على ${lines.length - 1} صف`)
+  }
+
+  // Detect delimiter
+  const delimiter = detectDelimiter(lines)
+
+  // Parse header row
+  const headers = parseLine(lines[0], delimiter)
+
+  if (headers.length === 0) {
+    throw new Error('لم يتم العثور على أعمدة في الملف')
+  }
+
+  // Parse data rows
+  const results: Record<string, string>[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const fields = parseLine(lines[i], delimiter)
+    const row: Record<string, string> = {}
+
+    headers.forEach((header, idx) => {
+      const cleanHeader = header.trim()
+      if (cleanHeader) {
+        row[cleanHeader] = fields[idx] || ''
       }
+    })
 
-      // Detect delimiter
-      const delimiter = detectDelimiter(lines)
+    results.push(row)
+  }
 
-      // Parse header row
-      const headers = parseLine(lines[0], delimiter)
-
-      if (headers.length === 0) {
-        reject(new Error('لم يتم العثور على أعمدة في الملف'))
-        return
-      }
-
-      // Parse data rows
-      const results: Record<string, string>[] = []
-
-      for (let i = 1; i < lines.length; i++) {
-        const fields = parseLine(lines[i], delimiter)
-        const row: Record<string, string> = {}
-
-        headers.forEach((header, idx) => {
-          const cleanHeader = header.trim()
-          if (cleanHeader) {
-            row[cleanHeader] = fields[idx] || ''
-          }
-        })
-
-        results.push(row)
-      }
-
-      resolve(results)
-    } catch (error) {
-      reject(
-        error instanceof Error ? error : new Error('حدث خطأ أثناء تحليل ملف CSV'),
-      )
-    }
-  })
+  return results
 }

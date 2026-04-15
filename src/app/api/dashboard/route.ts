@@ -3,6 +3,8 @@ import { withAuth } from '@/lib/auth-middleware'
 import { successResponse } from '@/lib/api-response'
 import { tryCatch } from '@/lib/api-error-handler'
 
+export const revalidate = 30 // Cache for 30 seconds
+
 export const GET = withAuth(tryCatch(async () => {
   const startOfDay = new Date(new Date().setHours(0, 0, 0, 0))
   const now = new Date()

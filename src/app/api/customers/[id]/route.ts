@@ -45,7 +45,18 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   const existing = await db.customer.findUnique({ where: { id } });
   if (!existing) return notFound("العميل غير موجود");
 
-  await db.customer.delete({ where: { id } });
+  // Check for invoices before soft-deleting
+  const invoiceCount = await db.invoice.count({
+    where: { customerId: id },
+  });
+  if (invoiceCount > 0) {
+    return errorResponse('لا يمكن حذف عميل لديه فواتير — يمكنك تعطيله بدلاً من ذلك', 400);
+  }
+
+  await db.customer.update({
+    where: { id },
+    data: { deletedAt: new Date(), isActive: false },
+  });
 
   const user = getRequestUser(request);
   logAction({
@@ -58,4 +69,4 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   });
 
   return successResponse({ deleted: true });
-}, 'فشل في حذف العميل'));
+}, 'فشل في حذف العميل'), { requireManager: true });

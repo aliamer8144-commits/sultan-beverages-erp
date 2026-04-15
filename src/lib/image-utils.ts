@@ -6,6 +6,7 @@
 /**
  * Compress an image file and return a base64 data URL.
  * Uses canvas to resize and compress the image.
+ * Preserves PNG transparency and properly revokes object URLs.
  *
  * @param file - The image File object to compress
  * @param maxWidth - Maximum width in pixels (default 400)
@@ -33,6 +34,7 @@ export function compressImage(
       return
     }
 
+    const objectUrl = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
       try {
@@ -50,6 +52,7 @@ export function compressImage(
 
         const ctx = canvas.getContext('2d')
         if (!ctx) {
+          URL.revokeObjectURL(objectUrl)
           reject(new Error('فشل في إنشاء سياق الرسم'))
           return
         }
@@ -59,14 +62,25 @@ export function compressImage(
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Convert to data URL with compression
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        // Check if the image has actual pixel transparency (any non-255 alpha values)
+        const imageData = ctx.getImageData(0, 0, width, height)
+        const hasTransparency = imageData.data.some((val, idx) => idx % 4 === 3 && val < 255)
+
+        const dataUrl = hasTransparency
+          ? canvas.toDataURL('image/png')
+          : canvas.toDataURL('image/jpeg', quality)
+
         resolve(dataUrl)
       } catch (error) {
         reject(error)
+      } finally {
+        URL.revokeObjectURL(objectUrl)
       }
     }
-    img.onerror = () => reject(new Error('فشل في تحميل الصورة'))
-    img.src = URL.createObjectURL(file)
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('فشل في تحميل الصورة'))
+    }
+    img.src = objectUrl
   })
 }

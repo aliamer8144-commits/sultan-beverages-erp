@@ -16,6 +16,7 @@ export const GET = withAuth(tryCatch(async (request) => {
   const dateFrom = searchParams.get('dateFrom')
   const dateTo = searchParams.get('dateTo')
   const search = searchParams.get('search')
+  const includeStats = searchParams.get('stats') === 'true'
 
   const where: Record<string, unknown> = {}
 
@@ -49,70 +50,65 @@ export const GET = withAuth(tryCatch(async (request) => {
     db.stockAdjustment.count({ where }),
   ])
 
-  // Today stats
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date()
-  todayEnd.setHours(23, 59, 59, 999)
+  // Stats (only when ?stats=true)
+  let stats = undefined as Record<string, unknown> | undefined
 
-  const todayWhere = { createdAt: { gte: todayStart, lte: todayEnd } } as Record<string, unknown>
+  if (includeStats) {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
 
-  const [todayTotal, inCount, outCount, adjustmentCount, saleCount, purchaseCount, returnCount, netChangeResult] = await Promise.all([
-    db.stockAdjustment.count({ where: todayWhere }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'in' } }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'out' } }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'adjustment' } }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'sale' } }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'purchase' } }),
-    db.stockAdjustment.count({ where: { ...todayWhere, type: 'return' } }),
-    db.stockAdjustment.aggregate({
-      where: todayWhere,
-      _sum: { newQty: true, previousQty: true },
-    }),
-  ])
+    const todayWhere = { createdAt: { gte: todayStart, lte: todayEnd } } as Record<string, unknown>
 
-  const netChange = (netChangeResult._sum.newQty || 0) - (netChangeResult._sum.previousQty || 0)
+    const [todayTotal, inCount, outCount, adjustmentCount, saleCount, purchaseCount, returnCount, netChangeResult] = await Promise.all([
+      db.stockAdjustment.count({ where: todayWhere }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'in' } }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'out' } }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'adjustment' } }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'sale' } }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'purchase' } }),
+      db.stockAdjustment.count({ where: { ...todayWhere, type: 'return' } }),
+      db.stockAdjustment.aggregate({
+        where: todayWhere,
+        _sum: { newQty: true, previousQty: true },
+      }),
+    ])
 
-  // Group by type for today
-  const increaseAgg = await db.stockAdjustment.groupBy({
-    by: ['type'],
-    where: { ...todayWhere },
-    _count: true,
-    _sum: { quantity: true },
-  })
+    const netChange = (netChangeResult._sum.newQty || 0) - (netChangeResult._sum.previousQty || 0)
 
-  let totalIncrease = 0
-  let totalDecrease = 0
-  for (const group of increaseAgg) {
-    const qty = group._sum.quantity || 0
-    if (['in', 'purchase', 'return'].includes(group.type)) {
-      totalIncrease += qty
-    } else if (['out', 'sale'].includes(group.type)) {
-      totalDecrease += qty
+    // Group by type for today
+    const increaseAgg = await db.stockAdjustment.groupBy({
+      by: ['type'],
+      where: { ...todayWhere },
+      _count: true,
+      _sum: { quantity: true },
+    })
+
+    let totalIncrease = 0
+    let totalDecrease = 0
+    for (const group of increaseAgg) {
+      const qty = group._sum.quantity || 0
+      if (['in', 'purchase', 'return'].includes(group.type)) {
+        totalIncrease += qty
+      } else if (['out', 'sale'].includes(group.type)) {
+        totalDecrease += qty
+      }
     }
-  }
 
-  // Adjustment net changes
-  const adjustmentAgg = await db.stockAdjustment.findMany({
-    where: { ...todayWhere, type: 'adjustment' },
-    select: { newQty: true, previousQty: true },
-  })
+    // Adjustment net changes
+    const adjustmentAgg = await db.stockAdjustment.findMany({
+      where: { ...todayWhere, type: 'adjustment' },
+      select: { newQty: true, previousQty: true },
+    })
 
-  for (const adj of adjustmentAgg) {
-    const diff = adj.newQty - adj.previousQty
-    if (diff > 0) totalIncrease += diff
-    else if (diff < 0) totalDecrease += Math.abs(diff)
-  }
+    for (const adj of adjustmentAgg) {
+      const diff = adj.newQty - adj.previousQty
+      if (diff > 0) totalIncrease += diff
+      else if (diff < 0) totalDecrease += Math.abs(diff)
+    }
 
-  return successResponse({
-    adjustments,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-    stats: {
+    stats = {
       todayTotal,
       inCount,
       outCount,
@@ -123,7 +119,18 @@ export const GET = withAuth(tryCatch(async (request) => {
       totalIncrease,
       totalDecrease,
       netChange,
+    }
+  }
+
+  return successResponse({
+    adjustments,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
     },
+    ...(stats ? { stats } : {}),
   })
 }, 'فشل في تحميل سجل التعديلات'))
 
@@ -212,4 +219,4 @@ export const POST = withAuth(tryCatch(async (request) => {
     ...adjustment,
     message: `تم تعديل المخزون بنجاح (${previousQty} → ${newQty})`,
   })
-}, 'فشل في تعديل المخزون'))
+}, 'فشل في تعديل المخزون'), { requireManager: true })

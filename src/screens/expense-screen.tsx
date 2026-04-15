@@ -361,6 +361,7 @@ export function ExpenseScreen() {
             onClick={() => fetchData(currentPage, true)}
             disabled={refreshing}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium disabled:opacity-50"
+            aria-label="تحديث"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -716,6 +717,7 @@ export function ExpenseScreen() {
             <button
               onClick={() => setSearch('')}
               className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="مسح البحث"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -817,6 +819,7 @@ export function ExpenseScreen() {
                                       onConfirm: handleDeleteExpense,
                                     })
                                   }}
+                                  aria-label="حذف"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>

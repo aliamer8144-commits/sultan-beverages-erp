@@ -23,8 +23,14 @@ export const updateCategorySchema = z.object({
 
 const imageValidation = z.string()
   .refine(
-    (val) => !val || val.startsWith('data:image/') || val.startsWith('http'),
-    'صيغة الصورة غير مدعومة'
+    (val) => {
+      if (!val) return true
+      if (val.startsWith('http')) return true
+      if (val.startsWith('data:image/svg')) return false // Block SVG (XSS risk)
+      if (val.startsWith('data:image/')) return true
+      return false
+    },
+    'صيغة الصورة غير مدعومة — يُسمح بـ JPEG, PNG, WebP, GIF فقط'
   )
   .refine(
     (val) => !val || val.length <= 2700000,
@@ -75,7 +81,15 @@ export const batchUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   priceChangeType: z.enum(['fixed', 'percentage']).optional(),
   priceChangeValue: z.number().optional(),
-})
+}).refine(
+  (data) => {
+    // If priceChangeType is set, priceChangeValue must also be set (and vice versa)
+    if (data.priceChangeType && data.priceChangeValue === undefined) return false
+    if (data.priceChangeValue !== undefined && !data.priceChangeType) return false
+    return true
+  },
+  { message: 'يجب تحديد نوع وقيمة تغيير السعر معاً' }
+)
 
 export const deleteProductsSchema = z.object({
   id: z.string().min(1).optional(),
@@ -96,7 +110,7 @@ export const createCustomerSchema = z.object({
 export const updateCustomerSchema = z.object({
   name: z.string().min(1, 'اسم العميل مطلوب').max(200).optional(),
   phone: z.string().max(20).nullable().optional(),
-  debt: z.coerce.number().min(0).optional(),
+  // REMOVED: debt field — debt should only change through invoices/payments
   category: z.string().max(50).optional(),
   notes: z.string().max(500).nullable().optional(),
 })
@@ -295,13 +309,16 @@ export const createStockAdjustmentSchema = z.object({
 
 export const createUserSchema = z.object({
   username: z.string().min(1, 'اسم المستخدم مطلوب'),
-  password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'),
+  password: z.string().min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'),
   name: z.string().min(1, 'الاسم الكامل مطلوب'),
+  role: z.enum(['admin', 'manager', 'cashier'], { message: 'الدور غير صالح' }).default('cashier'),
 })
 
 export const editUserSchema = z.object({
-  name: z.string().min(1, 'الاسم الكامل مطلوب'),
-  password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل').optional().or(z.literal('')),
+  name: z.string().min(1, 'الاسم الكامل مطلوب').optional(),
+  password: z.string().min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل').optional().or(z.literal('')),
+  role: z.enum(['admin', 'manager', 'cashier'], { message: 'الدور غير صالح' }).optional(),
+  isActive: z.boolean().optional(),
 })
 
 // ── POS Screen (client-side field validation) ───────────────────────

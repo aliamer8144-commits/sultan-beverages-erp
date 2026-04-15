@@ -38,10 +38,11 @@ async function seedSampleData() {
 
 // ── GET: Paginated audit logs with filters ──────────────────────────
 export const GET = withAuth(tryCatch(async (request) => {
-  // Seed sample data if empty
-  await seedSampleData()
-
+  // Seed sample data only when explicitly requested via ?seed=true
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('seed') === 'true') {
+    await seedSampleData()
+  }
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
   const action = searchParams.get('action') || ''

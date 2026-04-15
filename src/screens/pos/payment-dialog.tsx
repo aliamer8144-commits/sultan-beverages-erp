@@ -15,7 +15,7 @@ import {
   Banknote,
   ReceiptText,
 } from 'lucide-react'
-import { peekNextReceiptNumber } from '@/lib/receipt-utils'
+import { formatReceiptNo } from '@/lib/receipt-utils'
 import { useFormValidation } from '@/hooks/use-form-validation'
 import {
   posPaidAmountSchema,
@@ -120,7 +120,7 @@ export function PaymentDialog({
           <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-4 py-2.5">
             <ReceiptText className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">رقم الفاتورة:</span>
-            <span className="text-sm font-bold font-mono text-primary">{peekNextReceiptNumber()}</span>
+            <span className="text-sm font-bold font-mono text-primary">{formatReceiptNo()}</span>
           </div>
 
           {/* Summary */}

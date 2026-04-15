@@ -28,7 +28,11 @@ export const GET = withAuth(tryCatch(async (request) => {
     db.supplierPayment.count({ where }),
   ])
 
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
+  const totalPaidResult = await db.supplierPayment.aggregate({
+    where: supplierId ? { supplierId } : {},
+    _sum: { amount: true },
+  })
+  const totalPaid = totalPaidResult._sum.amount || 0
 
   return successResponse({ payments, totalPaid, total, totalPages: Math.ceil(total / limit), page })
 }, 'فشل في جلب مدفوعات المورد'))

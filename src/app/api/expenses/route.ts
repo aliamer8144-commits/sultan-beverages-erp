@@ -15,6 +15,7 @@ export const GET = withAuth(tryCatch(async (request) => {
   const dateFrom = searchParams.get('dateFrom') || ''
   const dateTo = searchParams.get('dateTo') || ''
   const search = searchParams.get('search') || ''
+  const includeStats = searchParams.get('stats') === 'true'
 
   // Build where clause
   const where: Record<string, unknown> = {}
@@ -39,166 +40,161 @@ export const GET = withAuth(tryCatch(async (request) => {
     db.expense.count({ where }),
   ])
 
-  // ── Summary Stats ──────────────────────────────────────────────
-  const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+  // ── Summary Stats (only when ?stats=true) ──────────────────────
+  let summary = undefined as Record<string, unknown> | undefined
 
-  // Week stats
-  const dayOfWeek = now.getDay()
-  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0)
-  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999)
+  if (includeStats) {
+    const now = new Date()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
 
-  const [totalExpensesResult, todayExpensesResult, thisWeekExpensesResult, thisMonthExpensesResult, categoryBreakdown] = await Promise.all([
-    // Total all-time expenses
-    db.expense.aggregate({ _sum: { amount: true } }),
-    // Today expenses
-    db.expense.aggregate({
-      where: { date: { gte: startOfDay, lte: endOfDay } },
-      _sum: { amount: true },
-    }),
-    // This week expenses
-    db.expense.aggregate({
-      where: { date: { gte: startOfWeek, lte: endOfWeek } },
-      _sum: { amount: true },
-    }),
-    // This month expenses
-    db.expense.aggregate({
-      where: { date: { gte: startOfMonth, lte: endOfMonth } },
-      _sum: { amount: true },
-    }),
-    // By category
-    db.expense.groupBy({
-      by: ['category'],
-      _sum: { amount: true },
-      _count: { id: true },
-      orderBy: { _sum: { amount: 'desc' } },
-    }),
-  ])
+    // Week stats
+    const dayOfWeek = now.getDay()
+    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0)
+    const endOfWeek = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59, 999)
 
-  // Monthly trend (last 6 months) + Daily trend (last 30 days) + Recurring
-  const monthlyStart = new Date()
-  monthlyStart.setMonth(monthlyStart.getMonth() - 5)
-  monthlyStart.setDate(1)
-  monthlyStart.setHours(0, 0, 0, 0)
+    const [totalExpensesResult, todayExpensesResult, thisWeekExpensesResult, thisMonthExpensesResult, categoryBreakdown] = await Promise.all([
+      // Total all-time expenses
+      db.expense.aggregate({ _sum: { amount: true } }),
+      // Today expenses
+      db.expense.aggregate({
+        where: { date: { gte: startOfDay, lte: endOfDay } },
+        _sum: { amount: true },
+      }),
+      // This week expenses
+      db.expense.aggregate({
+        where: { date: { gte: startOfWeek, lte: endOfWeek } },
+        _sum: { amount: true },
+      }),
+      // This month expenses
+      db.expense.aggregate({
+        where: { date: { gte: startOfMonth, lte: endOfMonth } },
+        _sum: { amount: true },
+      }),
+      // By category
+      db.expense.groupBy({
+        by: ['category'],
+        _sum: { amount: true },
+        _count: { id: true },
+        orderBy: { _sum: { amount: 'desc' } },
+      }),
+    ])
 
-  const dailyStart = new Date()
-  dailyStart.setDate(dailyStart.getDate() - 29)
-  dailyStart.setHours(0, 0, 0, 0)
+    // Monthly trend (last 6 months) + Daily trend (last 30 days) + Recurring
+    const monthlyStart = new Date()
+    monthlyStart.setMonth(monthlyStart.getMonth() - 5)
+    monthlyStart.setDate(1)
+    monthlyStart.setHours(0, 0, 0, 0)
 
-  const [monthlyRaw, dailyRaw, recurringExpenses] = await Promise.all([
-    db.expense.groupBy({
-      by: ['date'],
-      where: { date: { gte: monthlyStart } },
-      _sum: { amount: true },
-    }),
-    db.expense.groupBy({
-      by: ['date'],
-      where: { date: { gte: dailyStart } },
-      _sum: { amount: true },
-    }),
-    db.expense.findMany({
-      where: { recurring: true },
-      orderBy: { date: 'desc' },
-      distinct: ['category'],
-    }),
-  ])
+    const dailyStart = new Date()
+    dailyStart.setDate(dailyStart.getDate() - 29)
+    dailyStart.setHours(0, 0, 0, 0)
 
-  // Build monthly trend from groupBy result
-  const monthlyMap = new Map<string, number>()
-  for (const row of monthlyRaw) {
-    const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`
-    monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
-  }
+    const [monthlyRaw, dailyRaw, recurringExpenses] = await Promise.all([
+      db.expense.groupBy({
+        by: ['date'],
+        where: { date: { gte: monthlyStart } },
+        _sum: { amount: true },
+      }),
+      db.expense.groupBy({
+        by: ['date'],
+        where: { date: { gte: dailyStart } },
+        _sum: { amount: true },
+      }),
+      db.expense.findMany({
+        where: { recurring: true },
+        orderBy: { date: 'desc' },
+        distinct: ['category'],
+      }),
+    ])
 
-  const monthlyTrend: { month: string; total: number }[] = []
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - i)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const monthName = d.toLocaleDateString('ar-SA', { month: 'short' })
-    monthlyTrend.push({
-      month: monthName,
-      total: Math.round((monthlyMap.get(key) ?? 0) * 100) / 100,
-    })
-  }
-
-  // Build daily trend from groupBy result
-  const dailyMap = new Map<string, number>()
-  for (const row of dailyRaw) {
-    const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}-${String(row.date.getDate()).padStart(2, '0')}`
-    dailyMap.set(key, (dailyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
-  }
-
-  const dailyTrend: { date: string; total: number }[] = []
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const dayLabel = d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })
-    dailyTrend.push({
-      date: dayLabel,
-      total: Math.round((dailyMap.get(key) ?? 0) * 100) / 100,
-    })
-  }
-
-  const recurringSummary = recurringExpenses.map((e) => {
-    let nextDue: Date
-    switch (e.recurringPeriod) {
-      case 'daily':
-        nextDue = new Date()
-        nextDue.setDate(nextDue.getDate() + 1)
-        break
-      case 'weekly':
-        nextDue = new Date()
-        nextDue.setDate(nextDue.getDate() + 7)
-        break
-      case 'monthly':
-        nextDue = new Date()
-        nextDue.setMonth(nextDue.getMonth() + 1)
-        break
-      default:
-        nextDue = new Date(e.date)
+    // Build monthly trend from groupBy result
+    const monthlyMap = new Map<string, number>()
+    for (const row of monthlyRaw) {
+      const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
     }
 
-    return {
-      id: e.id,
-      category: e.category,
-      amount: Math.round(e.amount * 100) / 100,
-      description: e.description,
-      recurringPeriod: e.recurringPeriod,
-      nextDueDate: nextDue.toISOString(),
+    const monthlyTrend: { month: string; total: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date()
+      d.setMonth(d.getMonth() - i)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const monthName = d.toLocaleDateString('ar-SA', { month: 'short' })
+      monthlyTrend.push({
+        month: monthName,
+        total: Math.round((monthlyMap.get(key) ?? 0) * 100) / 100,
+      })
     }
-  })
 
-  const totalExpenses = Math.round((totalExpensesResult._sum.amount ?? 0) * 100) / 100
-  const todayExpenses = Math.round((todayExpensesResult._sum.amount ?? 0) * 100) / 100
-  const thisWeekExpenses = Math.round((thisWeekExpensesResult._sum.amount ?? 0) * 100) / 100
-  const thisMonthExpenses = Math.round((thisMonthExpensesResult._sum.amount ?? 0) * 100) / 100
-  const topCategory = categoryBreakdown.length > 0 ? categoryBreakdown[0].category : null
+    // Build daily trend from groupBy result
+    const dailyMap = new Map<string, number>()
+    for (const row of dailyRaw) {
+      const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}-${String(row.date.getDate()).padStart(2, '0')}`
+      dailyMap.set(key, (dailyMap.get(key) ?? 0) + (row._sum.amount ?? 0))
+    }
 
-  const totalByCategory = categoryBreakdown.map((c) => ({
-    category: c.category,
-    total: Math.round((c._sum.amount ?? 0) * 100) / 100,
-    count: c._count.id,
-  }))
+    const dailyTrend: { date: string; total: number }[] = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const dayLabel = d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })
+      dailyTrend.push({
+        date: dayLabel,
+        total: Math.round((dailyMap.get(key) ?? 0) * 100) / 100,
+      })
+    }
 
-  // Average daily expense (last 30 days total / 30)
-  const last30Total = dailyTrend.reduce((sum, d) => sum + d.total, 0)
-  const averageDailyExpense = Math.round((last30Total / 30) * 100) / 100
+    const recurringSummary = recurringExpenses.map((e) => {
+      let nextDue: Date
+      switch (e.recurringPeriod) {
+        case 'daily':
+          nextDue = new Date()
+          nextDue.setDate(nextDue.getDate() + 1)
+          break
+        case 'weekly':
+          nextDue = new Date()
+          nextDue.setDate(nextDue.getDate() + 7)
+          break
+        case 'monthly':
+          nextDue = new Date()
+          nextDue.setMonth(nextDue.getMonth() + 1)
+          break
+        default:
+          nextDue = new Date(e.date)
+      }
 
-  return successResponse({
-    expenses: expenses.map((e) => ({
-      ...e,
-      amount: Math.round(e.amount * 100) / 100,
-    })),
-    total,
-    totalPages: Math.ceil(total / limit),
-    page,
-    summary: {
+      return {
+        id: e.id,
+        category: e.category,
+        amount: Math.round(e.amount * 100) / 100,
+        description: e.description,
+        recurringPeriod: e.recurringPeriod,
+        nextDueDate: nextDue.toISOString(),
+      }
+    })
+
+    const totalExpenses = Math.round((totalExpensesResult._sum.amount ?? 0) * 100) / 100
+    const todayExpenses = Math.round((todayExpensesResult._sum.amount ?? 0) * 100) / 100
+    const thisWeekExpenses = Math.round((thisWeekExpensesResult._sum.amount ?? 0) * 100) / 100
+    const thisMonthExpenses = Math.round((thisMonthExpensesResult._sum.amount ?? 0) * 100) / 100
+    const topCategory = categoryBreakdown.length > 0 ? categoryBreakdown[0].category : null
+
+    const totalByCategory = categoryBreakdown.map((c) => ({
+      category: c.category,
+      total: Math.round((c._sum.amount ?? 0) * 100) / 100,
+      count: c._count.id,
+    }))
+
+    // Average daily expense (last 30 days total / 30)
+    const last30Total = dailyTrend.reduce((sum, d) => sum + d.total, 0)
+    const averageDailyExpense = Math.round((last30Total / 30) * 100) / 100
+
+    summary = {
       totalExpenses,
       todayExpenses,
       thisWeekExpenses,
@@ -209,7 +205,18 @@ export const GET = withAuth(tryCatch(async (request) => {
       dailyTrend,
       recurringSummary,
       averageDailyExpense,
-    },
+    }
+  }
+
+  return successResponse({
+    expenses: expenses.map((e) => ({
+      ...e,
+      amount: Math.round(e.amount * 100) / 100,
+    })),
+    total,
+    totalPages: Math.ceil(total / limit),
+    page,
+    ...(summary ? { summary } : {}),
   })
 }, 'فشل في تحميل المصروفات'))
 

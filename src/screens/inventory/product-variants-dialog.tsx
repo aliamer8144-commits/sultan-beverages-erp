@@ -223,6 +223,7 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                           size="sm"
                           onClick={() => openEditVariantDialog(variant)}
                           className="h-7 w-7 p-0 hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                          aria-label="تعديل"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -231,6 +232,7 @@ export function ProductVariantsDialog({ open, onOpenChange, product }: ProductVa
                           size="sm"
                           onClick={() => handleDeleteVariant(variant.id)}
                           className="h-7 w-7 p-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          aria-label="حذف"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>

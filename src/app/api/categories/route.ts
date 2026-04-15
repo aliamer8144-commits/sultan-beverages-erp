@@ -10,6 +10,7 @@ import { tryCatch } from "@/lib/api-error-handler";
  */
 export const GET = withAuth(tryCatch(async () => {
   const categories = await db.category.findMany({
+    where: { deletedAt: null },
     include: { _count: { select: { products: true } } },
     orderBy: { createdAt: "desc" },
   });
@@ -25,8 +26,8 @@ export const POST = withAuth(tryCatch(async (request) => {
   const validation = validateBody(createCategorySchema, body);
   if (!validation.success) return errorResponse(validation.error, 422);
 
-  const { name } = validation.data;
-  const icon = body.icon || "CupSoda";
+  const { name, icon: validatedIcon } = validation.data;
+  const icon = validatedIcon || "CupSoda";
 
   const existing = await db.category.findUnique({ where: { name } });
   if (existing) return errorResponse("اسم الفئة موجود بالفعل", 409);

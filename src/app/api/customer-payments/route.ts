@@ -41,6 +41,15 @@ export const POST = withAuth(tryCatch(async (request) => {
   const user = getRequestUser(request)
 
   const payment = await db.$transaction(async (tx) => {
+    // 0. Validate customer and payment amount against current debt
+    const customer = await tx.customer.findUnique({ where: { id: customerId } })
+    if (!customer) {
+      throw new Error('العميل غير موجود')
+    }
+    if (amount > customer.debt) {
+      throw new Error(`المبلغ يتجاوز الدين الحالي (الدين: ${customer.debt})`)
+    }
+
     // 1. Create the payment record
     const createdPayment = await tx.payment.create({
       data: {

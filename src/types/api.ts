@@ -59,11 +59,14 @@ export interface DateRangeQuery {
   to?: string
 }
 
+const VALID_SORT_FIELDS = ['name', 'price', 'quantity', 'createdAt', 'updatedAt', 'totalAmount', 'date']
+
 export function parsePaginationQuery(searchParams: URLSearchParams) {
   const page = Math.max(1, Number(searchParams.get('page')) || 1)
   const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
   const search = searchParams.get('search') || ''
-  const sortBy = searchParams.get('sortBy') || 'createdAt'
+  const rawSortBy = searchParams.get('sortBy') || 'createdAt'
+  const sortBy = VALID_SORT_FIELDS.includes(rawSortBy) ? rawSortBy : 'createdAt'
   const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc'
   return { page, limit, search, sortBy, sortOrder }
 }

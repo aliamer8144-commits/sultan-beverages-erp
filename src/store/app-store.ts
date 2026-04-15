@@ -22,7 +22,7 @@ interface AppState {
   user: User | null
   isAuthenticated: boolean
   token: string | null
-  login: (user: User, token: string) => void
+  login: (user: User) => void
   logout: () => void
 
   // Navigation
@@ -67,12 +67,27 @@ export const useAppStore = create<AppState>()(
       user: null,
       isAuthenticated: false,
       token: null,
-      login: (user, token) => set({ user, isAuthenticated: true, token }),
-      logout: () => set({ user: null, isAuthenticated: false, token: null, cart: [], cartDiscount: 0, cartCustomerId: null }),
+      login: (user) => set({ user, isAuthenticated: true }),
+      logout: () => set({ user: null, isAuthenticated: false, token: null, cart: [], cartDiscount: 0, cartCustomerId: null, heldOrders: [] }),
 
       // Navigation
       currentScreen: 'pos',
-      setScreen: (screen) => set({ currentScreen: screen }),
+      setScreen: (screen) => {
+        const { user } = get()
+        const role = user?.role
+        const adminScreens: Screen[] = ['users', 'audit-log', 'backup', 'settings']
+        const managerScreens: Screen[] = ['analytics', 'daily-close', 'sales-targets', 'purchases', 'expenses', 'stock-adjustments']
+
+        // Block unauthorized screen access
+        if (adminScreens.includes(screen) && role !== 'admin') {
+          return // Don't allow screen change
+        }
+        if (managerScreens.includes(screen) && role !== 'admin' && role !== 'manager') {
+          return // Don't allow screen change
+        }
+
+        set({ currentScreen: screen })
+      },
       sidebarOpen: true,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -142,7 +157,7 @@ export const useAppStore = create<AppState>()(
 
       holdCurrentOrder: (note = '', customerName?: string | null) => {
         const { cart, cartDiscount, cartCustomerId, user } = get()
-        const id = Date.now().toString(36)
+        const id = Math.random().toString(36).substring(2, 9)
 
         const heldOrder: HeldOrder = {
           id,
@@ -169,8 +184,31 @@ export const useAppStore = create<AppState>()(
         const held = heldOrders.find((o) => o.id === orderId)
         if (!held) return
 
+        // Merge held cart items into current cart intelligently:
+        // if a product already exists, increment its quantity instead of adding a duplicate
+        const mergedCart = [...cart]
+        for (const heldItem of held.cart) {
+          const heldKey = heldItem.variantId || heldItem.productId
+          const existingIdx = mergedCart.findIndex(
+            (c) => (c.variantId || c.productId) === heldKey,
+          )
+          if (existingIdx >= 0) {
+            // Product already in cart — increment quantity
+            mergedCart[existingIdx] = {
+              ...mergedCart[existingIdx],
+              quantity: Math.min(
+                mergedCart[existingIdx].quantity + heldItem.quantity,
+                mergedCart[existingIdx].maxQuantity,
+              ),
+            }
+          } else {
+            // New product — add to cart
+            mergedCart.push({ ...heldItem })
+          }
+        }
+
         set({
-          cart: [...cart, ...held.cart],
+          cart: mergedCart,
           cartDiscount: held.discount,
           cartCustomerId: held.customerId,
           heldOrders: heldOrders.filter((o) => o.id !== orderId),
@@ -191,7 +229,6 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        token: state.token,
         currentScreen: state.currentScreen,
         sidebarOpen: state.sidebarOpen,
         settings: state.settings,

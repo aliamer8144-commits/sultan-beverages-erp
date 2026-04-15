@@ -4,16 +4,14 @@ import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { validateBody, createSupplierSchema } from "@/lib/validations";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
+import { parsePaginationQuery } from "@/types/api";
 
 /**
  * GET /api/suppliers — List suppliers with balance info
  */
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search") || "";
-  const sortBy = searchParams.get("sortBy") || "createdAt";
-  const page = Math.max(1, Number(searchParams.get('page')) || 1);
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
+  const { search, sortBy, page, limit } = parsePaginationQuery(searchParams);
 
   const orderBy: Record<string, string> = {}
   if (sortBy === "rating") {
@@ -24,12 +22,13 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   const where = search
     ? {
+        deletedAt: null,
         OR: [
           { name: { contains: search } },
           { phone: { contains: search } },
         ],
       }
-    : undefined
+    : { deletedAt: null }
 
   const [suppliers, total] = await Promise.all([
     db.supplier.findMany({

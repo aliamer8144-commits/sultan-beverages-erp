@@ -32,6 +32,7 @@ import {
   HourglassIcon,
 } from 'lucide-react'
 import { formatDateShortMonth } from '@/lib/date-utils'
+import { getProgressColor, getProgressTextColor, getMotivationalMessage } from '@/lib/progress-utils'
 import { useApi } from '@/hooks/use-api'
 import { useFormValidation } from '@/hooks/use-form-validation'
 import { createSalesTargetSchema } from '@/lib/validations'
@@ -79,31 +80,12 @@ function formatCurrency(amount: number): string {
 }
 
 // formatDateShortMonth imported from @/lib/date-utils
-
-function getProgressColor(percent: number): string {
-  if (percent >= 80) return 'bg-green-500'
-  if (percent >= 50) return 'bg-amber-500'
-  return 'bg-red-500'
-}
+// getProgressColor, getProgressTextColor, getMotivationalMessage imported from @/lib/progress-utils
 
 function getProgressRingClass(percent: number): string {
   if (percent >= 80) return 'progress-ring-green'
   if (percent >= 50) return 'progress-ring-amber'
   return 'progress-ring-red'
-}
-
-function getProgressTextColor(percent: number): string {
-  if (percent >= 80) return 'text-green-500'
-  if (percent >= 50) return 'text-amber-500'
-  return 'text-red-500'
-}
-
-function getMotivationalMessage(percent: number): string {
-  if (percent >= 100) return '🎉 أحسنت! لقد حققت الهدف!'
-  if (percent >= 80) return '🔥 قريب جداً! استمر بنفس الحماس'
-  if (percent >= 50) return '💪 نصف الطريق! واصل المسيرة'
-  if (percent >= 25) return '🌱 بداية جيدة! المزيد من الجهد'
-  return '🚀 ابدأ الآن! كل خطوة تُحدث فرقاً'
 }
 
 function getTypeIcon(type: string): string {

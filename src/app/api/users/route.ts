@@ -23,7 +23,7 @@ export const GET = withAuth(tryCatch(async () => {
  */
 export const POST = withAuth(tryCatch(async (request) => {
   const body = await validateRequest(request, createUserSchema)
-  const { username, password, name } = body
+  const { username, password, name, role } = body
 
   const existing = await db.user.findUnique({ where: { username } })
   if (existing) {
@@ -33,7 +33,7 @@ export const POST = withAuth(tryCatch(async (request) => {
   const hashedPassword = await hashPassword(password)
 
   const user = await db.user.create({
-    data: { username, password: hashedPassword, name },
+    data: { username, password: hashedPassword, name, role },
   })
 
   const { password: _, ...safeUser } = user

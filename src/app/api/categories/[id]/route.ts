@@ -46,7 +46,18 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   const existing = await db.category.findUnique({ where: { id } });
   if (!existing) return notFound("الفئة غير موجودة");
 
-  await db.category.delete({ where: { id } });
+  // Check for active products in this category before soft-deleting
+  const productsInCategory = await db.product.count({
+    where: { categoryId: id, deletedAt: null },
+  });
+  if (productsInCategory > 0) {
+    return errorResponse('لا يمكن حذف فئة بها منتجات — يرجى نقل المنتجات أولاً', 400);
+  }
+
+  await db.category.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  });
 
   const user = getRequestUser(request);
   logAction({
@@ -59,4 +70,4 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   });
 
   return successResponse({ deleted: true });
-}, 'فشل في حذف الفئة'));
+}, 'فشل في حذف الفئة'), { requireAdmin: true });

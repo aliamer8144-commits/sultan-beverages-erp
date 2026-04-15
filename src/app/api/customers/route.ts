@@ -15,7 +15,9 @@ export const GET = withAuth(tryCatch(async (request) => {
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    deletedAt: null,
+  };
 
   if (search) {
     where.OR = [
@@ -25,7 +27,7 @@ export const GET = withAuth(tryCatch(async (request) => {
   }
   if (category) where.category = category;
 
-  const whereClause = Object.keys(where).length > 0 ? where : undefined;
+  const whereClause = where;
 
   const [customers, total] = await Promise.all([
     db.customer.findMany({

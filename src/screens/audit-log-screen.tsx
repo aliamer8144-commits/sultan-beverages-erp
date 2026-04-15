@@ -518,6 +518,7 @@ export function AuditLogScreen() {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                          aria-label={isExpanded ? "طي التفاصيل" : "توسيع التفاصيل"}
                         >
                           {isExpanded ? (
                             <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -602,6 +603,7 @@ export function AuditLogScreen() {
                 className="h-8 w-8"
                 disabled={currentPage <= 1}
                 onClick={() => fetchLogs(currentPage - 1)}
+                aria-label="الصفحة السابقة"
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -626,6 +628,7 @@ export function AuditLogScreen() {
                 className="h-8 w-8"
                 disabled={currentPage >= totalPages}
                 onClick={() => fetchLogs(currentPage + 1)}
+                aria-label="الصفحة التالية"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>

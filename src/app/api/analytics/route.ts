@@ -3,6 +3,8 @@ import { withAuth } from '@/lib/auth-middleware'
 import { successResponse } from '@/lib/api-response'
 import { tryCatch } from '@/lib/api-error-handler'
 
+export const revalidate = 30 // Cache for 30 seconds
+
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url)
   const startDateParam = searchParams.get('startDate')

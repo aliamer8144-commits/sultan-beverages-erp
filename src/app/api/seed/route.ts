@@ -7,6 +7,10 @@ import { tryCatch } from '@/lib/api-error-handler'
 
 // POST /api/seed — Seed database with sample data (admin only)
 export const POST = withAuth(tryCatch(async (request) => {
+  if (process.env.NODE_ENV === 'production') {
+    return errorResponse('لا يمكن تشغيل البذرة في بيئة الإنتاج', 403)
+  }
+
   const user = getRequestUser(request)
 
   // Create users — SECURITY: Hash passwords before storing

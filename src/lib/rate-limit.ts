@@ -1,11 +1,15 @@
 /**
- * In-Memory Rate Limiter — Sultan Beverages ERP
+ * In-Memory Rate Limiter with File Persistence — Sultan Beverages ERP
  *
- * Sliding window rate limiter using a Map<string, Count[]>.
- * No external dependencies — suitable for single-server deployments.
+ * Sliding window rate limiter using a Map<string, Attempt[]>.
+ * Includes file-based persistence so rate limits survive serverless
+ * cold starts and process restarts.
  *
  * ⚠️ Server-side only — never import this file in client components.
  */
+
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { join } from 'path'
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -28,7 +32,56 @@ interface RateLimitConfig {
 
 // ── Storage ────────────────────────────────────────────────────────
 
+const RATE_LIMIT_FILE = join('/tmp', 'sultan-erp-rate-limit.json')
+
+// In-memory store (always used for fast access)
 const store = new Map<string, Attempt[]>()
+
+// Track if we've loaded from file
+let loadedFromFile = false
+let lastWriteTime = 0
+const WRITE_INTERVAL = 10_000 // Write to file at most every 10 seconds
+
+// ── Persistence ────────────────────────────────────────────────────
+
+/** Load persisted data on first access (lazy — called by each public function) */
+function loadFromFile() {
+  if (loadedFromFile) return
+  loadedFromFile = true
+  try {
+    if (existsSync(RATE_LIMIT_FILE)) {
+      const data = JSON.parse(readFileSync(RATE_LIMIT_FILE, 'utf-8'))
+      const now = Date.now()
+      for (const [key, attempts] of Object.entries(data)) {
+        // Only load recent attempts (within the last 10 minutes)
+        const recent = (attempts as Attempt[]).filter((a: Attempt) => now - a.timestamp < 600_000)
+        if (recent.length > 0) {
+          store.set(key, recent)
+        }
+      }
+    }
+  } catch {
+    // Ignore file read errors — fall back to empty store
+  }
+}
+
+/** Debounced write — only persists to file if enough time has elapsed */
+function debouncedWrite() {
+  const now = Date.now()
+  if (now - lastWriteTime < WRITE_INTERVAL) return
+  lastWriteTime = now
+  try {
+    const data: Record<string, Attempt[]> = {}
+    for (const [key, attempts] of store) {
+      data[key] = attempts
+    }
+    writeFileSync(RATE_LIMIT_FILE, JSON.stringify(data))
+  } catch {
+    // Ignore write errors
+  }
+}
+
+// ── Cleanup ────────────────────────────────────────────────────────
 
 // Cleanup stale entries every 5 minutes to prevent memory leaks
 let cleanupTimer: ReturnType<typeof setInterval> | null = null
@@ -45,13 +98,15 @@ function ensureCleanup() {
         store.set(key, filtered)
       }
     }
+    // Also persist after cleanup
+    debouncedWrite()
   }, 300_000)
 }
 
-// ── Core Function ──────────────────────────────────────────────────
+// ── Core Functions ─────────────────────────────────────────────────
 
 /**
- * Check if a request is within rate limits.
+ * Check if a request is within rate limits and record the attempt.
  *
  * @param key - Unique identifier (e.g., IP address, username, or IP+endpoint)
  * @param config - Rate limit configuration
@@ -72,6 +127,7 @@ export function checkRateLimit(
   key: string,
   config: RateLimitConfig
 ): RateLimitResult {
+  loadFromFile()
   ensureCleanup()
 
   const now = Date.now()
@@ -91,6 +147,7 @@ export function checkRateLimit(
   if (recentAttempts.length >= config.maxAttempts) {
     // Find when the oldest attempt in the window expires
     const oldestInWindow = recentAttempts[0].timestamp
+    debouncedWrite()
     return {
       success: false,
       remaining: 0,
@@ -100,6 +157,7 @@ export function checkRateLimit(
 
   // Record this attempt
   recentAttempts.push({ timestamp: now })
+  debouncedWrite()
 
   return {
     success: true,
@@ -113,6 +171,7 @@ export function checkRateLimit(
  * Only failed attempts are counted — successful logins are not recorded.
  */
 export function recordFailedAttempt(key: string) {
+  loadFromFile()
   ensureCleanup()
   const now = Date.now()
   let attempts = store.get(key)
@@ -121,6 +180,7 @@ export function recordFailedAttempt(key: string) {
     store.set(key, attempts)
   }
   attempts.push({ timestamp: now })
+  debouncedWrite()
 }
 
 /**
@@ -128,6 +188,7 @@ export function recordFailedAttempt(key: string) {
  * Used to verify if a key has exceeded limits before allowing the request.
  */
 export function checkRateLimitOnly(key: string, config: RateLimitConfig): RateLimitResult {
+  loadFromFile()
   ensureCleanup()
   const now = Date.now()
   const windowStart = now - config.windowMs

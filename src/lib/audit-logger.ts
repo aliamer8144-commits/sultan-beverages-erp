@@ -20,7 +20,8 @@ export async function logAction(params: {
         ipAddress: params.ipAddress || null,
       }
     })
-  } catch {
+  } catch (error) {
     // Don't fail the main operation if logging fails
+    console.error('[Audit] Logging failed:', error)
   }
 }

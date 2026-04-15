@@ -13,12 +13,15 @@ export const PUT = withAuth(tryCatch(async (request, { params }) => {
   const id = getRequiredParam(params, 'id')
 
   const body = await validateRequest(request, editUserSchema)
-  const { name, password } = body
+  const { name, password, role, isActive } = body
 
-  const data: Record<string, unknown> = { name }
+  const data: Record<string, unknown> = {}
+  if (name !== undefined) data.name = name
   if (password) {
     data.password = await hashPassword(password)
   }
+  if (role !== undefined) data.role = role
+  if (isActive !== undefined) data.isActive = isActive
 
   const user = await db.user.update({
     where: { id },

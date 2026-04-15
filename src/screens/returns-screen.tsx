@@ -593,6 +593,7 @@ export function ReturnsScreen() {
                             className="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600 shimmer"
                             onClick={() => handleUpdateStatus(ret.id, 'approved')}
                             title="موافقة"
+                            aria-label="موافقة"
                           >
                             <Check className="w-4 h-4" />
                           </Button>
@@ -602,6 +603,7 @@ export function ReturnsScreen() {
                             className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => handleUpdateStatus(ret.id, 'rejected')}
                             title="رفض"
+                            aria-label="رفض"
                           >
                             <XCircle className="w-4 h-4" />
                           </Button>

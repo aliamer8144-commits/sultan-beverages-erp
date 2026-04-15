@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -12,7 +12,7 @@ model User {
   username  String    @unique
   password  String
   name      String
-  role      String    @default("cashier") // admin, cashier
+  role      String    @default("cashier") // admin, manager, cashier
   isActive  Boolean   @default(true)
   invoices  Invoice[]
   createdAt DateTime  @default(now())
@@ -20,12 +20,13 @@ model User {
 }
 
 model Category {
-  id       String    @id @default(cuid())
-  name     String    @unique
-  icon     String    @default("CupSoda")
-  products Product[]
+  id        String    @id @default(cuid())
+  name      String    @unique
+  icon      String    @default("CupSoda")
+  products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 }
 
 model Product {
@@ -46,6 +47,13 @@ model Product {
   variants         ProductVariant[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  @@index([categoryId])
+  @@index([barcode])
+  @@index([name])
+  @@index([deletedAt])
+  @@index([isActive])
 }
 
 model ProductVariant {
@@ -79,6 +87,10 @@ model Customer {
   loyaltyTransactions LoyaltyTransaction[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+  deletedAt       DateTime?
+
+  @@index([deletedAt])
+  @@index([name])
 }
 
 model Supplier {
@@ -98,6 +110,10 @@ model Supplier {
   reviews         SupplierReview[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  @@index([deletedAt])
+  @@index([name])
 }
 
 model Invoice {
@@ -118,6 +134,12 @@ model Invoice {
   loyaltyTransactions  LoyaltyTransaction[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model InvoiceItem {
@@ -129,6 +151,9 @@ model InvoiceItem {
   quantity  Int
   price     Float
   total     Float
+
+  @@index([invoiceId])
+  @@index([productId])
 }
 
 model Payment {
@@ -140,6 +165,9 @@ model Payment {
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([createdAt])
 }
 
 model SupplierPayment {
@@ -151,6 +179,9 @@ model SupplierPayment {
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([createdAt])
 }
 
 model ProductReturn {
@@ -169,6 +200,10 @@ model ProductReturn {
   userName    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([productId])
+  @@index([status])
 }
 
 model StockAdjustment {
@@ -185,6 +220,10 @@ model StockAdjustment {
   reference     String?  // e.g., invoice number, return number
   referenceType String?  // invoice, return, manual
   createdAt     DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([type])
 }
 
 model ExpenseCategory {
@@ -214,6 +253,10 @@ model Expense {
   categoryObj      ExpenseCategory?  @relation(fields: [categoryId], references: [id])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  @@index([category])
+  @@index([categoryId])
+  @@index([date])
 }
 
 model AuditLog {
@@ -226,6 +269,11 @@ model AuditLog {
   userName  String?
   ipAddress String?
   createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model SalesTarget {
@@ -237,6 +285,9 @@ model SalesTarget {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@index([type])
+  @@index([isActive])
 }
 
 model LoyaltyTransaction {
@@ -250,6 +301,9 @@ model LoyaltyTransaction {
   invoice        Invoice?  @relation(fields: [invoiceId], references: [id])
   description    String
   createdAt      DateTime  @default(now())
+
+  @@index([customerId])
+  @@index([invoiceId])
 }
 
 model SupplierReview {

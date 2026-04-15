@@ -45,7 +45,18 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   const existing = await db.supplier.findUnique({ where: { id } });
   if (!existing) return notFound("المورد غير موجود");
 
-  await db.supplier.delete({ where: { id } });
+  // Check for invoices before soft-deleting
+  const invoiceCount = await db.invoice.count({
+    where: { supplierId: id },
+  });
+  if (invoiceCount > 0) {
+    return errorResponse('لا يمكن حذف مورد لديه فواتير — يمكنك تعطيله بدلاً من ذلك', 400);
+  }
+
+  await db.supplier.update({
+    where: { id },
+    data: { deletedAt: new Date(), isActive: false },
+  });
 
   const user = getRequestUser(request);
   logAction({
@@ -58,4 +69,4 @@ export const DELETE = withAuth(tryCatch(async (request, context) => {
   });
 
   return successResponse({ deleted: true });
-}, 'فشل في حذف المورد'));
+}, 'فشل في حذف المورد'), { requireManager: true });

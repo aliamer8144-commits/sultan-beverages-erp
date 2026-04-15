@@ -23,11 +23,17 @@ function getSecret(): Uint8Array {
       'Add it to your .env file: JWT_SECRET=your-random-secret-here'
     )
   }
+  if (secret.length < 32) {
+    throw new Error(
+      'JWT_SECRET must be at least 32 characters long for security. ' +
+      'Current length: ' + secret.length
+    )
+  }
   return new TextEncoder().encode(secret)
 }
 
 /** JWT token expiry */
-export const TOKEN_EXPIRY = '7d'
+export const TOKEN_EXPIRY = '24h'
 
 /** Cookie / header name for the auth token */
 export const AUTH_COOKIE_NAME = 'sultan-erp-token'

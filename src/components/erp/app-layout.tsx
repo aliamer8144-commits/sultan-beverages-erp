@@ -34,6 +34,7 @@ import { ProductVariantsScreen } from '@/screens/product-variants-screen'
 import { QuickStatsPanel } from '@/components/quick-stats-panel'
 import { StockAlertsWidget } from '@/components/stock-alerts-widget'
 import { GlobalSearchDialog } from '@/components/global-search-dialog'
+import { ScreenErrorBoundary } from '@/components/screen-error-boundary'
 import {
   ShoppingCart,
   Package,
@@ -75,27 +76,27 @@ function useHasMounted() {
   return useSyncExternalStore(emptySubscribe, () => true, () => false)
 }
 
-// ─── Screen Labels Map ─────────────────────────────────────────────
-const screenLabels: Record<Screen, string> = {
-  pos: 'نقطة البيع',
-  inventory: 'المخزون',
-  'stock-adjustments': 'تعديلات المخزون',
-  purchases: 'المشتريات',
-  customers: 'العملاء',
-  invoices: 'الفواتير',
-  returns: 'المرتجعات',
-  dashboard: 'التقارير',
-  users: 'المستخدمين',
-  settings: 'الإعدادات',
-  'daily-close': 'إغلاق اليوم',
-  'audit-log': 'سجل العمليات',
-  backup: 'النسخ الاحتياطي',
-  analytics: 'التحليلات المتقدمة',
-  expenses: 'المصروفات',
-  'sales-targets': 'أهداف المبيعات',
-  'customer-statement': 'كشف حساب عميل',
-  loyalty: 'برنامج النقاط',
-  'product-variants': 'متغيرات المنتجات',
+// ─── Navigation Key Map (shared across components) ─────────────────
+const navKeyMap: Record<Screen, string> = {
+  pos: 'nav.pos',
+  inventory: 'nav.inventory',
+  'stock-adjustments': 'nav.stock-adjustments',
+  purchases: 'nav.purchases',
+  customers: 'nav.customers',
+  invoices: 'nav.invoices',
+  returns: 'nav.returns',
+  dashboard: 'nav.dashboard',
+  users: 'nav.users',
+  settings: 'nav.settings',
+  'daily-close': 'nav.daily-close',
+  'audit-log': 'nav.audit-log',
+  backup: 'nav.backup',
+  analytics: 'nav.analytics',
+  expenses: 'nav.expenses',
+  'sales-targets': 'nav.sales-targets',
+  'customer-statement': 'nav.customer-statement',
+  loyalty: 'nav.loyalty',
+  'product-variants': 'nav.product-variants',
 }
 
 // ─── Keyboard Shortcuts Definition (uses translation keys) ──────
@@ -107,27 +108,31 @@ const keyboardShortcutKeys = [
   { keys: ['Escape'], descriptionKey: 'closeWindow' },
 ] as const
 
+// ─── Screen Permission Maps ─────────────────────────────────────────
+const ADMIN_ONLY_SCREENS: Screen[] = ['users', 'audit-log', 'backup', 'settings']
+const MANAGER_PLUS_SCREENS: Screen[] = ['analytics', 'daily-close', 'sales-targets', 'purchases', 'expenses', 'stock-adjustments']
+
 // ─── Navigation Items ──────────────────────────────────────────────
-const navItems: { id: Screen; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
+const navItems: { id: Screen; label: string; icon: React.ElementType; adminOnly?: boolean; managerPlus?: boolean }[] = [
   { id: 'pos', label: 'نقطة البيع', icon: ShoppingCart },
   { id: 'inventory', label: 'المخزون', icon: Package },
-  { id: 'stock-adjustments', label: 'تعديلات المخزون', icon: SlidersHorizontal, adminOnly: true },
-  { id: 'purchases', label: 'المشتريات', icon: Truck, adminOnly: true },
+  { id: 'stock-adjustments', label: 'تعديلات المخزون', icon: SlidersHorizontal, managerPlus: true },
+  { id: 'purchases', label: 'المشتريات', icon: Truck, managerPlus: true },
   { id: 'customers', label: 'العملاء', icon: Users },
   { id: 'loyalty', label: 'برنامج النقاط', icon: Gift },
   { id: 'invoices', label: 'الفواتير', icon: FileText },
-  { id: 'returns', label: 'المرتجعات', icon: RotateCcw, adminOnly: true },
-  { id: 'dashboard', label: 'التقارير', icon: BarChart3, adminOnly: true },
+  { id: 'returns', label: 'المرتجعات', icon: RotateCcw, managerPlus: true },
+  { id: 'dashboard', label: 'التقارير', icon: BarChart3, managerPlus: true },
   { id: 'users', label: 'المستخدمين', icon: UserCog, adminOnly: true },
-  { id: 'settings', label: 'الإعدادات', icon: Settings },
-  { id: 'daily-close', label: 'إغلاق اليوم', icon: CalendarCheck, adminOnly: true },
+  { id: 'settings', label: 'الإعدادات', icon: Settings, adminOnly: true },
+  { id: 'daily-close', label: 'إغلاق اليوم', icon: CalendarCheck, managerPlus: true },
   { id: 'audit-log', label: 'سجل العمليات', icon: ClipboardList, adminOnly: true },
   { id: 'backup', label: 'النسخ الاحتياطي', icon: DatabaseBackup, adminOnly: true },
-  { id: 'expenses', label: 'المصروفات', icon: Receipt, adminOnly: true },
-  { id: 'analytics', label: 'التحليلات المتقدمة', icon: TrendingUp },
-  { id: 'sales-targets', label: 'أهداف المبيعات', icon: Target, adminOnly: true },
-  { id: 'customer-statement', label: 'كشف حساب عميل', icon: FileText, adminOnly: true },
-  { id: 'product-variants', label: 'متغيرات المنتجات', icon: Layers, adminOnly: true },
+  { id: 'expenses', label: 'المصروفات', icon: Receipt, managerPlus: true },
+  { id: 'analytics', label: 'التحليلات المتقدمة', icon: TrendingUp, managerPlus: true },
+  { id: 'sales-targets', label: 'أهداف المبيعات', icon: Target, managerPlus: true },
+  { id: 'customer-statement', label: 'كشف حساب عميل', icon: FileText, managerPlus: true },
+  { id: 'product-variants', label: 'متغيرات المنتجات', icon: Layers, managerPlus: true },
 ]
 
 // ─── Theme Toggle Component ────────────────────────────────────────
@@ -317,29 +322,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
   const { user, currentScreen, setScreen, logout, sidebarOpen, setSidebarOpen } = useAppStore()
   const { t, isRTL } = useTranslation()
   const isAdmin = user?.role === 'admin'
-
-  // Navigation key mapping
-  const navKeyMap: Record<Screen, string> = {
-    pos: 'nav.pos',
-    inventory: 'nav.inventory',
-    'stock-adjustments': 'nav.stock-adjustments',
-    purchases: 'nav.purchases',
-    customers: 'nav.customers',
-    invoices: 'nav.invoices',
-    returns: 'nav.returns',
-    dashboard: 'nav.dashboard',
-    users: 'nav.users',
-    settings: 'nav.settings',
-    'daily-close': 'nav.daily-close',
-    'audit-log': 'nav.audit-log',
-    backup: 'nav.backup',
-    analytics: 'nav.analytics',
-    expenses: 'nav.expenses',
-    'sales-targets': 'nav.sales-targets',
-    'customer-statement': 'nav.customer-statement',
-    loyalty: 'nav.loyalty',
-    'product-variants': 'nav.product-variants',
-  }
+  const isManagerOrAbove = isAdmin || user?.role === 'manager'
 
   const handleNav = (screen: Screen) => {
     setScreen(screen)
@@ -382,6 +365,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
           <div className="sidebar-section-title">القائمة الرئيسية</div>
           {navItems.map((item) => {
             if (item.adminOnly && !isAdmin) return null
+            if (item.managerPlus && !isManagerOrAbove) return null
             const isActive = currentScreen === item.id
             const Icon = item.icon
 
@@ -431,8 +415,8 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
               <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              <span className={`badge-status ${user.role === 'admin' ? 'badge-status-success' : 'badge-status-info'}`}>
-                {user.role === 'admin' ? t('common.admin') : t('common.cashier')}
+              <span className={`badge-status ${user.role === 'admin' ? 'badge-status-success' : user.role === 'manager' ? 'badge-status-warning' : 'badge-status-info'}`}>
+                {user.role === 'admin' ? t('common.admin') : user.role === 'manager' ? 'مدير' : t('common.cashier')}
               </span>
             </p>
           </div>
@@ -462,33 +446,24 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
 
 // ─── Main AppLayout ────────────────────────────────────────────────
 export function AppLayout() {
-  const { currentScreen, sidebarOpen, setSidebarOpen, toggleSidebar } = useAppStore()
+  const { currentScreen, sidebarOpen, setSidebarOpen, toggleSidebar, setScreen, user } = useAppStore()
   const { t, isRTL } = useTranslation()
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
 
-  // Navigation key mapping
-  const navKeyMap: Record<Screen, string> = {
-    pos: 'nav.pos',
-    inventory: 'nav.inventory',
-    'stock-adjustments': 'nav.stock-adjustments',
-    purchases: 'nav.purchases',
-    customers: 'nav.customers',
-    invoices: 'nav.invoices',
-    returns: 'nav.returns',
-    dashboard: 'nav.dashboard',
-    users: 'nav.users',
-    settings: 'nav.settings',
-    'daily-close': 'nav.daily-close',
-    'audit-log': 'nav.audit-log',
-    backup: 'nav.backup',
-    analytics: 'nav.analytics',
-    expenses: 'nav.expenses',
-    'sales-targets': 'nav.sales-targets',
-    'customer-statement': 'nav.customer-statement',
-    loyalty: 'nav.loyalty',
-    'product-variants': 'nav.product-variants',
-  }
+  // ── Role-based access control ────────────────────────────────────
+  const isAdmin = user?.role === 'admin'
+  const isManagerOrAbove = isAdmin || user?.role === 'manager'
+
+  // Redirect unauthorized screen access
+  useEffect(() => {
+    if (ADMIN_ONLY_SCREENS.includes(currentScreen) && !isAdmin) {
+      setScreen('pos')
+    }
+    if (MANAGER_PLUS_SCREENS.includes(currentScreen) && !isManagerOrAbove) {
+      setScreen('pos')
+    }
+  }, [currentScreen, isAdmin, isManagerOrAbove, setScreen])
 
   // ── Keyboard shortcuts listener ───────────────────────────────────
   useEffect(() => {
@@ -620,7 +595,9 @@ export function AppLayout() {
 
         {/* Screen Content */}
         <div key={currentScreen} className="flex-1 overflow-hidden animate-fade-in-up">
-          {renderScreen()}
+          <ScreenErrorBoundary>
+            {renderScreen()}
+          </ScreenErrorBoundary>
         </div>
       </main>
 

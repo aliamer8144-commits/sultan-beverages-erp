@@ -54,6 +54,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { formatShortDate } from '@/lib/date-utils'
+import { getProgressColor, getProgressTextColor } from '@/lib/progress-utils'
 import type { Customer, SalesTarget } from './settings/types'
 
 // ─── Hydration-safe mounted hook ─────────────────────────────────
@@ -249,18 +250,6 @@ function SalesTargetsSection() {
     daily: 'يومي',
     weekly: 'أسبوعي',
     monthly: 'شهري',
-  }
-
-  const getProgressColor = (percent: number) => {
-    if (percent >= 80) return 'bg-emerald-500'
-    if (percent >= 50) return 'bg-amber-500'
-    return 'bg-red-500'
-  }
-
-  const getProgressTextColor = (percent: number) => {
-    if (percent >= 80) return 'text-emerald-600'
-    if (percent >= 50) return 'text-amber-600'
-    return 'text-red-600'
   }
 
   return (

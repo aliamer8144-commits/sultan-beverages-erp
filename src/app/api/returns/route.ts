@@ -135,7 +135,7 @@ export const POST = withAuth(tryCatch(async (request) => {
 
     const returnNo = `${todayPrefix}${String(sequence).padStart(3, '0')}`
 
-    // 3. Create the Return record
+    // 3. Create the Return record (pending — stock/debt handled on approval)
     const createdReturn = await tx.productReturn.create({
       data: {
         returnNo,
@@ -145,7 +145,7 @@ export const POST = withAuth(tryCatch(async (request) => {
         unitPrice,
         totalAmount,
         reason: reason || '',
-        status: 'approved', // Auto-approve on creation
+        status: 'pending', // Must be approved via PATCH before affecting stock/debt
         userId,
         userName: userName || null,
       },
@@ -158,46 +158,6 @@ export const POST = withAuth(tryCatch(async (request) => {
         },
       },
     })
-
-    // 4. Restore product quantity and log stock adjustment
-    const productBefore = await tx.product.findUnique({
-      where: { id: productId },
-      select: { quantity: true },
-    })
-    const previousQty = productBefore?.quantity || 0
-    const newQty = previousQty + quantity
-
-    await tx.product.update({
-      where: { id: productId },
-      data: { quantity: newQty },
-    })
-
-    // Auto-log stock adjustment for return
-    await tx.stockAdjustment.create({
-      data: {
-        productId,
-        type: 'return',
-        quantity,
-        previousQty,
-        newQty,
-        reason: `إرجاع - مرتجع ${returnNo}`,
-        reference: returnNo,
-        referenceType: 'return',
-        userId: userId || '',
-        userName: userName || null,
-      },
-    })
-
-    // 5. Adjust customer debt if applicable (reduce by return amount)
-    if (invoice.customerId && invoice.customer) {
-      const debtReduction = Math.min(totalAmount, invoice.customer.debt)
-      if (debtReduction > 0) {
-        await tx.customer.update({
-          where: { id: invoice.customerId },
-          data: { debt: { decrement: debtReduction } },
-        })
-      }
-    }
 
     return createdReturn
   })
@@ -238,8 +198,12 @@ export const PATCH = withAuth(tryCatch(async (request) => {
       throw new Error('Return not found')
     }
 
-    if (existingReturn.status !== 'pending') {
-      throw new Error('Return is already processed')
+    if (existingReturn.status === 'approved') {
+      throw new Error('هذا المرتجع معالج بالفعل')
+    }
+
+    if (existingReturn.status === 'rejected') {
+      throw new Error('هذا المرتجع مرفوض بالفعل')
     }
 
     // Update the status

@@ -87,12 +87,26 @@ export const POST = withAuth(tryCatch(async (request) => {
   if (!validation.success) return errorResponse(validation.error, 422);
 
   const { type, customerId, supplierId, discount, paidAmount, items } = validation.data;
+
+  // Cashiers cannot create purchase invoices
+  if (type === 'purchase' && user.role === 'cashier') {
+    return errorResponse('ليس لديك صلاحية لإنشاء فواتير الشراء', 403);
+  }
+
   const userId = user.userId;
 
   const invoice = await db.$transaction(async (tx) => {
-    // 1. Generate invoice number
-    const count = await tx.invoice.count();
-    const invoiceNo = `INV-${String(count + 1).padStart(5, "0")}`;
+    // 1. Generate invoice number — find latest and increment to avoid duplicates
+    const lastInvoice = await tx.invoice.findFirst({
+      orderBy: { invoiceNo: 'desc' },
+      select: { invoiceNo: true },
+    });
+    let nextNum = 1;
+    if (lastInvoice?.invoiceNo) {
+      const match = lastInvoice.invoiceNo.match(/\d+$/);
+      if (match) nextNum = parseInt(match[0], 10) + 1;
+    }
+    const invoiceNo = `INV-${String(nextNum).padStart(5, '0')}`;
 
     // 2. Calculate total from items
     const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -156,7 +170,10 @@ export const POST = withAuth(tryCatch(async (request) => {
       let reason: string;
 
       if (type === "sale") {
-        newQty = Math.max(0, previousQty - item.quantity);
+        if (previousQty < item.quantity) {
+          throw new Error(`المخزون غير كافٍ للمنتج: ${item.productId} (المتاح: ${previousQty}, المطلوب: ${item.quantity})`);
+        }
+        newQty = previousQty - item.quantity;
         adjustmentType = "sale";
         reason = `بيع - فاتورة ${invoiceNo}`;
       } else if (type === "purchase") {
@@ -197,8 +214,10 @@ export const POST = withAuth(tryCatch(async (request) => {
     ]);
 
     // 7. Update customer debt + visit tracking (sales only)
+    // totalAmount is pre-discount for accounting; grandTotal is what customer owes
     if (customerId && type === "sale") {
-      const remaining = totalAmount - (paidAmount || 0);
+      const grandTotal = totalAmount - (discount || 0);
+      const remaining = grandTotal - (paidAmount || 0);
       const customerUpdate: Record<string, unknown> = {
         visitCount: { increment: 1 },
         lastVisit: new Date(),

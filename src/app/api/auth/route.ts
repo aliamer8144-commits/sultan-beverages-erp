@@ -108,8 +108,7 @@ export const POST = tryCatch(async (request) => {
     role: user.role as "admin" | "cashier",
   })
 
-  // 5. Build success response — token in both cookie AND response body
-  //    (cookie for security, body for client-side Zustand store)
+  // 5. Build success response — token ONLY in httpOnly cookie (never in response body)
   const response = NextResponse.json({
     success: true,
     user: {
@@ -119,7 +118,6 @@ export const POST = tryCatch(async (request) => {
       role: user.role,
       isActive: user.isActive,
     },
-    token,
   })
 
   setAuthCookie(response, token)

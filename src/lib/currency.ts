@@ -32,8 +32,8 @@ export function formatCurrency(
     ? decimals
     : (meta?.decimalPlaces ?? 0)
 
-  // Format the number with Arabic-Indic digits and thousand separators
-  const formatted = amount.toLocaleString('ar-SA', {
+  // Format the number with Western Arabic numerals and thousand separators
+  const formatted = amount.toLocaleString('ar-SA-u-nu-latn', {
     minimumFractionDigits: effectiveDecimals,
     maximumFractionDigits: effectiveDecimals,
   })
@@ -82,7 +82,7 @@ export function formatWithSettings(amount: number): string {
  * @param exchangeRate - How many `to` currency units = 1 `from` currency unit
  */
 export function convertCurrency(amount: number, exchangeRate: number): number {
-  if (!exchangeRate || exchangeRate <= 0) return 0
+  if (!exchangeRate || exchangeRate <= 0) return amount
   return amount * exchangeRate
 }
 

@@ -9,6 +9,9 @@
 import { supabaseAdmin, isStorageConfigured, PRODUCT_IMAGES_BUCKET, getSupabasePublicUrl } from './supabase'
 import { nanoid } from './utils'
 
+/** Module-level flag to skip redundant createBucket calls */
+let bucketVerified = false
+
 /**
  * Upload a base64 image to Supabase Storage.
  *
@@ -44,14 +47,17 @@ export async function uploadProductImage(
     // Generate a unique file path: product-images/{productId}/{uniqueId}.{ext}
     const filePath = `${productId}/${nanoid()}.${ext}`
 
-    // Ensure the bucket exists (create if not)
-    const { error: bucketError } = await supabaseAdmin.storage.createBucket(
-      PRODUCT_IMAGES_BUCKET,
-      { public: true }
-    )
-    // Ignore error if bucket already exists
-    if (bucketError && !bucketError.message.includes('already exists')) {
-      console.error('[Storage] Failed to create bucket:', bucketError.message)
+    // Ensure the bucket exists (create if not) — cached to avoid repeated calls
+    if (!bucketVerified) {
+      const { error: bucketError } = await supabaseAdmin.storage.createBucket(
+        PRODUCT_IMAGES_BUCKET,
+        { public: true }
+      )
+      // Ignore error if bucket already exists
+      if (bucketError && !bucketError.message.includes('already exists')) {
+        console.error('[Storage] Failed to create bucket:', bucketError.message)
+      }
+      bucketVerified = true
     }
 
     // Upload the file
@@ -73,7 +79,9 @@ export async function uploadProductImage(
       .from(PRODUCT_IMAGES_BUCKET)
       .getPublicUrl(filePath)
 
-    console.log(`[Storage] Image uploaded: ${urlData.publicUrl}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Storage] Image uploaded: ${urlData.publicUrl}`)
+    }
     return urlData.publicUrl
   } catch (error) {
     console.error('[Storage] Upload error:', error)
@@ -103,7 +111,7 @@ export async function deleteProductImage(imageUrl: string | null | undefined): P
 
     if (error) {
       console.error('[Storage] Delete failed:', error.message)
-    } else {
+    } else if (process.env.NODE_ENV === 'development') {
       console.log(`[Storage] Image deleted: ${filePath}`)
     }
   } catch (error) {

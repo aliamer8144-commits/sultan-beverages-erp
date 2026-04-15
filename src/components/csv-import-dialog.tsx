@@ -101,7 +101,7 @@ export function CsvImportDialog({ open, onOpenChange, categories, onImportComple
 
     try {
       const text = await selectedFile.text()
-      const data = await parseCSV(text)
+      const data = parseCSV(text)
 
       if (data.length === 0) {
         setParseError('لم يتم العثور على بيانات في الملف')

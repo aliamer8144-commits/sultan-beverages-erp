@@ -149,21 +149,20 @@ interface PrismaError extends Error {
 
 /** Check if an error is a Prisma client error */
 function isPrismaError(error: unknown): error is PrismaError {
-  if (error instanceof Error && 'code' in error) {
-    return typeof (error as PrismaError).code === 'string'
-  }
-  return false
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    typeof (error as PrismaError).code === 'string' &&
+    (error as PrismaError).code.startsWith('P')
+  )
 }
 
 /** Map common Prisma error codes to user-friendly Arabic messages */
 function handlePrismaError(error: PrismaError, fallback: string): NextResponse {
   switch (error.code) {
     case 'P2002':
-      // Unique constraint violation
-      const target = Array.isArray(error.meta?.target)
-        ? (error.meta.target as string[]).join(', ')
-        : ''
-      return errorResponse(`القيمة "${target}" موجودة بالفعل`, 409)
+      // Unique constraint violation — don't expose field names
+      return errorResponse('القيمة موجودة بالفعل — يرجى استخدام قيمة مختلفة', 409)
 
     case 'P2025':
       // Record not found

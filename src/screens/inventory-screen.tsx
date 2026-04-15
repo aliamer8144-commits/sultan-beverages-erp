@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,6 +29,7 @@ import {
 import { CsvImportDialog } from '@/components/csv-import-dialog'
 import { useApi } from '@/hooks/use-api'
 import { useCurrency } from '@/hooks/use-currency'
+import { useAppStore } from '@/store/app-store'
 import { exportToCSV } from '@/lib/export-csv'
 import { formatDateTime, formatTime } from '@/lib/date-utils'
 import { format } from 'date-fns'
@@ -56,6 +57,9 @@ export function InventoryScreen() {
 
   // Currency
   const { symbol, formatCurrency } = useCurrency()
+
+  // Role-based access
+  const isAdmin = useAppStore((s) => s.user?.role === 'admin')
 
   // Data state
   const [products, setProducts] = useState<Product[]>([])
@@ -462,7 +466,7 @@ export function InventoryScreen() {
   }
 
   // Count low stock items
-  const lowStockCount = products.filter((p) => p.quantity <= p.minQuantity).length
+  const lowStockCount = useMemo(() => products.filter((p) => p.quantity <= p.minQuantity).length, [products])
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 gap-4 md:gap-6 bg-muted/30 animate-fade-in-up">
@@ -843,6 +847,7 @@ export function InventoryScreen() {
                             <Pencil className="w-4 h-4" />
                             <span className="sr-only">تعديل</span>
                           </Button>
+                          {isAdmin && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -852,6 +857,7 @@ export function InventoryScreen() {
                             <Trash2 className="w-4 h-4" />
                             <span className="sr-only">حذف</span>
                           </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -922,6 +928,7 @@ export function InventoryScreen() {
                 <Tags className="w-3.5 h-3.5" />
                 تعديل الحالة
               </Button>
+              {isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
@@ -931,6 +938,7 @@ export function InventoryScreen() {
                 <Trash2 className="w-3.5 h-3.5" />
                 حذف المحدد
               </Button>
+              )}
             </div>
 
             <div className="w-px h-8 bg-border/50" />

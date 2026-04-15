@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { useFormValidation } from '@/hooks/use-form-validation'
 import { invoiceItemSchema } from '@/lib/validations'
-import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Truck, ShoppingCart, Package, Wallet, History, AlertCircle, TrendingDown, Star, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useApi } from '@/hooks/use-api'
@@ -47,6 +47,7 @@ export function PurchasesScreen() {
     notes: '',
   })
   const [supplierLoading, setSupplierLoading] = useState(false)
+  const [suppliersLoading, setSuppliersLoading] = useState(true)
   const [supplierSort, setSupplierSort] = useState<string>('createdAt')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -75,12 +76,17 @@ export function PurchasesScreen() {
 
   // ==================== Load Data ====================
   const doFetchSuppliers = useCallback(async (s: string, sortBy: string, p: number) => {
-    const result = await get<{ suppliers: Supplier[]; total: number; page: number; totalPages: number }>('/api/suppliers', { search: s || undefined, sortBy: sortBy || undefined, page: p, limit: 50 })
-    if (result) {
-      setSuppliers(result.suppliers)
-      setSupplierTotal(result.total)
-      setPage(result.page)
-      setTotalPages(result.totalPages)
+    setSuppliersLoading(true)
+    try {
+      const result = await get<{ suppliers: Supplier[]; total: number; page: number; totalPages: number }>('/api/suppliers', { search: s || undefined, sortBy: sortBy || undefined, page: p, limit: 50 })
+      if (result) {
+        setSuppliers(result.suppliers)
+        setSupplierTotal(result.total)
+        setPage(result.page)
+        setTotalPages(result.totalPages)
+      }
+    } finally {
+      setSuppliersLoading(false)
     }
   }, [get])
 
@@ -430,7 +436,16 @@ export function PurchasesScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="stagger-children">
-                    {suppliers.length === 0 ? (
+                    {suppliersLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <div className="flex items-center justify-center gap-3">
+                            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                            <span className="text-sm text-muted-foreground">جاري تحميل الموردين...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : suppliers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-12">
                           <EmptyState
@@ -521,6 +536,7 @@ export function PurchasesScreen() {
                                   className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600"
                                   onClick={() => openPaymentDialogForSupplier(supplier)}
                                   title="تسجيل دفعة"
+                                  aria-label="تسجيل دفعة"
                                 >
                                   <Wallet className="w-4 h-4" />
                                 </Button>
@@ -531,6 +547,7 @@ export function PurchasesScreen() {
                                 className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
                                 onClick={() => openPaymentHistory(supplier)}
                                 title="سجل الدفعات"
+                                aria-label="سجل الدفعات"
                               >
                                 <History className="w-4 h-4" />
                               </Button>
@@ -540,6 +557,7 @@ export function PurchasesScreen() {
                                 className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary"
                                 onClick={() => openEditSupplierDialog(supplier)}
                                 title="تعديل"
+                                aria-label="تعديل"
                               >
                                 <Pencil className="w-4 h-4" />
                               </Button>
@@ -549,6 +567,7 @@ export function PurchasesScreen() {
                                 className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => handleDeleteSupplier(supplier)}
                                 title="حذف"
+                                aria-label="حذف"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -583,6 +602,7 @@ export function PurchasesScreen() {
                   className="h-8 w-8"
                   disabled={page <= 1}
                   onClick={() => goToSupplierPage(page - 1)}
+                  aria-label="الصفحة السابقة"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -620,6 +640,7 @@ export function PurchasesScreen() {
                   className="h-8 w-8"
                   disabled={page >= totalPages}
                   onClick={() => goToSupplierPage(page + 1)}
+                  aria-label="الصفحة التالية"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -840,6 +861,7 @@ export function PurchasesScreen() {
                                 size="icon"
                                 className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive flex-shrink-0 mt-4"
                                 onClick={() => handleRemoveItem(item.productId)}
+                                aria-label="إزالة"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>

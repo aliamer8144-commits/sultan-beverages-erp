@@ -3,24 +3,30 @@ import { Prisma } from "@prisma/client";
 import { withAuth, getRequestUser } from "@/lib/auth-middleware";
 import { successResponse } from "@/lib/api-response";
 import { tryCatch } from "@/lib/api-error-handler";
+import { parsePaginationQuery } from "@/types/api";
 
 export const GET = withAuth(tryCatch(async (request) => {
   const { searchParams } = new URL(request.url);
 
   // ── Query Parameters ──────────────────────────────────────────────
+  const { page, limit } = parsePaginationQuery(searchParams);
   const q = searchParams.get("q") || "";
   const categoryId = searchParams.get("categoryId") || "";
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
   const inStock = searchParams.get("inStock");
-  const sortBy = searchParams.get("sortBy") || "newest";
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+
+  // Validate sortBy against product-specific whitelist
+  const VALID_PRODUCT_SORTS = ['newest', 'price_asc', 'price_desc', 'name_asc', 'name_desc', 'quantity_asc', 'quantity_desc'] as const
+  type ProductSortKey = typeof VALID_PRODUCT_SORTS[number]
+  const rawSortBy = searchParams.get("sortBy") || "newest"
+  const sortBy: ProductSortKey = VALID_PRODUCT_SORTS.includes(rawSortBy as ProductSortKey) ? (rawSortBy as ProductSortKey) : "newest"
   const skip = (page - 1) * limit;
 
   // ── Build Where Clause ────────────────────────────────────────────
   const where: Prisma.ProductWhereInput = {
     isActive: true,
+    deletedAt: null,
   };
 
   // Full-text search (case-insensitive partial match on name)
