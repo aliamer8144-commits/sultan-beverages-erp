@@ -31,7 +31,7 @@ export const GET = withAuth(tryCatch(async (request) => {
 
   if (search && search.trim()) {
     where.product = {
-      name: { contains: search.trim(), mode: 'insensitive' },
+      name: { contains: search.trim() },
     } as Prisma.ProductWhereInput
   }
 

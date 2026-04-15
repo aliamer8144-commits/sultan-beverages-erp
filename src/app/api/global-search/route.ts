@@ -29,8 +29,8 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { barcode: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { barcode: { contains: q } },
           ],
         },
         select: {
@@ -49,8 +49,8 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { barcode: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { barcode: { contains: q } },
           ],
         },
       }),
@@ -77,8 +77,8 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { phone: { contains: q } },
           ],
         },
         select: {
@@ -97,8 +97,8 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { phone: { contains: q } },
           ],
         },
       }),
@@ -120,9 +120,9 @@ export const GET = withAuth(tryCatch(async (request) => {
   const searchInvoices = async () => {
     const invoiceWhere: Prisma.InvoiceWhereInput = {
       OR: [
-        { invoiceNo: { contains: q, mode: "insensitive" } },
-        { customer: { name: { contains: q, mode: "insensitive" } } },
-        { supplier: { name: { contains: q, mode: "insensitive" } } },
+        { invoiceNo: { contains: q } },
+        { customer: { name: { contains: q } } },
+        { supplier: { name: { contains: q } } },
       ],
     };
 
@@ -171,9 +171,9 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
-            { phone2: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { phone: { contains: q } },
+            { phone2: { contains: q } },
           ],
         },
         select: {
@@ -191,9 +191,9 @@ export const GET = withAuth(tryCatch(async (request) => {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
-            { phone2: { contains: q, mode: "insensitive" } },
+            { name: { contains: q } },
+            { phone: { contains: q } },
+            { phone2: { contains: q } },
           ],
         },
       }),

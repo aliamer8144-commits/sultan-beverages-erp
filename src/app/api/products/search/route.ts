@@ -33,7 +33,6 @@ export const GET = withAuth(tryCatch(async (request) => {
   if (q) {
     where.name = {
       contains: q,
-      mode: "insensitive",
     };
   }
 
